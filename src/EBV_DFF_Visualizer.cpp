@@ -88,7 +88,7 @@ void Visualizer::run()
 
     while(key != 'q')
     {
-        // TODO: Explain Mutex and high-level of for loop
+        // Grant unique access of thread resources
         m_evtMutex.lock();
         for(int i=0; i<m_rows*m_cols; i++)
         {
