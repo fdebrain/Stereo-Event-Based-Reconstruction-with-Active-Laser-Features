@@ -196,8 +196,6 @@ void DAVIS240C::readThread()
                 //f.m_frame = theFrame.pixels;
                 //theFrame.getPixel()
 
-
-                // Alternative
                 for (int row = 0; row < theFrame.getLengthY(); row++) {
                     for (int col = 0; col < theFrame.getLengthX(); col++) {
                         f.m_frame[row*m_cols + col] = (unsigned char)(255.*theFrame.getPixel(col, row)/65535.);
