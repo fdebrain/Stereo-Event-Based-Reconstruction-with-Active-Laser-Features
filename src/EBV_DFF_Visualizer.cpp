@@ -61,7 +61,7 @@ void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e)
     m_evtMutex.unlock();
 }
 
-// Store event info in a vectorized datastructure (function called each time the DAVIS receives an event)
+// Store events info in a vectorized datastructure (function called each time the DAVIS receives an event)
 void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f)
 {
     m_evtMutex.lock();
