@@ -18,12 +18,17 @@ static void usbShutdownHandler(void *ptr) {
     globalShutdown.store(true);
 }
 
+//
+int DAVIS240C::m_nbCams=0;
 
 DAVIS240C::DAVIS240C()
     // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
-    : m_davisHandle(libcaer::devices::davis(1)),
+    : m_id(m_nbCams),
+      m_davisHandle(libcaer::devices::davis(m_id)),
       m_stopreadThread(false)
 {
+    m_nbCams += 1;
+
     struct sigaction shutdownAction;
 
     shutdownAction.sa_handler = &globalShutdownSignalHandler;
@@ -47,6 +52,7 @@ DAVIS240C::DAVIS240C()
 
 DAVIS240C::~DAVIS240C()
 {
+    m_nbCams -= 1;
     // Close automatically done by destructor.
 }
 
@@ -118,16 +124,19 @@ void DAVIS240C::readThread()
             continue; // Skip if nothing there.
         }
 
-        printf("\nGot event container with %d packets (allocated).\n", packetContainer->size());
+        // DEBUG ===
+        //printf("\nGot event container with %d packets (allocated).\n", packetContainer->size());
 
         for (auto &packet : *packetContainer) {
             if (packet == nullptr) {
-                printf("Packet is empty (not present).\n");
+                // DEBUG ===
+                //printf("Packet is empty (not present).\n");
                 continue; // Skip if nothing there.
             }
 
-            printf("Packet of type %d -> %d events, %d capacity.\n", packet->getEventType(), packet->getEventNumber(),
-                packet->getEventCapacity());
+            // DEBUG ===
+           //printf("Packet of type %d -> %d events, %d capacity.\n", packet->getEventType(), packet->getEventNumber(),
+           //     packet->getEventCapacity());
 
             if (packet->getEventType() == POLARITY_EVENT) {
                 std::shared_ptr<const libcaer::events::PolarityEventPacket> polarity
@@ -252,7 +261,7 @@ void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
     for(it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
     {
         for(int i=0;i<events.size();i++)
-            (*it)->receivedNewDAVIS240CEvent(events[i]);
+            (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
     }
 }
 
@@ -273,6 +282,6 @@ void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
     std::list<DAVIS240CListener*>::iterator it;
     for(it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
     {
-        (*it)->receivedNewDAVIS240CFrame(frame);
+        (*it)->receivedNewDAVIS240CFrame(frame,m_id);
     }
 }

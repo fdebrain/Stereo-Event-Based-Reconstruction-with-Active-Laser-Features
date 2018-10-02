@@ -48,16 +48,6 @@ public:
         m_frame.resize(240*180);
     }
 
-    /*
-    DAVIS240CFrame(const cv::Mat frame,
-                   const int timestamp)
-        : m_frame(frame),
-          m_timestamp(timestamp)
-    {
-        m_frame.resize(240*180);
-    }
-    */
-
     DAVIS240CFrame(const std::vector<unsigned char> frame,
                    const int timestamp)
         : m_frame(frame),
@@ -75,8 +65,8 @@ class DAVIS240CListener
 {
     public:
         DAVIS240CListener(void) {}
-        virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event) = 0;
-        virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame) = 0;
+        virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,int id) = 0;
+        virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,int id) = 0;
 };
 
 class DAVIS240C
@@ -84,6 +74,8 @@ class DAVIS240C
 public:
     DAVIS240C();
     ~DAVIS240C();
+
+    static int m_nbCams;
 
     // Life cycle of a DAVIS240C
     int init();
@@ -106,6 +98,9 @@ public:
     // Register a listener to receive the new frames
     void registerFrameListener(DAVIS240CListener* listener);
     void deregisterFrameListener(DAVIS240CListener* listener);
+
+    // Id of the camera
+    const int m_id;
 
 private:
     //Device handle
