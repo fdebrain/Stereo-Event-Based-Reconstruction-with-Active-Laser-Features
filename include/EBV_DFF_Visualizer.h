@@ -3,6 +3,7 @@
 
 #include <EBV_DVS128USB.h>
 #include <EBV_DAVIS240C.h>
+#include <EBV_MagneticMirrorLaser.h>
 #include <string>
 #include <mutex>
 
@@ -57,6 +58,10 @@ public:
     std::string         m_polWin1;
     std::string         m_ageWin1;
     std::string         m_frameWin1;
+
+    // Laser
+    MagneticMirrorLaser m_laser;
+
 };
 
 #endif // EBV_VISUALIZER_H

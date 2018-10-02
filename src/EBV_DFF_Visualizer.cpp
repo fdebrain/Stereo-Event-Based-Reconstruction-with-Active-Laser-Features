@@ -41,11 +41,13 @@ Visualizer::Visualizer(int rows, int cols, int nbCams)
 
     m_thresh = 40e3; // 40ms
     cv::createTrackbar("Threshold",m_ageWin0,&m_thresh,m_max_trackbar_val,0);
+
+    m_laser.init("/dev/ttyUSB0");
 }
 
 Visualizer::~Visualizer()
 {
-    //cv::destroyAllWindows();
+    m_laser.close();
 }
 
 void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
@@ -90,7 +92,7 @@ void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,int id)
 
 // Store events info in a vectorized datastructure (function called each time the DAVIS receives an event)
 void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,int id)
-{ 
+{
     // Store frame (Master id is 0 - Slave id is 1)
     switch(id)
     {
@@ -123,8 +125,21 @@ void Visualizer::run()
     cv::Mat ageMatHSV1(m_rows,m_cols,CV_8UC3);
     cv::Mat ageMatRGB1(m_rows,m_cols,CV_8UC3);
 
+    // Laser test
+    float t = 0;
+    int cx = 2048, cy=2048, r=1592;
+    int x, y;
+    m_laser.blink(0);
+
     while(key != 'q')
     {
+        // Draw a circle with laser
+        t += 1./100; // 10*20ms => 1 cycle in 200ms
+        x = cx + r*cos(2*3.14*t);
+        y = cy + r*sin(2*3.14*t);
+        m_laser.pos(x,y);
+        //m_laser.vel(8e4,8e4);
+
         // Grant unique access of thread resources
         m_evtMutex.lock();
         for(int i=0; i<m_rows*m_cols; i++)
