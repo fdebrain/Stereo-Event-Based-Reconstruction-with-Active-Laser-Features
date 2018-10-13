@@ -1,21 +1,21 @@
 ﻿#include <EBV_DFF_Visualizer.h>
 
-// OpenCV
+#include <string.h>
+
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
-#include <string.h>
 
 Visualizer::Visualizer(int rows, int cols, int nbCams)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams)
 {
-    // Create a data structure to hold the events (flatten matrix)
+    // Initialize data structure to hold the events (flatten matrices)
     m_polEvts0.resize(m_rows*m_cols);
     m_ageEvts0.resize(m_rows*m_cols);
 
     m_polEvts1.resize(m_rows*m_cols);
     m_ageEvts1.resize(m_rows*m_cols);
 
-    // Create a data structure to hold the frame
+    // Initialize data structure to hold the frame
     m_grayFrame0.resize(m_rows*m_cols);
     m_grayFrame0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
 
@@ -39,9 +39,14 @@ Visualizer::Visualizer(int rows, int cols, int nbCams)
     cv::namedWindow(m_ageWin1,0);
     cv::namedWindow(m_frameWin1,0);
 
+    //====
+    cv::namedWindow(m_filtWin0,0);
+    //====
+
     m_thresh = 40e3; // 40ms
     cv::createTrackbar("Threshold",m_ageWin0,&m_thresh,m_max_trackbar_val,0);
 
+    // Initialize laser
     m_laser.init("/dev/ttyUSB0");
 }
 
@@ -61,6 +66,20 @@ void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
     m_evtMutex.unlock();
 }
 
+//====
+void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e, int id)
+{
+    int x = e.m_x;
+    int y = e.m_y;
+    int p = e.m_pol; // p={0,1}
+
+    m_evtMutex.lock();
+        m_filtEvts0[x*m_cols+y] += 2*p-1; // p={-1,1}
+    m_evtMutex.unlock();
+}
+//====
+
+// Store events info in a vectorized datastructure (function called each time the DAVIS receives an event)
 void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,int id)
 {
     int x = e.m_x;
@@ -90,7 +109,6 @@ void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,int id)
     }
 }
 
-// Store events info in a vectorized datastructure (function called each time the DAVIS receives an event)
 void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,int id)
 {
     // Store frame (Master id is 0 - Slave id is 1)
@@ -125,7 +143,11 @@ void Visualizer::run()
     cv::Mat ageMatHSV1(m_rows,m_cols,CV_8UC3);
     cv::Mat ageMatRGB1(m_rows,m_cols,CV_8UC3);
 
-    // Laser test
+    //====
+    cv::Mat filtMat0(m_rows,m_cols,CV_8UC3);
+    //====
+
+    // Initialize laser position
     float t = 0;
     int cx = 2048, cy=2048, r=1592;
     int x, y;
@@ -133,7 +155,7 @@ void Visualizer::run()
 
     while(key != 'q')
     {
-        // Draw a circle with laser
+        // Laser control: draw a circle
         t += 1./100; // 10*20ms => 1 cycle in 200ms
         x = cx + r*cos(2*3.14*t);
         y = cy + r*sin(2*3.14*t);
@@ -175,6 +197,14 @@ void Visualizer::run()
             ageMatHSV1.data[3*i + 0] = (unsigned char)(0.75*180.*dt/float(m_thresh)); //H
             ageMatHSV1.data[3*i + 1] = (unsigned char)255; //S
             ageMatHSV1.data[3*i + 2] = (unsigned char)(dt==m_thresh?0:255); //V
+
+            //
+            //====
+            int filtPol = m_filtEvts0[i];
+            filtMat0.data[3*i + 0] = (unsigned char)0;
+            filtMat0.data[3*i + 1] = (unsigned char)(filtPol>0?255:0); ;
+            filtMat0.data[3*i + 2] = (unsigned char)(filtPol<0?255:0); ;
+            //====
         }
         m_evtMutex.unlock();
 
@@ -190,11 +220,19 @@ void Visualizer::run()
         cv::imshow(m_ageWin1,ageMatRGB1);
         cv::imshow(m_frameWin1,m_grayFrame1);
 
+        // Display filtered events
+        //====
+        cv::imshow(m_filtWin0,filtMat0);
+        //====
+
         // Reset the display matrices
         ageMatHSV0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
         polMat0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
         ageMatHSV1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
         polMat1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
+        //====
+        filtMat0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
+        //====
 
         // Wait for 20ms
         key = cv::waitKey(20);
