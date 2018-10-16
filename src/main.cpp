@@ -16,8 +16,8 @@ int main(int argc, char** argv)
     davis_master.start();
     davis_master.registerEventListener(&visu);
     davis_master.registerFrameListener(&visu);
-    //davis_master.registerEventListener(&filter);
     //====
+    davis_master.registerEventListener(&filter);
     filter.registerFilterListener(&visu);
     //====
     davis_master.listen();

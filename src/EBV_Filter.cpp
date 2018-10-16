@@ -10,14 +10,14 @@ Filter::Filter(int rows, int cols)
     m_events.resize(m_rows*m_cols);
 
     // Parameters for flushing old events
-    m_maxTimeToKeep = 1e5; //us (=>100ms)
+    m_maxTimeToKeep = 2e4; //us (=>20ms)
 
     // Parameters for events filtering
-    m_targetPeriod = 1680; //us
-    m_eps = 0.01*m_targetPeriod; //us
+    m_targetPeriod =  5600; //1680; //us
+    m_eps = 0.03*m_targetPeriod; //us
     m_neighborSize = 3;
-    m_threshSupports = 50;
-    m_threshAntiSupports = 50;
+    m_threshSupports = 10;
+    m_threshAntiSupports = 3;
 }
 
 Filter::~Filter()
@@ -59,17 +59,10 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
                 {
                     // Check if support event of type A: neighbor events with p=0 and t in [m_currTime-eps;m_currTime+eps]
                     if (   (it->m_pol<=0)
-                        && (it->m_timestamp > (m_currTime - m_eps))
-                        && (it->m_timestamp < (m_currTime + m_eps))
+                        && ((m_currTime - it->m_timestamp) < m_eps)
                        )
                     {
                         nbSupportsA++;
-                        /* DEBUG ==
-                        if (nbSupports>m_threshSupports)
-                        {
-                            printf(" Found laser at (%d,%d) with %d supports.\n\r",col,row,nbSupports);
-                        }
-                        */ // == END DEBUG
                     }
                     // Otherwise: useless to check following event in the list (ordered in timestamps)
                     //else {break;}
@@ -81,6 +74,9 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
         int nbSupportsB = 0;
         if (nbSupportsA>m_threshSupports)
         {
+            // DEBUG === Tuning of m_threshSupportsA
+            //printf(" Found supportA at (%d,%d) with %d supports \n\r",e.m_x,e.m_y,nbSupportsA);
+
             for (int row=xMin; row<xMax; row++)
             {
                 for (int col=yMin; col<yMax; col++)
@@ -92,13 +88,18 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
                     std::list<DAVIS240CEvent>::reverse_iterator it;
                     for(it = neighborList->rbegin(); it!=neighborList->rend(); it++)
                     {
+                        // DEBUG === Checking eps of last events
+                        //printf(" Temporal distance of from m_targetPeriod in us : %u \n\r",m_currTime-it->m_timestamp- m_targetPeriod);
+
                         // Check support events of type B: neighbor events with p=0 and t in [m_currTime+dt-eps;m_currTime+dt+eps]
                         if (   (it->m_pol<=0)
-                            && (it->m_timestamp > (m_currTime + m_targetPeriod - m_eps))
-                            && (it->m_timestamp < (m_currTime + m_targetPeriod + m_eps))
+                            && ((m_currTime - it->m_timestamp) > (m_targetPeriod - m_eps))
+                            && ((m_currTime - it->m_timestamp) < (m_targetPeriod + m_eps))
                            )
                         {
                             nbSupportsB++;
+                            // DEBUG === Tuning of m_targetPeriod and m_eps
+                            //printf(" Found supportB at (%d,%d) with %dus eps \n\r",col,row,(m_currTime - it->m_timestamp - m_targetPeriod));
                         }
                     }
                 }
@@ -109,6 +110,9 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
         int nbAntiSupports = 0;
         if (nbSupportsB>m_threshSupports)
         {
+            // DEBUG === Tuning of m_threshSupportsB
+            //printf(" Found supportB at (%d,%d) with %d supports \n\r",e.m_x,e.m_y,nbSupportsB);
+
             for (int row=xMin; row<xMax; row++)
             {
                 for (int col=yMin; col<yMax; col++)
@@ -124,19 +128,25 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
                         // and t in [m_currTime+eps;m_currTime+dt/2-eps] or [m_currTime+dt/2+eps;m_currTime+dt-eps]
                         if (it->m_pol<=0)
                         {
-                            if (   (it->m_timestamp > (m_currTime + m_eps))
-                                && (it->m_timestamp < (m_currTime + m_targetPeriod/2 - m_eps))
+                            if (   (m_currTime - it->m_timestamp > m_eps)
+                                && (m_currTime - it->m_timestamp < m_targetPeriod/2 - m_eps)
                                )
                             {
                                 nbAntiSupports++;
                             }
 
-                            if (   (it->m_timestamp > (m_currTime + m_targetPeriod/2 + m_eps))
-                                && (it->m_timestamp < (m_currTime + m_targetPeriod - m_eps))
+                            if (   (m_currTime - it->m_timestamp > m_targetPeriod/2 + m_eps)
+                                && (m_currTime - it->m_timestamp < m_targetPeriod - m_eps)
                                )
                            {
                                 nbAntiSupports++;
                            }
+                        }
+
+                        // DEBUG === Tuning of m_threshAntiSupports
+                        if (nbAntiSupports>0)
+                        {
+                            //printf(" Found antiSupport at (%d,%d) with %d anti-supports \n\r",col,row,nbAntiSupports);
                         }
                     }
                 }
@@ -144,33 +154,12 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
         } // end if condition 3
 
         // If incoming event fulfil all 4 conditions it's likely to be stemming from the laser
-        if (nbAntiSupports<m_threshAntiSupports)
+        if (nbSupportsB>m_threshSupports && nbAntiSupports<m_threshAntiSupports)
         {
-            printf(" Found laser at (%d,%d) with %d anti-supports.\n\r",x,y,nbAntiSupports);
+            //printf(" Found laser at (%d,%d) with %d anti-supports.\n\r",x,y,nbAntiSupports);
             this->warnFilteredEvent(e,id);
         }
     } // end if condition 0
-
-
-    // Get mean period between events at (x,y)
-    /*
-    if (x==m_laserPosX && y==m_laserPosY && p<=0)
-    {
-        // Iterate through events in pixel (recent first)
-        std::list<DAVIS240CEvent>::reverse_iterator it;
-        for(it = eventsList->rbegin(); it!=eventsList->rend(); it++)
-        {
-            // Find first event with pol=0
-            if(it->m_pol <= 0)
-            {
-                dtMean = eta*dtMean + (1-eta)*(t-it->m_timestamp);
-                printf("Last: %u | Current: %u | dtMean: %f.\n\r",
-                       it->m_timestamp,t,dtMean);
-                break;
-            }
-        }
-    }
-    */
 
     // Queue new event
     eventsList->push_back(e);

@@ -62,14 +62,13 @@ public:
     std::string         m_polWin0;
     std::string         m_ageWin0;
     std::string         m_frameWin0;
+    //====
+    std::string         m_filtWin0;
+    //====
 
     std::string         m_polWin1;
     std::string         m_ageWin1;
     std::string         m_frameWin1;
-
-    //====
-    std::string         m_filtWin0;
-    //====
 
     // Laser
     MagneticMirrorLaser m_laser;

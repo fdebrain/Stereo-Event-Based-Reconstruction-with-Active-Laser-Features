@@ -11,6 +11,9 @@ Visualizer::Visualizer(int rows, int cols, int nbCams)
     // Initialize data structure to hold the events (flatten matrices)
     m_polEvts0.resize(m_rows*m_cols);
     m_ageEvts0.resize(m_rows*m_cols);
+    //====
+    m_filtEvts0.resize(m_rows*m_cols);
+    //====
 
     m_polEvts1.resize(m_rows*m_cols);
     m_ageEvts1.resize(m_rows*m_cols);
@@ -26,6 +29,9 @@ Visualizer::Visualizer(int rows, int cols, int nbCams)
     m_polWin0 = "Events by Polarity - Master"; //+ std::to_string(id);
     m_ageWin0 = "Events by Age - Master";
     m_frameWin0 = "Frame - Master";
+    //====
+    m_filtWin0 = "Filtered Events - Master";
+    //====
 
     m_polWin1 = "Events by Polarity - Slave"; //+ std::to_string(id);
     m_ageWin1 = "Events by Age - Slave";
@@ -34,14 +40,13 @@ Visualizer::Visualizer(int rows, int cols, int nbCams)
     cv::namedWindow(m_polWin0,0);
     cv::namedWindow(m_ageWin0,0);
     cv::namedWindow(m_frameWin0,0);
+    //====
+    cv::namedWindow(m_filtWin0,0);
+    //====
 
     cv::namedWindow(m_polWin1,0);
     cv::namedWindow(m_ageWin1,0);
     cv::namedWindow(m_frameWin1,0);
-
-    //====
-    cv::namedWindow(m_filtWin0,0);
-    //====
 
     m_thresh = 40e3; // 40ms
     cv::createTrackbar("Threshold",m_ageWin0,&m_thresh,m_max_trackbar_val,0);
@@ -74,7 +79,8 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e, int id)
     int p = e.m_pol; // p={0,1}
 
     m_evtMutex.lock();
-        m_filtEvts0[x*m_cols+y] += 2*p-1; // p={-1,1}
+        m_currenTime0 = e.m_timestamp;
+        m_filtEvts0[x*m_cols+y] = 2*p-1; // p={-1,1}
     m_evtMutex.unlock();
 }
 //====
@@ -148,18 +154,18 @@ void Visualizer::run()
     //====
 
     // Initialize laser position
-    float t = 0;
-    int cx = 2048, cy=2048, r=1592;
-    int x, y;
-    m_laser.blink(0);
+    //float t = 0;
+    //int cx = 2048, cy=2048, r=1592;
+    //int x, y;
+    //m_laser.blink(0);
 
     while(key != 'q')
     {
         // Laser control: draw a circle
-        t += 1./100; // 10*20ms => 1 cycle in 200ms
-        x = cx + r*cos(2*3.14*t);
-        y = cy + r*sin(2*3.14*t);
-        m_laser.pos(x,y);
+        //t += 1./100; // 10*20ms => 1 cycle in 200ms
+        //x = cx + r*cos(2*3.14*t);
+        //y = cy + r*sin(2*3.14*t);
+        //m_laser.pos(x,y);
         //m_laser.vel(8e4,8e4);
 
         // Grant unique access of thread resources
@@ -168,7 +174,8 @@ void Visualizer::run()
         {
             // Get the polarity of i-th event and fill display matrix (color by polarity) - Master
             int pol = m_polEvts0[i];
-            if((m_currenTime0-m_ageEvts0[i])<m_thresh)
+            int dt = m_currenTime0 - m_ageEvts0[i];
+            if(dt<m_thresh)
             {
                 polMat0.data[3*i + 0] = (unsigned char)0;              // Blue channel
                 polMat0.data[3*i + 1] = (unsigned char)(pol>0?255:0);    // Green channel
@@ -177,7 +184,8 @@ void Visualizer::run()
 
             // Get the polarity of i-th event and fill display matrix (color by polarity) - Slave
             pol = m_polEvts1[i];
-            if((m_currenTime1-m_ageEvts1[i])<m_thresh)
+            dt = m_currenTime1 - m_ageEvts1[i];
+            if(dt<m_thresh)
             {
                 polMat1.data[3*i + 0] = (unsigned char)0;              // Blue channel
                 polMat1.data[3*i + 1] = (unsigned char)(pol>0?255:0);    // Green channel
@@ -185,7 +193,7 @@ void Visualizer::run()
             }
 
             // Compute age of event and set a maximum age threshold and fill the display matrix (color by age) - Master
-            int dt = m_currenTime0 - m_ageEvts0[i];
+            dt = m_currenTime0 - m_ageEvts0[i];
             if(dt>m_thresh) { dt = m_thresh; }
             ageMatHSV0.data[3*i + 0] = (unsigned char)(0.75*180.*dt/float(m_thresh)); //H
             ageMatHSV0.data[3*i + 1] = (unsigned char)255; //S
@@ -198,12 +206,16 @@ void Visualizer::run()
             ageMatHSV1.data[3*i + 1] = (unsigned char)255; //S
             ageMatHSV1.data[3*i + 2] = (unsigned char)(dt==m_thresh?0:255); //V
 
-            //
+            // Get the polarity of i-th filtered event and fill display matric - Master
             //====
             int filtPol = m_filtEvts0[i];
-            filtMat0.data[3*i + 0] = (unsigned char)0;
-            filtMat0.data[3*i + 1] = (unsigned char)(filtPol>0?255:0); ;
-            filtMat0.data[3*i + 2] = (unsigned char)(filtPol<0?255:0); ;
+            dt = m_currenTime0 - m_ageEvts0[i];
+            if(dt<m_thresh)
+            {
+                filtMat0.data[3*i + 0] = (unsigned char)0;
+                filtMat0.data[3*i + 1] = (unsigned char)(filtPol>0?255:0);
+                filtMat0.data[3*i + 2] = (unsigned char)(filtPol<0?255:0);
+            }
             //====
         }
         m_evtMutex.unlock();
@@ -214,7 +226,7 @@ void Visualizer::run()
         cv::imshow(m_ageWin0,ageMatRGB0);
         cv::imshow(m_frameWin0,m_grayFrame0);
 
-        // Display the "polarity" and "age" event matrices - Master
+        // Display the "polarity" and "age" event matrices - Slave
         cv::imshow(m_polWin1,polMat1);
         cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
         cv::imshow(m_ageWin1,ageMatRGB1);
