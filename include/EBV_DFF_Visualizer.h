@@ -27,9 +27,7 @@ public:
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
-    // ====
     void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
-    // ====
     void run();
 
 public:
@@ -60,15 +58,12 @@ public:
 
     // Display window related variables
     std::string         m_polWin0;
-    std::string         m_ageWin0;
-    std::string         m_frameWin0;
-    //====
-    std::string         m_filtWin0;
-    //====
-
     std::string         m_polWin1;
+    std::string         m_ageWin0;
     std::string         m_ageWin1;
+    std::string         m_frameWin0;
     std::string         m_frameWin1;
+    std::string         m_filtWin0;
 
     // Laser
     MagneticMirrorLaser m_laser;

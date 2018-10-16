@@ -7,15 +7,12 @@
 #include <mutex>
 #include <list>
 
-//=====
 class FilterListener
 {
     public:
         FilterListener(void) {}
         virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,int id) = 0;
 };
-//=====
-
 
 class Filter : public DAVIS240CListener
 {
@@ -25,11 +22,9 @@ public:
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id) {}
-    //====
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
     void warnFilteredEvent(DAVIS240CEvent& event, int id);
-    //====
 
 private:
     // Datastructure matrix of list of events
@@ -45,7 +40,8 @@ private:
     int m_targetPeriod;
     int m_eps;
     int m_neighborSize;
-    int m_threshSupports;
+    int m_threshSupportsA;
+    int m_threshSupportsB;
     int m_threshAntiSupports;
 
     // List of filter listeners
