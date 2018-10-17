@@ -10,6 +10,8 @@ int main(int argc, char** argv)
     //DAVIS240C    davis_slave;
     Visualizer   visu(180,240,davis_master.m_nbCams);
     Filter       filter(180,240);
+    visu.setFilter(&filter);
+
 
     // Open Master
     davis_master.init();

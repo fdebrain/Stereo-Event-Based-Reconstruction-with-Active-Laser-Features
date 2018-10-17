@@ -1,5 +1,12 @@
 #include <EBV_Filter.h>
 
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
+
+
+int percentEps = 5;
+int etaInt = 500;
+
 Filter::Filter(int rows, int cols)
     : m_rows(rows),
       m_cols(cols)
@@ -10,12 +17,30 @@ Filter::Filter(int rows, int cols)
     m_maxTimeToKeep = 1e4; //us (=>10ms)
 
     // Parameters for events filtering
-    m_targetPeriod = 1e6/204; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+    m_frequency = 320;
+    m_targetPeriod = 1e6/m_frequency; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
     m_eps = 0.05*m_targetPeriod; //us
     m_neighborSize = 3;
     m_threshSupportsA = 5; //5
     m_threshSupportsB = 10; //10
     m_threshAntiSupports = 5; //5
+
+    // Tuning window
+    //===
+    m_paramsWin = "Filtered Events - Master";
+    cv::namedWindow(m_paramsWin,0);
+    cv::createTrackbar("Frequency",m_paramsWin,&m_frequency,700,0);
+    cv::createTrackbar("Epsilon",m_paramsWin,&percentEps,20,0);
+    cv::createTrackbar("Neighbor Size",m_paramsWin,&m_neighborSize,100,0);
+    cv::createTrackbar("SupportsA",m_paramsWin,&m_threshSupportsA,100,0);
+    cv::createTrackbar("SupportsB",m_paramsWin,&m_threshSupportsB,100,0);
+    cv::createTrackbar("Anti-supports",m_paramsWin,&m_threshAntiSupports,100,0);
+    cv::createTrackbar("Eta",m_paramsWin,&etaInt,1000,0);
+    //===
+
+    m_xc = 0;
+    m_yc = 0;
+    m_eta = 0.1;
 }
 
 Filter::~Filter()
@@ -29,6 +54,11 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
     int p = e.m_pol;
 
     m_currTime = t;
+    //===
+    m_targetPeriod = 1e6/m_frequency;
+    m_eps = percentEps*m_targetPeriod/100.;
+    m_eta = etaInt/1000.;
+    //===
 
     // Renaming for conveniency
     std::list<DAVIS240CEvent>* eventsList = &(m_events[x*m_cols+y]);
@@ -94,6 +124,8 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
             && nbAntiSupports<m_threshAntiSupports
            )
         {
+            m_xc = m_eta*m_xc + (1.-m_eta)*x;
+            m_yc = m_eta*m_yc + (1.-m_eta)*y;
             this->warnFilteredEvent(e,id);
         }
 

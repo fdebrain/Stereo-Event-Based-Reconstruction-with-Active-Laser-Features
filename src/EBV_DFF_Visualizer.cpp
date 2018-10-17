@@ -5,6 +5,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+#include <EBV_Filter.h>
+
 //#include <fstream>
 //std::ofstream file;
 
@@ -38,9 +40,9 @@ Visualizer::Visualizer(int rows, int cols, int nbCams)
     cv::namedWindow(m_polWin0,0);
     cv::namedWindow(m_polWin1,0);
     cv::namedWindow(m_ageWin0,0);
-    cv::namedWindow(m_ageWin1,0);
+    //cv::namedWindow(m_ageWin1,0);
     cv::namedWindow(m_frameWin0,0);
-    cv::namedWindow(m_frameWin1,0);
+    //cv::namedWindow(m_frameWin1,0);
     cv::namedWindow(m_filtWin0,0);
 
     m_thresh = 40e3; // 40ms
@@ -145,19 +147,20 @@ void Visualizer::run()
     cv::Mat filtMat0(m_rows,m_cols,CV_8UC3);
 
     // Initialize laser position
-    //float t = 0;
-    //int cx = 2048, cy=2048, r=1592;
-    //int x, y;
-    //m_laser.blink(0);
-    //m_laser.blink(1e6/204);
+
+    float t = 0;
+    int cx = 2048, cy=2048, r=500; //r=1592;
+    int x, y;
+    m_laser.blink(1e6/(2*300)); // T/2
+
 
     while(key != 'q')
     {
         // Laser control: draw a circle
-        //t += 1./10; // 10*20ms => 1 cycle in 200ms
-        //x = cx + r*cos(2*3.14*t);
-        //y = cy + r*sin(2*3.14*t);
-        //m_laser.pos(x,y);
+        t += 1./4; // 10*20ms => 1 cycle in 200ms
+        x = cx + r*cos(2*3.14*t);
+        y = cy + r*sin(2*3.14*t);
+        m_laser.pos(x,y);
         //m_laser.vel(8e4,8e4);
 
         m_evtMutex.lock();
@@ -217,20 +220,27 @@ void Visualizer::run()
 
         // Display events by polarity
         cv::imshow(m_polWin0,polMat0);
-        cv::imshow(m_polWin1,polMat1);
+        //cv::imshow(m_polWin1,polMat1);
 
         // Display events by age
         cv::cvtColor(ageMatHSV0,ageMatRGB0,CV_HSV2BGR);
         cv::imshow(m_ageWin0,ageMatRGB0);
-        cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
-        cv::imshow(m_ageWin1,ageMatRGB1);
+        //cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
+        //cv::imshow(m_ageWin1,ageMatRGB1);
 
         // Display filtered events
+        if(m_filter != NULL)
+        {
+            int x = m_filter->getX();
+            int y = m_filter->getY();
+            cv::circle(filtMat0,cv::Point2i(y,x),
+                       3,cv::Scalar(0,255,0));
+        }
         cv::imshow(m_filtWin0,filtMat0);
 
         // Display frame
         cv::imshow(m_frameWin0,m_grayFrame0);
-        cv::imshow(m_frameWin1,m_grayFrame1);
+        //cv::imshow(m_frameWin1,m_grayFrame1);
 
         // Reset the display matrices
         ageMatHSV0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);

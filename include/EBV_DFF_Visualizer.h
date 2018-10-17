@@ -15,6 +15,8 @@ namespace cv {
     class Mat;
 }
 
+class Filter;
+
 class Visualizer : public DVS128USBListener,
                    public DAVIS240CListener,
                    public FilterListener
@@ -29,6 +31,8 @@ public:
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
     void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
     void run();
+
+    void setFilter(Filter* filter) {m_filter = filter;}
 
 public:
     // Parameters for camera settings
@@ -67,6 +71,7 @@ public:
 
     // Laser
     MagneticMirrorLaser m_laser;
+    Filter*             m_filter;
 };
 
 #endif // EBV_VISUALIZER_H
