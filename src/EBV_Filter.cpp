@@ -4,8 +4,9 @@
 #include <opencv2/opencv.hpp>
 
 
-Filter::Filter(int rows, int cols)
-    : m_rows(rows),
+Filter::Filter(int rows, int cols, int id)
+    : m_id(id),
+      m_rows(rows),
       m_cols(cols)
 {
     m_events.resize(m_rows*m_cols);
@@ -22,8 +23,8 @@ Filter::Filter(int rows, int cols)
     m_threshAntiSupports = 5;
 
     // Tuning window
-    m_paramsWin = "Filtered Events - Master";
-    cv::namedWindow(m_paramsWin,0);
+    //m_paramsWin = "Filtered Events - Master";
+    //cv::namedWindow(m_paramsWin,0);
 
     // Center of mass tracker initialization
     m_xc = 0;
@@ -108,7 +109,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
             m_xc = m_eta*m_xc + (1.-m_eta)*x;
             m_yc = m_eta*m_yc + (1.-m_eta)*y;
 
-            this->warnFilteredEvent(e,id);
+            this->warnFilteredEvent(e);
         }
 
         // ==== DEBUG ====
@@ -160,11 +161,11 @@ void Filter::deregisterFilterListener(FilterListener* listener)
 }
 
 
-void Filter::warnFilteredEvent(DAVIS240CEvent& filterEvent, int id)
+void Filter::warnFilteredEvent(DAVIS240CEvent& filterEvent)
 {
     std::list<FilterListener*>::iterator it;
     for(it = m_filteredEventListeners.begin(); it!=m_filteredEventListeners.end(); it++)
     {
-        (*it)->receivedNewFilterEvent(filterEvent,id);
+        (*it)->receivedNewFilterEvent(filterEvent,m_id);
     }
 }

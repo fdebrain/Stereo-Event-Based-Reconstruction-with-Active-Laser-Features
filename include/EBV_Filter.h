@@ -18,14 +18,14 @@ public:
 class Filter : public DAVIS240CListener
 {
 public:
-    Filter(int rows, int cols);
+    Filter(int rows, int cols, int id);
     ~Filter();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id) {}
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
-    void warnFilteredEvent(DAVIS240CEvent& event, int id);
+    void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
     float getX() const {return m_xc;}
@@ -53,6 +53,9 @@ public:
     void setEta(float eta) {m_eta=eta;}
 
 private:
+    // Id of the filter
+    const int m_id;
+
     // Datastructure matrix of list of events
     std::vector<std::list<DAVIS240CEvent>> m_events;
     int m_rows;

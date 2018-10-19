@@ -24,7 +24,8 @@ class Visualizer : public DVS128USBListener,
 
 public:
     Visualizer(int rows, int cols, int nbCams,
-               Filter* filter = nullptr);
+               Filter* filter0 = nullptr,
+               Filter* filter1 = nullptr);
     ~Visualizer();
 
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
@@ -32,7 +33,7 @@ public:
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
     void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
     void run();
-    void setFilter(Filter* filter) {m_filter = filter;}
+    void setFilter(Filter* filter, int id);
 
 public:
     // Parameters for camera settings
@@ -49,9 +50,10 @@ public:
     // Structures for data storing (flattened matrices)
     std::vector<int>            m_polEvts0;
     std::vector<unsigned int>   m_ageEvts0;
+    std::vector<int>            m_filtEvts0;
     std::vector<int>            m_polEvts1;
     std::vector<unsigned int>   m_ageEvts1;
-    std::vector<int>            m_filtEvts0;
+    std::vector<int>            m_filtEvts1;
 
     // Thread-safety
     std::mutex                  m_evtMutex;
@@ -62,27 +64,37 @@ public:
 
     // Display window related variables
     std::string         m_polWin0;
-    std::string         m_polWin1;
     std::string         m_ageWin0;
-    std::string         m_ageWin1;
     std::string         m_frameWin0;
-    std::string         m_frameWin1;
     std::string         m_filtWin0;
+    std::string         m_polWin1;
+    std::string         m_ageWin1;
+    std::string         m_frameWin1;
+    std::string         m_filtWin1;
 
     // Trackbar parameters
-    int m_freq;
-    int m_eps;
-    int m_neighborSize;
-    int m_threshA;
-    int m_threshB;
-    int m_threshAnti;
-    int m_etaInt;
+    int m_freq0;
+    int m_eps0;
+    int m_neighborSize0;
+    int m_threshA0;
+    int m_threshB0;
+    int m_threshAnti0;
+    int m_etaInt0;
+    int m_freq1;
+    int m_eps1;
+    int m_neighborSize1;
+    int m_threshA1;
+    int m_threshB1;
+    int m_threshAnti1;
+    int m_etaInt1;
+
 
     // Laser object
     MagneticMirrorLaser m_laser;
 
     // Filter object
-    Filter*             m_filter;
+    Filter*             m_filter0;
+    Filter*             m_filter1;
 };
 
 #endif // EBV_VISUALIZER_H
