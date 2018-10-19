@@ -14,8 +14,8 @@ Filter::Filter(int rows, int cols)
     m_maxTimeToKeep = 1e4; //us (=>10ms)
 
     // Parameters for events filtering
-    m_frequency = 204; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
-    m_eps = 3; // In percent
+    m_frequency = 320; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+    m_eps = 3; // In percent of period T
     m_neighborSize = 3;
     m_threshSupportsA = 5;
     m_threshSupportsB = 10;
@@ -38,8 +38,8 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
 {
     int x = e.m_x;
     int y = e.m_y;
-    int t = e.m_timestamp;
     int p = e.m_pol;
+    int t = e.m_timestamp;
     m_currTime = t;
 
     int targetPeriod = 1e6/m_frequency;
@@ -73,32 +73,27 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
                     // Only consider events of negative polarity
                     if (it->m_pol>0){ continue; }
 
-                    int dt = (m_currTime - it->m_timestamp);
+                    int dt = (m_currTime - static_cast<int>(it->m_timestamp));
                     //printf("Delta: %d. \n\r",dt);
 
                     // Check if support event of type A: neighbor events with p=0 and t in [m_currTime-eps;m_currTime+eps]
                     if (dt < epsPeriod){ nbSupportsA++; }
 
                     // Check support events of type B: neighbor events with p=0 and t in [m_currTime+dt-eps;m_currTime+dt+eps]
-                    else if ( std::abs(dt-targetPeriod)<epsPeriod )
+                    else if (std::abs(dt-targetPeriod)<epsPeriod)
                     {
                         nbSupportsB++;
                     }
 
                     // Check anti-support event: neighbor events with p=0
                     else if (   (dt > epsPeriod)
-                             && (dt < targetPeriod/2 - epsPeriod))
-                    {
-                        nbAntiSupports++;
-                    }
-                    else if (   (dt > targetPeriod/2 + epsPeriod)
                              && (dt < targetPeriod - epsPeriod))
                     {
                         nbAntiSupports++;
                     }
 
                     // Avoid unnecessary computation
-                    if (nbAntiSupports>2*m_threshAntiSupports){ break; }
+                    if (nbAntiSupports>m_threshAntiSupports){ break; }
                 }
             }
         }

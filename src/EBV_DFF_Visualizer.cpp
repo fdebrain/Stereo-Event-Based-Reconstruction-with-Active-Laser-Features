@@ -205,7 +205,7 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e, int id)
 {
     int x = e.m_x;
     int y = e.m_y;
-    m_filtEvts0[x*m_cols+y] = e.m_timestamp; // p={-1,1}
+    m_filtEvts0[x*m_cols+y] = e.m_timestamp;
     //file << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
 }
 
@@ -233,7 +233,7 @@ void Visualizer::run()
     while(key != 'q')
     {
         // Laser control: draw a circle
-        t += 1./10; // 10*20ms => 1 cycle in 200ms
+        t += 1./10; // Need 10 increments for full cycle = 200ms (10*20ms waitKey)
         x = cx + r*cos(2*3.14*t);
         y = cy + r*sin(2*3.14*t);
         m_laser.pos(x,y);
