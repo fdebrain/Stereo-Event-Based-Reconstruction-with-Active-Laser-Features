@@ -23,7 +23,8 @@ class Visualizer : public DVS128USBListener,
 {
 
 public:
-    Visualizer(int rows, int cols, int nbCams);
+    Visualizer(int rows, int cols, int nbCams,
+               Filter* filter = nullptr);
     ~Visualizer();
 
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
@@ -31,7 +32,6 @@ public:
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
     void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
     void run();
-
     void setFilter(Filter* filter) {m_filter = filter;}
 
 public:
@@ -69,8 +69,19 @@ public:
     std::string         m_frameWin1;
     std::string         m_filtWin0;
 
-    // Laser
+    // Trackbar parameters
+    int m_freq;
+    int m_eps;
+    int m_neighborSize;
+    int m_threshA;
+    int m_threshB;
+    int m_threshAnti;
+    int m_etaInt;
+
+    // Laser object
     MagneticMirrorLaser m_laser;
+
+    // Filter object
     Filter*             m_filter;
 };
 

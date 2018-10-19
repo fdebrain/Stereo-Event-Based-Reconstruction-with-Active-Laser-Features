@@ -8,20 +8,17 @@ int main(int argc, char** argv)
     //DVS128USB    davis_master;
     DAVIS240C    davis_master;
     //DAVIS240C    davis_slave;
-    Visualizer   visu(180,240,davis_master.m_nbCams);
     Filter       filter(180,240);
-    visu.setFilter(&filter);
-
+    Visualizer   visu(180,240,davis_master.m_nbCams,
+                      &filter);
 
     // Open Master
     davis_master.init();
     davis_master.start();
     davis_master.registerEventListener(&visu);
     davis_master.registerFrameListener(&visu);
-    //====
     davis_master.registerEventListener(&filter);
     filter.registerFilterListener(&visu);
-    //====
     davis_master.listen();
 
     // Open Slave
@@ -40,7 +37,7 @@ int main(int argc, char** argv)
     // Close Slave
     davis_slave.stopListening();
     davis_slave.deregisterEventListener(&visu);
-    davis_master.deregisterFrameListener(&visu);
+    davis_slave.deregisterFrameListener(&visu);
     davis_slave.stop();
     davis_slave.close();
     */
@@ -49,6 +46,8 @@ int main(int argc, char** argv)
     davis_master.stopListening();
     davis_master.deregisterEventListener(&visu);
     davis_master.deregisterFrameListener(&visu);
+    davis_master.deregisterEventListener(&filter);
+    filter.deregisterFilterListener(&visu);
     davis_master.stop();
     davis_master.close();
 

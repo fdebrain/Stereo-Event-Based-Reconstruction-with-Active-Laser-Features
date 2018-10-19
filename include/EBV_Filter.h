@@ -10,9 +10,9 @@
 
 class FilterListener
 {
-    public:
-        FilterListener(void) {}
-        virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,int id) = 0;
+public:
+    FilterListener(void) {}
+    virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,int id) = 0;
 };
 
 class Filter : public DAVIS240CListener
@@ -27,8 +27,30 @@ public:
     void deregisterFilterListener(FilterListener* listener);
     void warnFilteredEvent(DAVIS240CEvent& event, int id);
 
-    float getX() {return m_xc;};
-    float getY() {return m_yc;};
+    // Setters and Getters
+    float getX() const {return m_xc;}
+    float getY() const {return m_yc;}
+
+    int getFreq() const {return m_frequency;}
+    void setFreq(int freq) {m_frequency=freq;}
+
+    int getEps() const {return m_eps;}
+    void setEps(int eps) {m_eps=eps;}
+
+    int getNeighborSize() const {return m_neighborSize;}
+    void setNeighborSize(int size) {m_neighborSize=size;}
+
+    int getThreshA() const {return m_threshSupportsA;}
+    void setThreshA(int nbSupports) {m_threshSupportsA=nbSupports;}
+
+    int getThreshB() const {return m_threshSupportsB;}
+    void setThreshB(int nbSupports) {m_threshSupportsB=nbSupports;}
+
+    int getThreshAnti() const {return m_threshAntiSupports;}
+    void setThreshAnti(int nbAntiSupports) {m_threshAntiSupports=nbAntiSupports;}
+
+    float getEta() const {return m_eta;}
+    void setEta(float eta) {m_eta=eta;}
 
 private:
     // Datastructure matrix of list of events
@@ -42,13 +64,13 @@ private:
 
     // Parameters for events filtering
     int m_frequency;
-    int m_targetPeriod;
     int m_eps;
     int m_neighborSize;
     int m_threshSupportsA;
     int m_threshSupportsB;
     int m_threshAntiSupports;
 
+    // Center of mass tracker
     float m_xc, m_yc;
     float m_eta;
 
