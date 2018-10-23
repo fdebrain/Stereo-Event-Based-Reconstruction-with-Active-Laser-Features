@@ -52,14 +52,16 @@ public:
     float getEta() const {return m_eta;}
     void setEta(float eta) {m_eta=eta;}
 
+    DAVIS240CEvent getCoGEvent();
+
 private:
     // Id of the filter
     const int m_id;
 
     // Datastructure matrix of list of events
-    std::vector<std::list<DAVIS240CEvent>> m_events;
     int m_rows;
     int m_cols;
+    std::vector<std::list<DAVIS240CEvent>> m_events;
 
     // Parameters for flushing old events
     int m_currTime;
@@ -79,10 +81,6 @@ private:
 
     // List of filter listeners
     std::list<FilterListener*> m_filteredEventListeners;
-
-    // Trackbar
-    std::string m_paramsWin;
-
 };
 
 #endif // EBV_FILTER_H

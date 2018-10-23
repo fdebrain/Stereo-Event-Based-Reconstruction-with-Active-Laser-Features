@@ -9,7 +9,7 @@
 #include <string>
 #include <mutex>
 
-class DepthEstimator;
+class Triangulator;
 
 namespace cv {
     class Mat;
@@ -25,7 +25,8 @@ class Visualizer : public DVS128USBListener,
 public:
     Visualizer(int rows, int cols, int nbCams,
                Filter* filter0 = nullptr,
-               Filter* filter1 = nullptr);
+               Filter* filter1 = nullptr,
+               Triangulator* triangulator = nullptr);
     ~Visualizer();
 
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
@@ -34,6 +35,9 @@ public:
     void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
     void run();
     void setFilter(Filter* filter, int id);
+    //====
+    void setTriangulator(Triangulator* triangulator){ m_triangulator=triangulator; }
+    //====
 
 public:
     // Parameters for camera settings
@@ -46,6 +50,10 @@ public:
     unsigned int        m_currenTime1;
     int                 m_thresh;
     int                 m_max_trackbar_val=1e6;
+    //====
+    int                 m_max_depth = 0;
+    int                 m_min_depth = 100;
+    //====
 
     // Structures for data storing (flattened matrices)
     std::vector<int>            m_polEvts0;
@@ -54,6 +62,9 @@ public:
     std::vector<int>            m_polEvts1;
     std::vector<unsigned int>   m_ageEvts1;
     std::vector<int>            m_filtEvts1;
+    //====
+    std::vector<int>            m_depthMap;
+    //====
 
     // Thread-safety
     std::mutex                  m_evtMutex;
@@ -71,6 +82,9 @@ public:
     std::string         m_ageWin1;
     std::string         m_frameWin1;
     std::string         m_filtWin1;
+    //====
+    std::string         m_depthWin;
+    //====
 
     // Trackbar parameters
     int m_freq0;
@@ -88,13 +102,17 @@ public:
     int m_threshAnti1;
     int m_etaInt1;
 
-
     // Laser object
     MagneticMirrorLaser m_laser;
 
     // Filter object
     Filter*             m_filter0;
     Filter*             m_filter1;
+
+    //====
+    // Triangulator (depth estimator)
+    Triangulator*       m_triangulator;
+    //====
 };
 
 #endif // EBV_VISUALIZER_H

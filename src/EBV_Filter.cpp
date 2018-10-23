@@ -22,18 +22,13 @@ Filter::Filter(int rows, int cols, int id)
     m_threshSupportsB = 10;
     m_threshAntiSupports = 5;
 
-    // Tuning window
-    //m_paramsWin = "Filtered Events - Master";
-    //cv::namedWindow(m_paramsWin,0);
-
     // Center of mass tracker initialization
     m_xc = 0;
     m_yc = 0;
     m_eta = 0.1;
 }
 
-Filter::~Filter()
-{}
+Filter::~Filter(){}
 
 void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
 {
@@ -168,4 +163,12 @@ void Filter::warnFilteredEvent(DAVIS240CEvent& filterEvent)
     {
         (*it)->receivedNewFilterEvent(filterEvent,m_id);
     }
+}
+
+DAVIS240CEvent Filter::getCoGEvent()
+{
+    unsigned int x = static_cast<unsigned int>(m_xc);
+    unsigned int y = static_cast<unsigned int>(m_yc);
+    std::list<DAVIS240CEvent>* eventsList = &(m_events[x*m_cols+y]);
+    return *(eventsList->begin());
 }

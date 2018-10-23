@@ -65,17 +65,21 @@ void Visualizer::setFilter(Filter* filter, int id)
     }
 }
 
-
 Visualizer::Visualizer(int rows, int cols, int nbCams,
-                       Filter* filter0, Filter* filter1)
+                       Filter* filter0, Filter* filter1,
+                       Triangulator* triangulator)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams)
 {
     // Initialize laser
-    m_laser.init("/dev/ttyUSB1");
+    m_laser.init("/dev/ttyUSB0");
 
     // Initialize filter
     this->setFilter(filter0,0);
     this->setFilter(filter1,1);
+
+    //====
+    this->setTriangulator(triangulator);
+    //====
 
     // Initialize data structure to hold the events (flatten matrices)
     m_polEvts0.resize(m_rows*m_cols);
@@ -84,6 +88,9 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     m_polEvts1.resize(m_rows*m_cols);
     m_ageEvts1.resize(m_rows*m_cols);
     m_filtEvts1.resize(m_rows*m_cols);
+    //====
+    m_depthMap.resize(m_rows*m_cols);
+    //====
 
     // Initialize data structure to hold the frame
     m_grayFrame0.resize(m_rows*m_cols);
@@ -100,6 +107,9 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     m_ageWin1 = "Events by Age - Slave";
     m_frameWin1 = "Frame - Slave";
     m_filtWin1 = "Filtered Events - Slave";
+    //====
+    m_depthWin = "Depth Map";
+    //====
 
     // Create display windows
     cv::namedWindow(m_polWin0,0);
@@ -111,6 +121,10 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     //cv::namedWindow(m_ageWin1,0);
     cv::namedWindow(m_frameWin1,0);
     cv::namedWindow(m_filtWin1,0);
+
+    //====
+    cv::namedWindow(m_depthWin,0);
+    //====
 
     // Initialize tuning parameters
     m_thresh = 40e3; // 40ms
@@ -130,13 +144,13 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     m_threshAnti1 = m_filter1->getThreshAnti();
     m_etaInt1 = static_cast<int>(100*m_filter1->getEta());
 
-    printf("Freq set to: %d. \n\r",m_freq0);
+    printf("\rFreq set to: %d. \n\r",m_freq0);
     printf("Eps set to: %d%. \n\r",m_eps0);
     printf("Neighbor Size set to: %d. \n\r",m_neighborSize0);
     printf("SupportsA set to: %d. \n\r",m_threshA0);
     printf("SupportsB set to: %d. \n\r",m_threshB0);
     printf("Anti-Supports set to: %d. \n\r",m_threshAnti0);
-    printf("Eta set to: %d. \n\r",m_etaInt0);
+    printf("Eta set to: %d. \n\r\n",m_etaInt0);
 
     printf("Freq set to: %d. \n\r",m_freq1);
     printf("Eps set to: %d%. \n\r",m_eps1);
@@ -144,7 +158,7 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     printf("SupportsA set to: %d. \n\r",m_threshA1);
     printf("SupportsB set to: %d. \n\r",m_threshB1);
     printf("Anti-Supports set to: %d. \n\r",m_threshAnti1);
-    printf("Eta set to: %d. \n\r",m_etaInt1);
+    printf("Eta set to: %d. \n\r\n",m_etaInt1);
 
     // Filter tuning trackbars
     cv::createTrackbar("Threshold",m_ageWin0,&m_thresh,m_max_trackbar_val,0);
@@ -285,12 +299,18 @@ void Visualizer::run()
     cv::Mat ageMatRGB1(m_rows,m_cols,CV_8UC3);
     cv::Mat filtMat1(m_rows,m_cols,CV_8UC3);
 
+    //====
+    cv::Mat depthMatHSV(m_rows,m_cols,CV_8UC3);
+    cv::Mat depthMatRGB(m_rows,m_cols,CV_8UC3);
+    //====
+
     // Initialize laser position
     float t = 0;
     int cx = 2048, cy=2048, r=500; //r=1592;
     int x, y;
-    m_laser.blink(1e6/(2*300)); // T/2
-
+    int freq = 300;
+    m_laser.blink(1e6/(2*freq)); // T/2
+    printf("Blinking frequency set to %d.\n\r\n",freq);
 
     while(key != 'q')
     {
@@ -309,9 +329,9 @@ void Visualizer::run()
             int dt = m_currenTime0 - m_ageEvts0[i];
             if(dt<m_thresh)
             {
-                polMat0.data[3*i + 0] = (unsigned char)0;              // Blue channel
-                polMat0.data[3*i + 1] = (unsigned char)(pol>0?255:0);    // Green channel
-                polMat0.data[3*i + 2] = (unsigned char)(pol<0?255:0);    // Red Channel
+                polMat0.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
+                polMat0.data[3*i + 1] = static_cast<unsigned char>(pol>0?255:0);    // Green channel
+                polMat0.data[3*i + 2] = static_cast<unsigned char>(pol<0?255:0);    // Red Channel
             }
 
             // Events by polarity - Slave
@@ -319,55 +339,64 @@ void Visualizer::run()
             dt = m_currenTime1 - m_ageEvts1[i];
             if(dt<m_thresh)
             {
-                polMat1.data[3*i + 0] = (unsigned char)0;              // Blue channel
-                polMat1.data[3*i + 1] = (unsigned char)(pol>0?255:0);    // Green channel
-                polMat1.data[3*i + 2] = (unsigned char)(pol<0?255:0);    // Red Channel
+                polMat1.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
+                polMat1.data[3*i + 1] = static_cast<unsigned char>(pol>0?255:0);    // Green channel
+                polMat1.data[3*i + 2] = static_cast<unsigned char>(pol<0?255:0);    // Red Channel
             }
 
             // Events by age - Master
             dt = m_currenTime0 - m_ageEvts0[i];
             if(dt>m_thresh) { dt = m_thresh; }
-            ageMatHSV0.data[3*i + 0] = (unsigned char)(0.75*180.*dt/float(m_thresh)); //H
-            ageMatHSV0.data[3*i + 1] = (unsigned char)255; //S
-            ageMatHSV0.data[3*i + 2] = (unsigned char)(dt==m_thresh?0:255); //V
+            ageMatHSV0.data[3*i + 0] = static_cast<unsigned char>(0.75*180*dt/float(m_thresh)); //H
+            ageMatHSV0.data[3*i + 1] = static_cast<unsigned char>(255); //S
+            ageMatHSV0.data[3*i + 2] = static_cast<unsigned char>(dt==m_thresh?0:255); //V
 
             // Events by age - Slave
             dt = m_currenTime1 - m_ageEvts1[i];
             if(dt>m_thresh) { dt = m_thresh; }
-            ageMatHSV1.data[3*i + 0] = (unsigned char)(0.75*180.*dt/float(m_thresh)); //H
-            ageMatHSV1.data[3*i + 1] = (unsigned char)255; //S
-            ageMatHSV1.data[3*i + 2] = (unsigned char)(dt==m_thresh?0:255); //V
+            ageMatHSV1.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_thresh)); //H
+            ageMatHSV1.data[3*i + 1] = static_cast<unsigned char>(255); //S
+            ageMatHSV1.data[3*i + 2] = static_cast<unsigned char>(dt==m_thresh?0:255); //V
 
             // Filtered events - Master
             dt = m_currenTime0 - m_filtEvts0[i];
             if(dt < m_thresh)
             {
-                filtMat0.data[3*i + 0] = (unsigned char)0;
-                filtMat0.data[3*i + 1] = (unsigned char)0;
-                filtMat0.data[3*i + 2] = (unsigned char)255;  // why not change color given laser frequency?
+                filtMat0.data[3*i + 0] = static_cast<unsigned char>(0);
+                filtMat0.data[3*i + 1] = static_cast<unsigned char>(0);
+                filtMat0.data[3*i + 2] = static_cast<unsigned char>(255);  // why not change color given laser frequency?
             }
             else
             {
-                filtMat0.data[3*i + 0] = (unsigned char)0;
-                filtMat0.data[3*i + 1] = (unsigned char)0;
-                filtMat0.data[3*i + 2] = (unsigned char)0;
+                filtMat0.data[3*i + 0] = static_cast<unsigned char>(0);
+                filtMat0.data[3*i + 1] = static_cast<unsigned char>(0);
+                filtMat0.data[3*i + 2] = static_cast<unsigned char>(0);
             }
 
             // Filtered events - Slave
             dt = m_currenTime1 - m_filtEvts1[i];
             if(dt < m_thresh)
             {
-                filtMat1.data[3*i + 0] = (unsigned char)0;
-                filtMat1.data[3*i + 1] = (unsigned char)0;
-                filtMat1.data[3*i + 2] = (unsigned char)255;  // why not change color given laser frequency?
+                filtMat1.data[3*i + 0] = static_cast<unsigned char>(0);
+                filtMat1.data[3*i + 1] = static_cast<unsigned char>(0);
+                filtMat1.data[3*i + 2] = static_cast<unsigned char>(255);  // why not change color given laser frequency?
             }
             else
             {
-                filtMat1.data[3*i + 0] = (unsigned char)0;
-                filtMat1.data[3*i + 1] = (unsigned char)0;
-                filtMat1.data[3*i + 2] = (unsigned char)0;
+                filtMat1.data[3*i + 0] = static_cast<unsigned char>(0);
+                filtMat1.data[3*i + 1] = static_cast<unsigned char>(0);
+                filtMat1.data[3*i + 2] = static_cast<unsigned char>(0);
             }
 
+            // Depth map
+            //====
+            int z = m_depthMap[i];
+            if (z<m_min_depth){ z = m_min_depth; }
+            else if (z>m_max_depth){ z = m_max_depth; }
+            depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_thresh));
+            depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(0);
+            depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(0);
+            //====
         }
         m_evtMutex.unlock();
 
@@ -386,24 +415,31 @@ void Visualizer::run()
         cv::imshow(m_frameWin1,m_grayFrame1);
 
         // Display filtered events
-        if(m_filter0 != NULL)
+        cv::imshow(m_filtWin0,filtMat0);
+        cv::imshow(m_filtWin1,filtMat1);
+
+        // Display trackers
+        if(m_filter0 != nullptr)
         {
-            int x = m_filter0->getX();
-            int y = m_filter0->getY();
+            int x = static_cast<int>(m_filter0->getX());
+            int y = static_cast<int>(m_filter0->getY());
             cv::circle(filtMat0,cv::Point2i(y,x),
                        3,cv::Scalar(0,255,0));
         }
-        cv::imshow(m_filtWin0,filtMat0);
 
-        if(m_filter1 != NULL)
+        if(m_filter1 != nullptr)
         {
-            int x = m_filter1->getX();
-            int y = m_filter1->getY();
+            int x = static_cast<int>(m_filter1->getX());
+            int y = static_cast<int>(m_filter1->getY());
             cv::circle(filtMat1,cv::Point2i(y,x),
                        3,cv::Scalar(0,255,0));
         }
-        cv::imshow(m_filtWin1,filtMat1);
 
+        // Display depth map
+        //====
+        cv::cvtColor(depthMatHSV,depthMatRGB,CV_HSV2BGR);
+        cv::imshow(m_depthWin,depthMatRGB);
+        //====
 
         // Reset the display matrices
         ageMatHSV0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);

@@ -1,0 +1,4 @@
+#ifndef EBV_TRIANGULATOR_H
+#define EBV_TRIANGULATOR_H
+
+#endif // EBV_TRIANGULATOR_H
