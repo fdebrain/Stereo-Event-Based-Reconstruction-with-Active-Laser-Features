@@ -9,14 +9,17 @@ Filter::Filter(int rows, int cols, int id)
       m_rows(rows),
       m_cols(cols)
 {
+    // Initialize thread
+    m_thread = std::thread(&Filter::run,this);
+
     m_events.resize(m_rows*m_cols);
 
     // Parameters for flushing old events
     m_maxTimeToKeep = 1e4; //us (=>10ms)
 
     // Parameters for events filtering
-    m_frequency = 320; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
-    m_eps = 3; // In percent of period T
+    m_frequency = 310; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+    m_eps = 5; // In percent of period T
     m_neighborSize = 3;
     m_threshSupportsA = 5;
     m_threshSupportsB = 10;

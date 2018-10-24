@@ -5,21 +5,18 @@
 #include <EBV_DAVIS240C.h>
 #include <EBV_MagneticMirrorLaser.h>
 #include <EBV_Filter.h>
+#include <EBV_Triangulator.h>
 
 #include <string>
 #include <mutex>
 
-class Triangulator;
-
-namespace cv {
-    class Mat;
-}
-
-class Filter;
+namespace cv { class Mat; }
 
 class Visualizer : public DVS128USBListener,
                    public DAVIS240CListener,
-                   public FilterListener
+                   public FilterListener,
+                   public TriangulatorListener
+
 {
 
 public:
@@ -29,15 +26,18 @@ public:
                Triangulator* triangulator = nullptr);
     ~Visualizer();
 
-    void receivedNewDVS128USBEvent(DVS128USBEvent& e);
-    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
-    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
-    void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
-    void run();
     void setFilter(Filter* filter, int id);
     //====
     void setTriangulator(Triangulator* triangulator){ m_triangulator=triangulator; }
     //====
+
+    void receivedNewDVS128USBEvent(DVS128USBEvent& e);
+    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
+    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
+    void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
+    void receivedNewDepth() {}
+
+    void run();
 
 public:
     // Parameters for camera settings
@@ -67,6 +67,7 @@ public:
     //====
 
     // Thread-safety
+    std::thread                 m_thread;
     std::mutex                  m_evtMutex;
 
     // Structures for displaying camera frames

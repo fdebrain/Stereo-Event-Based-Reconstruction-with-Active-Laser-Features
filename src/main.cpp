@@ -42,7 +42,10 @@ int main(int argc, char** argv)
 
     // Visualize
     matcher.registerMatcherListener(&triangulator);
+    triangulator.registerTriangulatorListener(&visu);
     visu.run();
+    matcher.deregisterMatcherListener(&triangulator);
+    triangulator.deregisterTriangulatorListener(&visu);
 
     // Close Slave
     davis_slave.stopListening();
@@ -50,6 +53,7 @@ int main(int argc, char** argv)
     davis_slave.deregisterFrameListener(&visu);
     davis_slave.deregisterEventListener(&filter1);
     filter1.deregisterFilterListener(&visu);
+    filter1.deregisterFilterListener(&matcher);
     davis_slave.stop();
     davis_slave.close();
 
@@ -59,6 +63,7 @@ int main(int argc, char** argv)
     davis_master.deregisterFrameListener(&visu);
     davis_master.deregisterEventListener(&filter0);
     filter0.deregisterFilterListener(&visu);
+    filter0.deregisterFilterListener(&matcher);
     davis_master.stop();
     davis_master.close();
 

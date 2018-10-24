@@ -5,8 +5,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-#include <EBV_Filter.h>
-
 //#include <fstream>
 //std::ofstream file;
 
@@ -70,6 +68,9 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
                        Triangulator* triangulator)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams)
 {
+    // Initialize thread
+    //m_thread = std::thread(&Visualizer::run,this);
+
     // Initialize laser
     m_laser.init("/dev/ttyUSB0");
 
@@ -286,7 +287,7 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e, int id)
 
 
 void Visualizer::run()
-{
+{   
     char key = ' ';
 
     // Initialize display matrices
@@ -404,7 +405,7 @@ void Visualizer::run()
         cv::imshow(m_polWin0,polMat0);
         cv::imshow(m_polWin1,polMat1);
 
-        // Display events by age
+        // Display events by age (timestamp)
         //cv::cvtColor(ageMatHSV0,ageMatRGB0,CV_HSV2BGR);
         //cv::imshow(m_ageWin0,ageMatRGB0);
         //cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
@@ -413,10 +414,6 @@ void Visualizer::run()
         // Display frame
         cv::imshow(m_frameWin0,m_grayFrame0);
         cv::imshow(m_frameWin1,m_grayFrame1);
-
-        // Display filtered events
-        cv::imshow(m_filtWin0,filtMat0);
-        cv::imshow(m_filtWin1,filtMat1);
 
         // Display trackers
         if(m_filter0 != nullptr)
@@ -434,6 +431,10 @@ void Visualizer::run()
             cv::circle(filtMat1,cv::Point2i(y,x),
                        3,cv::Scalar(0,255,0));
         }
+
+        // Display filtered events + trackers
+        cv::imshow(m_filtWin0,filtMat0);
+        cv::imshow(m_filtWin1,filtMat1);
 
         // Display depth map
         //====

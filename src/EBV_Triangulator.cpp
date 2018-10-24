@@ -11,6 +11,21 @@ Triangulator::Triangulator(int rows, int cols,
 
 Triangulator::~Triangulator() {}
 
+void Triangulator::receivedNewMatch(DAVIS240CEvent& event1, DAVIS240CEvent& event2)
+{
+
+}
+
+void Triangulator::run()
+{
+
+}
+
+void Triangulator::process()
+{
+
+}
+
 void Triangulator::registerTriangulatorListener(TriangulatorListener* listener)
 {
     m_triangulatorListeners.push_back(listener);

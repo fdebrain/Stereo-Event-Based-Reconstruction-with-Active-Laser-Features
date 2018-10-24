@@ -3,10 +3,11 @@
 
 #include <EBV_Filter.h>
 
+#include <list>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include <list>
+
 
 //class Triangulator;
 
@@ -27,21 +28,22 @@ public:
     ~Matcher();
 
     void setFilter(Filter* filter, int id);
+    void receivedNewFilterEvent(DAVIS240CEvent& event, int id);
     void run();
     void process();
 
-    void receivedNewFilterEvent(DAVIS240CEvent& event, int id);
     void registerMatcherListener(MatcherListener* listener);
     void deregisterMatcherListener(MatcherListener* listener);
     void warnMatch(DAVIS240CEvent& event0, DAVIS240CEvent& event1);
+
+public:
+    // Thread this object runs in
+    std::thread m_thread;
 
 private:
     int m_rows;
     int m_cols;
     int m_eps;
-
-    // Thread this object runs in
-    std::thread m_thread;
 
     // List of incoming filtered events for each camera (FIFO)
     std::list<DAVIS240CEvent> m_evtQueue0;

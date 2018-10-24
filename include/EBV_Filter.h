@@ -3,10 +3,12 @@
 
 #include <EBV_DAVIS240C.h>
 
-#include <vector>
-#include <mutex>
-#include <list>
 #include <string>
+#include <list>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 class FilterListener
 {
@@ -23,6 +25,11 @@ public:
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id) {}
+    //====
+    void run();
+    void process();
+    //====
+
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
     void warnFilteredEvent(DAVIS240CEvent& event);
@@ -54,6 +61,11 @@ public:
 
     DAVIS240CEvent getCoGEvent();
 
+//====
+public:
+    std::thread m_thread;
+//====
+
 private:
     // Id of the filter
     const int m_id;
@@ -81,6 +93,18 @@ private:
 
     // List of filter listeners
     std::list<FilterListener*> m_filteredEventListeners;
+
+    //====
+    // List of incoming raw events
+    std::list<DAVIS240CEvent> m_evtQueue;
+
+    // Mutex to access the queue
+    std::mutex m_queueAccessMutex;
+
+    // Wait when no processing has to be done
+    std::condition_variable m_condWait;
+    std::mutex m_condWaitMutex;
+    //====
 };
 
 #endif // EBV_FILTER_H
