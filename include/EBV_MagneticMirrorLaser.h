@@ -33,6 +33,7 @@ private:
 private:
     // File descriptors
     int m_ttyFd;
+
     // Device descriptors
     std::string m_device;
     struct termios m_oldStdio;

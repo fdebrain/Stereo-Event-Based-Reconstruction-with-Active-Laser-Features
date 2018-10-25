@@ -76,6 +76,7 @@ public:
     ~DAVIS240C();
 
     static int m_nbCams;
+    static libcaer::devices::davis* m_davisMasterHandle;
 
     // Life cycle of a DAVIS240C
     int init();
@@ -98,6 +99,8 @@ public:
     // Register a listener to receive the new frames
     void registerFrameListener(DAVIS240CListener* listener);
     void deregisterFrameListener(DAVIS240CListener* listener);
+
+    void resetMasterClock();
 
     // Id of the camera
     const int m_id;

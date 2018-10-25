@@ -16,18 +16,31 @@ public:
     Triangulator(int rows, int cols, Matcher* matcher = nullptr);
     ~Triangulator();
 
-    void setMatcher(Matcher* matcher){ m_matcher=matcher; }
     void receivedNewMatch(DAVIS240CEvent& event1, DAVIS240CEvent& event2);
     void run();
-    void process();
+    void process(DAVIS240CEvent& event0, DAVIS240CEvent& event1);
 
     void registerTriangulatorListener(TriangulatorListener* listener);
     void deregisterTriangulatorListener(TriangulatorListener* listener);
     void warnDepth();
 
+    void importCalibration(std::string path);
+    void setCameraMatrix(cv::Mat P, int id);
+
 private:
     int m_rows;
     int m_cols;
+
+    // Calibration related
+    std::string m_pathCalib = "../calibration/calib.xml";
+    cv::Mat m_K0;
+    cv::Mat m_K1;
+    cv::Mat m_R;
+    cv::Mat m_T;
+    cv::Mat m_F;
+
+    cv::Mat m_P0;
+    cv::Mat m_P1;
 
     // Thread this object runs in
     std::thread m_thread;

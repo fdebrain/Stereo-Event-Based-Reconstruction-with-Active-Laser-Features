@@ -21,15 +21,12 @@ class Visualizer : public DVS128USBListener,
 
 public:
     Visualizer(int rows, int cols, int nbCams,
+               DAVIS240C* davis0 = nullptr,
+               DAVIS240C* davis1 = nullptr,
                Filter* filter0 = nullptr,
                Filter* filter1 = nullptr,
                Triangulator* triangulator = nullptr);
     ~Visualizer();
-
-    void setFilter(Filter* filter, int id);
-    //====
-    void setTriangulator(Triangulator* triangulator){ m_triangulator=triangulator; }
-    //====
 
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
@@ -62,13 +59,14 @@ public:
     std::vector<int>            m_polEvts1;
     std::vector<unsigned int>   m_ageEvts1;
     std::vector<int>            m_filtEvts1;
-    //====
     std::vector<int>            m_depthMap;
-    //====
 
     // Thread-safety
-    std::thread                 m_thread;
     std::mutex                  m_evtMutex;
+    std::mutex                  m_frameMutex;
+    std::mutex                  m_filterEvtMutex;
+    std::mutex                  m_depthMutex;
+
 
     // Structures for displaying camera frames
     cv::Mat                     m_grayFrame0;
@@ -83,9 +81,7 @@ public:
     std::string         m_ageWin1;
     std::string         m_frameWin1;
     std::string         m_filtWin1;
-    //====
     std::string         m_depthWin;
-    //====
 
     // Trackbar parameters
     int m_freq0;
@@ -106,14 +102,16 @@ public:
     // Laser object
     MagneticMirrorLaser m_laser;
 
+    // Davis object
+    DAVIS240C* m_davis0;
+    DAVIS240C* m_davis1;
+
     // Filter object
     Filter*             m_filter0;
     Filter*             m_filter1;
 
-    //====
     // Triangulator (depth estimator)
     Triangulator*       m_triangulator;
-    //====
 };
 
 #endif // EBV_VISUALIZER_H

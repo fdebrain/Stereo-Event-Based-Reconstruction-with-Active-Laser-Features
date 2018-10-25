@@ -15,7 +15,7 @@ class MatcherListener
 {
 public:
     MatcherListener(void) {}
-    virtual void receivedNewMatch(DAVIS240CEvent& event1, DAVIS240CEvent& event2) = 0;
+    virtual void receivedNewMatch(DAVIS240CEvent& e1, DAVIS240CEvent& e2) = 0;
 };
 
 
@@ -27,10 +27,9 @@ public:
             Filter* filter1 = nullptr);
     ~Matcher();
 
-    void setFilter(Filter* filter, int id);
     void receivedNewFilterEvent(DAVIS240CEvent& event, int id);
-    void run();
-    void process();
+    void runThread();
+    void process(DAVIS240CEvent e0, DAVIS240CEvent e1);
 
     void registerMatcherListener(MatcherListener* listener);
     void deregisterMatcherListener(MatcherListener* listener);
@@ -45,6 +44,10 @@ private:
     int m_cols;
     int m_eps;
 
+    // Flushing old events
+    unsigned int m_currTime;
+    int m_maxTimeToKeep;
+
     // List of incoming filtered events for each camera (FIFO)
     std::list<DAVIS240CEvent> m_evtQueue0;
     std::list<DAVIS240CEvent> m_evtQueue1;
@@ -55,6 +58,7 @@ private:
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
+
 
     // Alternative: We access m_events by reference (setFilter here, getEvents in Filter)
     Filter* m_filter0;

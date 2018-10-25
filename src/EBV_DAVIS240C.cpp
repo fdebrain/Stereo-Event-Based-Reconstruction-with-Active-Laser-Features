@@ -18,8 +18,8 @@ static void usbShutdownHandler(void *ptr) {
     globalShutdown.store(true);
 }
 
-//
 int DAVIS240C::m_nbCams=0;
+libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
 
 DAVIS240C::DAVIS240C()
     // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
@@ -61,7 +61,7 @@ int DAVIS240C::init()
     // Let's take a look at the information we have on the device.
     struct caer_davis_info davis_info = m_davisHandle.infoGet();
 
-    printf("%s --- ID: %d, Master: %d, DVS X: %d, DVS Y: %d, Logic: %d.\n", davis_info.deviceString,
+    printf("%s --- ID: %d, Master: %d, DVS X: %d, DVS Y: %d, Logic: %d.\n\r", davis_info.deviceString,
         davis_info.deviceID, davis_info.deviceIsMaster, davis_info.dvsSizeX, davis_info.dvsSizeY,
         davis_info.logicVersion);
 
@@ -94,9 +94,9 @@ int DAVIS240C::init()
     uint32_t prBias   = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP);
     uint32_t prsfBias = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP);
 
-    printf("New bias values --- PR-coarse: %d, PR-fine: %d, PRSF-coarse: %d, PRSF-fine: %d.\n",
-        caerBiasCoarseFineParse(prBias).coarseValue, caerBiasCoarseFineParse(prBias).fineValue,
-        caerBiasCoarseFineParse(prsfBias).coarseValue, caerBiasCoarseFineParse(prsfBias).fineValue);
+    //printf("New bias values --- PR-coarse: %d, PR-fine: %d, PRSF-coarse: %d, PRSF-fine: %d.\n\r",
+    //    caerBiasCoarseFineParse(prBias).coarseValue, caerBiasCoarseFineParse(prBias).fineValue,
+    //    caerBiasCoarseFineParse(prsfBias).coarseValue, caerBiasCoarseFineParse(prsfBias).fineValue);
 
     return 0;
 }
@@ -110,6 +110,16 @@ int DAVIS240C::start()
 
     // Let's turn on blocking data-get mode to avoid wasting resources.
     m_davisHandle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+
+    // Reset master clock when new device is added
+    if (m_id==0)
+    {
+        m_davisMasterHandle = &m_davisHandle;
+    }
+    else
+    {
+        resetMasterClock();
+    }
 
     return 0;
 }
@@ -152,7 +162,7 @@ void DAVIS240C::readThread()
                 uint16_t y = firstEvent.getY();
                 bool pol   = firstEvent.getPolarity();
 
-                printf("First polarity event - ts: %d, x: %d, y: %d, pol: %d.\n", ts, x, y, pol);
+                printf("First polarity event - ts: %d, x: %d, y: %d, pol: %d, id: %d.\n\r", ts, x, y, pol,m_id);
                 */
 
                 int nEvents = packet->getEventNumber();
@@ -283,5 +293,15 @@ void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
     for(it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
     {
         (*it)->receivedNewDAVIS240CFrame(frame,m_id);
+    }
+}
+
+void DAVIS240C::resetMasterClock()
+{
+    if (m_davisMasterHandle->infoGet().deviceIsMaster)
+    {
+        m_davisMasterHandle->configSet(DAVIS_CONFIG_MUX,
+                                 DAVIS_CONFIG_MUX_TIMESTAMP_RESET, 2);
+        printf("Reset Master clock. \n\r");
     }
 }

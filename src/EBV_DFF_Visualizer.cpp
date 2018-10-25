@@ -5,6 +5,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 //#include <fstream>
 //std::ofstream file;
 
@@ -50,37 +54,32 @@ static void callbackTrackbarEta(int newEta, void *data)
     filter->setEta(newEta/100.);
 }
 
-void Visualizer::setFilter(Filter* filter, int id)
-{
-    switch (id)
-    {
-    case 0:
-        m_filter0 = filter;
-        break;
-    case 1:
-        m_filter1 = filter;
-        break;
-    }
-}
-
 Visualizer::Visualizer(int rows, int cols, int nbCams,
+                       DAVIS240C* davis0, DAVIS240C* davis1,
                        Filter* filter0, Filter* filter1,
                        Triangulator* triangulator)
-    : m_rows(rows), m_cols(cols), m_nbCams(nbCams)
+    : m_rows(rows), m_cols(cols), m_nbCams(nbCams),
+      m_davis0(davis0), m_davis1(davis1),
+      m_filter0(filter0), m_filter1(filter1),
+      m_triangulator(triangulator)
 {
-    // Initialize thread
-    //m_thread = std::thread(&Visualizer::run,this);
+    // Listen to Davis
+    m_davis0->registerEventListener(this);
+    m_davis0->registerFrameListener(this);
+    m_davis1->registerEventListener(this);
+    m_davis1->registerFrameListener(this);
+
+    // Listen to filter
+    m_filter0->registerFilterListener(this);
+    m_filter1->registerFilterListener(this);
+
+    //====
+    // Listen to triangulator
+    //m_triangulator->registerTriangulatorListener(this);
+    //====
 
     // Initialize laser
     m_laser.init("/dev/ttyUSB0");
-
-    // Initialize filter
-    this->setFilter(filter0,0);
-    this->setFilter(filter1,1);
-
-    //====
-    this->setTriangulator(triangulator);
-    //====
 
     // Initialize data structure to hold the events (flatten matrices)
     m_polEvts0.resize(m_rows*m_cols);
@@ -89,9 +88,7 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     m_polEvts1.resize(m_rows*m_cols);
     m_ageEvts1.resize(m_rows*m_cols);
     m_filtEvts1.resize(m_rows*m_cols);
-    //====
     m_depthMap.resize(m_rows*m_cols);
-    //====
 
     // Initialize data structure to hold the frame
     m_grayFrame0.resize(m_rows*m_cols);
@@ -108,9 +105,7 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     m_ageWin1 = "Events by Age - Slave";
     m_frameWin1 = "Frame - Slave";
     m_filtWin1 = "Filtered Events - Slave";
-    //====
     m_depthWin = "Depth Map";
-    //====
 
     // Create display windows
     cv::namedWindow(m_polWin0,0);
@@ -122,10 +117,7 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     //cv::namedWindow(m_ageWin1,0);
     cv::namedWindow(m_frameWin1,0);
     cv::namedWindow(m_filtWin1,0);
-
-    //====
     cv::namedWindow(m_depthWin,0);
-    //====
 
     // Initialize tuning parameters
     m_thresh = 40e3; // 40ms
@@ -201,6 +193,15 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
 Visualizer::~Visualizer()
 {
     m_laser.close();
+    m_davis0->deregisterEventListener(this);
+    m_davis0->deregisterFrameListener(this);
+    m_filter0->deregisterFilterListener(this);
+
+    m_davis1->deregisterEventListener(this);
+    m_filter1->deregisterFilterListener(this);
+    m_davis1->deregisterFrameListener(this);
+
+    //m_triangulator->deregisterTriangulatorListener(this);
     //file.close();
 }
 
@@ -250,17 +251,17 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,int id)
     switch(id)
     {
         case 0:
-            m_evtMutex.lock();
+            m_frameMutex.lock();
                 m_currenTime0 = f.m_timestamp;
                 m_grayFrame0 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-            m_evtMutex.unlock();
+            m_frameMutex.unlock();
         break;
 
         case 1:
-            m_evtMutex.lock();
+            m_frameMutex.lock();
                 m_currenTime1 = f.m_timestamp;
                 m_grayFrame1 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-            m_evtMutex.unlock();
+            m_frameMutex.unlock();
         break;
     }
 }
@@ -271,16 +272,22 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e, int id)
     int x = e.m_x;
     int y = e.m_y;
 
+    //printf("Camera %d - Timestamp %f. \n\r",id,1e-3*e.m_timestamp);
+
     switch (id)
     {
     case 0:
-        m_filtEvts0[x*m_cols+y] = e.m_timestamp;
-        //file << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+        m_filterEvtMutex.lock();
+            m_filtEvts0[x*m_cols+y] = e.m_timestamp;
+            //file << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+         m_filterEvtMutex.unlock();
         break;
 
     case 1:
-        m_filtEvts1[x*m_cols+y] = e.m_timestamp;
-        //file << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+        m_filterEvtMutex.lock();
+            m_filtEvts1[x*m_cols+y] = e.m_timestamp;
+            //file << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+        m_filterEvtMutex.unlock();
         break;
     }
 }
@@ -322,12 +329,15 @@ void Visualizer::run()
         m_laser.pos(x,y);
         //m_laser.vel(8e4,8e4);
 
-        m_evtMutex.lock();
+        //m_evtMutex.lock();
         for(int i=0; i<m_rows*m_cols; i++)
         {
             // Events by polarity - Master
-            int pol = m_polEvts0[i];
-            int dt = m_currenTime0 - m_ageEvts0[i];
+            m_evtMutex.lock();
+                int pol = m_polEvts0[i];
+                int dt = m_currenTime0 - m_ageEvts0[i];
+            m_evtMutex.unlock();
+
             if(dt<m_thresh)
             {
                 polMat0.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
@@ -336,8 +346,11 @@ void Visualizer::run()
             }
 
             // Events by polarity - Slave
-            pol = m_polEvts1[i];
-            dt = m_currenTime1 - m_ageEvts1[i];
+            m_evtMutex.lock();
+                pol = m_polEvts1[i];
+                dt = m_currenTime1 - m_ageEvts1[i];
+            m_evtMutex.unlock();
+
             if(dt<m_thresh)
             {
                 polMat1.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
@@ -346,21 +359,30 @@ void Visualizer::run()
             }
 
             // Events by age - Master
-            dt = m_currenTime0 - m_ageEvts0[i];
+            m_evtMutex.lock();
+                dt = m_currenTime0 - m_ageEvts0[i];
+            m_evtMutex.unlock();
+
             if(dt>m_thresh) { dt = m_thresh; }
             ageMatHSV0.data[3*i + 0] = static_cast<unsigned char>(0.75*180*dt/float(m_thresh)); //H
             ageMatHSV0.data[3*i + 1] = static_cast<unsigned char>(255); //S
             ageMatHSV0.data[3*i + 2] = static_cast<unsigned char>(dt==m_thresh?0:255); //V
 
             // Events by age - Slave
-            dt = m_currenTime1 - m_ageEvts1[i];
+            m_evtMutex.lock();
+                dt = m_currenTime1 - m_ageEvts1[i];
+            m_evtMutex.unlock();
+
             if(dt>m_thresh) { dt = m_thresh; }
             ageMatHSV1.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_thresh)); //H
             ageMatHSV1.data[3*i + 1] = static_cast<unsigned char>(255); //S
             ageMatHSV1.data[3*i + 2] = static_cast<unsigned char>(dt==m_thresh?0:255); //V
 
             // Filtered events - Master
-            dt = m_currenTime0 - m_filtEvts0[i];
+            m_filterEvtMutex.lock();
+                dt = m_currenTime0 - m_filtEvts0[i];
+            m_filterEvtMutex.unlock();
+
             if(dt < m_thresh)
             {
                 filtMat0.data[3*i + 0] = static_cast<unsigned char>(0);
@@ -375,7 +397,10 @@ void Visualizer::run()
             }
 
             // Filtered events - Slave
-            dt = m_currenTime1 - m_filtEvts1[i];
+            m_filterEvtMutex.lock();
+                dt = m_currenTime1 - m_filtEvts1[i];
+            m_filterEvtMutex.unlock();
+
             if(dt < m_thresh)
             {
                 filtMat1.data[3*i + 0] = static_cast<unsigned char>(0);
@@ -391,15 +416,19 @@ void Visualizer::run()
 
             // Depth map
             //====
+            /*
+            m_depthMutex.lock();
             int z = m_depthMap[i];
+            m_depthMutex.unlock();
             if (z<m_min_depth){ z = m_min_depth; }
             else if (z>m_max_depth){ z = m_max_depth; }
             depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_thresh));
             depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(0);
             depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(0);
+            */
             //====
         }
-        m_evtMutex.unlock();
+        //m_evtMutex.unlock();
 
         // Display events by polarity
         cv::imshow(m_polWin0,polMat0);
@@ -418,16 +447,20 @@ void Visualizer::run()
         // Display trackers
         if(m_filter0 != nullptr)
         {
-            int x = static_cast<int>(m_filter0->getX());
-            int y = static_cast<int>(m_filter0->getY());
+            //m_filterEvtMutex.lock();
+                int x = static_cast<int>(m_filter0->getX());
+                int y = static_cast<int>(m_filter0->getY());
+            //m_filterEvtMutex.unlock();
             cv::circle(filtMat0,cv::Point2i(y,x),
                        3,cv::Scalar(0,255,0));
         }
 
         if(m_filter1 != nullptr)
         {
-            int x = static_cast<int>(m_filter1->getX());
-            int y = static_cast<int>(m_filter1->getY());
+            //m_filterEvtMutex.lock();
+                int x = static_cast<int>(m_filter1->getX());
+                int y = static_cast<int>(m_filter1->getY());
+            //m_filterEvtMutex.unlock();
             cv::circle(filtMat1,cv::Point2i(y,x),
                        3,cv::Scalar(0,255,0));
         }

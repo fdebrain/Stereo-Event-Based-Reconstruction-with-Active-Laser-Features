@@ -20,14 +20,15 @@ public:
 class Filter : public DAVIS240CListener
 {
 public:
-    Filter(int rows, int cols, int id);
+    Filter(int rows, int cols,
+           DAVIS240C* davis = nullptr);
     ~Filter();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id) {}
     //====
     void run();
-    void process();
+    void process(DAVIS240CEvent e);
     //====
 
     void registerFilterListener(FilterListener* listener);
@@ -35,6 +36,8 @@ public:
     void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
+    void setDavis(DAVIS240C* davis) {m_davis = davis;}
+
     float getX() const {return m_xc;}
     float getY() const {return m_yc;}
 
@@ -59,8 +62,6 @@ public:
     float getEta() const {return m_eta;}
     void setEta(float eta) {m_eta=eta;}
 
-    DAVIS240CEvent getCoGEvent();
-
 //====
 public:
     std::thread m_thread;
@@ -68,7 +69,7 @@ public:
 
 private:
     // Id of the filter
-    const int m_id;
+    DAVIS240C* m_davis;
 
     // Datastructure matrix of list of events
     int m_rows;
@@ -94,7 +95,6 @@ private:
     // List of filter listeners
     std::list<FilterListener*> m_filteredEventListeners;
 
-    //====
     // List of incoming raw events
     std::list<DAVIS240CEvent> m_evtQueue;
 
@@ -104,7 +104,6 @@ private:
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
-    //====
 };
 
 #endif // EBV_FILTER_H
