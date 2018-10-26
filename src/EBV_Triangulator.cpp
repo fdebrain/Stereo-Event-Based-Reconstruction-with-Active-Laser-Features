@@ -9,21 +9,39 @@ void Triangulator::importCalibration(std::string path)
 
     cv::FileNode calibs = fs["camera_calib"];
     calibs[0]["camera_matrix"] >> m_K0;
-    std::cout << m_K0 << std::endl;
+    std::cout << "K0: " << m_K0 << std::endl;
+
+    calibs[0]["dist_coeffs"] >> m_D0;
+    std::cout << "D0: " << m_D0 << std::endl;
 
     calibs[1]["camera_matrix"] >> m_K1;
-    std::cout << m_K1 << std::endl;
+    std::cout << "K1: " << m_K1 << std::endl;
+
+    calibs[1]["dist_coeffs"] >> m_D1;
+    std::cout << "D1: " << m_D1 << std::endl;
 
     fs["R"] >> m_R;
-    std::cout << m_R << std::endl;
+    std::cout << "R: " << m_R << std::endl;
 
     fs["T"] >> m_T;
-    std::cout << m_T << std::endl;
+    std::cout << "T: " << m_T << std::endl;
 
     fs["F"] >> m_F;
-    std::cout << m_F << std::endl;
+    std::cout << "F: " << m_F << std::endl;
 }
 
+void Triangulator::computeProjMat()
+{
+    cv::Mat RT0 = cv::Mat::eye(3, 4, CV_64FC1);
+    m_P0 = m_K0 * RT0;
+    std::cout << "P0: " << m_P0 << std::endl;
+
+    cv::Mat RT1 = cv::Mat::eye(3, 4, CV_64FC1);
+    m_R.copyTo(RT1.rowRange(0,3).colRange(0,3));
+    m_T.copyTo(RT1.rowRange(0,3).col(3));
+    m_P1 = m_K1 * RT1;
+    std::cout << "P1: " << m_P1 << std::endl;
+}
 
 Triangulator::Triangulator(int rows, int cols,
                            Matcher*  matcher):
@@ -36,9 +54,9 @@ Triangulator::Triangulator(int rows, int cols,
     // Listen to matcher
     m_matcher->registerMatcherListener(this);
 
-    // Initialize camera matrices
+    // Get camera settings
     this->importCalibration(m_pathCalib);
-
+    this->computeProjMat();
 }
 
 Triangulator::~Triangulator()
@@ -82,7 +100,6 @@ void Triangulator::run()
 
 void Triangulator::receivedNewMatch(DAVIS240CEvent& event0, DAVIS240CEvent& event1)
 {
-    printf("Received new match ! \n\r");
     m_queueAccessMutex.lock();
         m_evtQueue0.push_back(event0);
         m_evtQueue1.push_back(event1);
@@ -92,18 +109,54 @@ void Triangulator::receivedNewMatch(DAVIS240CEvent& event0, DAVIS240CEvent& even
     m_condWait.notify_one();
 }
 
-void Triangulator::process(DAVIS240CEvent& event0, DAVIS240CEvent& event1)
+void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& event1)
 {
-    cv::Point2d point0;
-    point0.x = event0.m_x;
-    point0.y = event0.m_y;
-    cv::Point2d point1;
-    point1.x = event1.m_x;
-    point1.y = event1.m_y;
+    // DEBUG - CHECK EVENTS POSITION
+    //m_queueAccessMutex.lock();
+    //printf("Event0: (%d,%d). \n\r",event0.m_y,event0.m_x);
+    //printf("Event1: (%d,%d). \n\r",event1.m_y,event1.m_x);
+    //m_queueAccessMutex.unlock();
+    // END DEBUG
 
-    cv::Mat point3D(4,1,CV_64FC4);
+    // Get 2D point coordinates - SLOW !
+    //cv::Mat coords0(2,1,CV_32FC1);
+    //cv::Mat coords1(2,1,CV_32FC1);
+    //cv::Mat undistCoords0(2,1,CV_32FC1);
+    //cv::Mat undistCoords1(2,1,CV_32FC1);
+    //cv::Mat triangCoords4D(4,1,CV_32FC1);
 
-    //cv::triangulatePoints(m_P0,m_P1,point0,point1,point3D);
+    std::vector<cv::Point2d> coords0, coords1;
+    std::vector<cv::Point2d> undistCoords0, undistCoords1;
+    cv::Mat point3D_homo;
+
+    m_queueAccessMutex.lock();
+        coords0.push_back(cv::Point2d(event0.m_x,event0.m_y));
+        coords1.push_back(cv::Point2d(event1.m_x,event1.m_y));
+        //printf("Event0: (%f,%f). \n\r",coords0.back().x,coords0.back().y);
+        //printf("Event1: (%f,%f). \n\r",coords1.back().x,coords1.back().y);
+
+        // Undistort 2D points
+        cv::undistortPoints(coords0, undistCoords0, m_K0, m_D0);
+        cv::undistortPoints(coords1, undistCoords1, m_K1, m_D1);
+        //printf("Undistorted Event0: (%f,%f). \n\r",undistCoords0.back().x,undistCoords0.back().y);
+        //printf("Undistorted Event1: (%f,%f). \n\r",undistCoords1.back().x,undistCoords1.back().y);
+
+        // Triangulate
+        cv::triangulatePoints(m_P0, m_P1,
+                              undistCoords0,
+                              undistCoords1,
+                              point3D_homo);
+
+        //printf("Point at: (%f,%f,%f,%f).\n\r",point3D_homo.at<double>(0),
+        //                                      point3D_homo.at<double>(1),
+        //                                      point3D_homo.at<double>(2),
+        //                                      point3D_homo.at<double>(3));
+
+        //printf("Depth: %f.\n\r",100*(point3D_homo.at<double>(2)/point3D_homo.at<double>(3)-738));
+
+        warnDepth(event0.m_x,event0.m_y,point3D_homo.at<double>(2)/point3D_homo.at<double>(3));
+    m_queueAccessMutex.unlock();
+
 }
 
 void Triangulator::registerTriangulatorListener(TriangulatorListener* listener)
@@ -116,11 +169,11 @@ void Triangulator::deregisterTriangulatorListener(TriangulatorListener* listener
     m_triangulatorListeners.remove(listener);
 }
 
-void Triangulator::warnDepth()
+void Triangulator::warnDepth(int u, int v, float z)
 {
     std::list<TriangulatorListener*>::iterator it;
     for(it = m_triangulatorListeners.begin(); it!=m_triangulatorListeners.end(); it++)
     {
-        (*it)->receivedNewDepth();
+        (*it)->receivedNewDepth(u,v,z);
     }
 }

@@ -32,7 +32,7 @@ public:
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
     void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
-    void receivedNewDepth() {}
+    void receivedNewDepth(int &u, int &v, float &depth);
 
     void run();
 
@@ -48,8 +48,8 @@ public:
     int                 m_thresh;
     int                 m_max_trackbar_val=1e6;
     //====
-    int                 m_max_depth = 0;
-    int                 m_min_depth = 100;
+    float                 m_min_depth = 0.1;
+    float                 m_max_depth = 0.3;
     //====
 
     // Structures for data storing (flattened matrices)
@@ -59,7 +59,7 @@ public:
     std::vector<int>            m_polEvts1;
     std::vector<unsigned int>   m_ageEvts1;
     std::vector<int>            m_filtEvts1;
-    std::vector<int>            m_depthMap;
+    std::vector<float>          m_depthMap;
 
     // Thread-safety
     std::mutex                  m_evtMutex;

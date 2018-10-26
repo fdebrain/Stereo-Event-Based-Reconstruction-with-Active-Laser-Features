@@ -7,7 +7,7 @@ class TriangulatorListener
 {
 public:
     TriangulatorListener(void) {}
-    virtual void receivedNewDepth() = 0;
+    virtual void receivedNewDepth(int &u, int &v, float &depth) = 0;
 };
 
 class Triangulator : public MatcherListener
@@ -18,14 +18,14 @@ public:
 
     void receivedNewMatch(DAVIS240CEvent& event1, DAVIS240CEvent& event2);
     void run();
-    void process(DAVIS240CEvent& event0, DAVIS240CEvent& event1);
+    void process(const DAVIS240CEvent& event0, const DAVIS240CEvent& event1);
 
     void registerTriangulatorListener(TriangulatorListener* listener);
     void deregisterTriangulatorListener(TriangulatorListener* listener);
-    void warnDepth();
+    void warnDepth(int u, int v, float depth);
 
     void importCalibration(std::string path);
-    void setCameraMatrix(cv::Mat P, int id);
+    void computeProjMat();
 
 private:
     int m_rows;
@@ -33,14 +33,17 @@ private:
 
     // Calibration related
     std::string m_pathCalib = "../calibration/calib.xml";
-    cv::Mat m_K0;
-    cv::Mat m_K1;
-    cv::Mat m_R;
-    cv::Mat m_T;
-    cv::Mat m_F;
+    cv::Mat m_K0 = cv::Mat(3,3,CV_32FC1);
+    cv::Mat m_D0 = cv::Mat(1,5,CV_32FC1);
+    cv::Mat m_P0 = cv::Mat(3,4,CV_32FC1);
 
-    cv::Mat m_P0;
-    cv::Mat m_P1;
+    cv::Mat m_R = cv::Mat(3,3,CV_32FC1);
+    cv::Mat m_T = cv::Mat(1,3,CV_32FC1);
+    cv::Mat m_F = cv::Mat(3,3,CV_32FC1);
+
+    cv::Mat m_K1 = cv::Mat(3,3,CV_32FC1);
+    cv::Mat m_D1 = cv::Mat(1,5,CV_32FC1);
+    cv::Mat m_P1 = cv::Mat(3,4,CV_32FC1);
 
     // Thread this object runs in
     std::thread m_thread;

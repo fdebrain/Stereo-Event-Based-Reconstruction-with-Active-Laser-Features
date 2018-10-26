@@ -73,10 +73,8 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
     m_filter0->registerFilterListener(this);
     m_filter1->registerFilterListener(this);
 
-    //====
     // Listen to triangulator
-    //m_triangulator->registerTriangulatorListener(this);
-    //====
+    m_triangulator->registerTriangulatorListener(this);
 
     // Initialize laser
     m_laser.init("/dev/ttyUSB0");
@@ -192,7 +190,6 @@ Visualizer::Visualizer(int rows, int cols, int nbCams,
 
 Visualizer::~Visualizer()
 {
-    m_laser.close();
     m_davis0->deregisterEventListener(this);
     m_davis0->deregisterFrameListener(this);
     m_filter0->deregisterFilterListener(this);
@@ -201,7 +198,8 @@ Visualizer::~Visualizer()
     m_filter1->deregisterFilterListener(this);
     m_davis1->deregisterFrameListener(this);
 
-    //m_triangulator->deregisterTriangulatorListener(this);
+    m_laser.close();
+    m_triangulator->deregisterTriangulatorListener(this);
     //file.close();
 }
 
@@ -292,6 +290,14 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e, int id)
     }
 }
 
+
+void Visualizer::receivedNewDepth(int &u, int &v, float &depth)
+{
+    m_depthMutex.lock();
+        //printf("Depth at (%d,%d) = (%f). \n\r",v,u,depth);
+        m_depthMap[u*m_cols+v] = depth;
+    m_depthMutex.unlock();
+}
 
 void Visualizer::run()
 {   
@@ -415,20 +421,15 @@ void Visualizer::run()
             }
 
             // Depth map
-            //====
-            /*
             m_depthMutex.lock();
-            int z = m_depthMap[i];
+                float z = m_depthMap[i];
             m_depthMutex.unlock();
             if (z<m_min_depth){ z = m_min_depth; }
             else if (z>m_max_depth){ z = m_max_depth; }
-            depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_thresh));
-            depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(0);
-            depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(0);
-            */
-            //====
+            depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+            depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(255);
+            depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(255);
         }
-        //m_evtMutex.unlock();
 
         // Display events by polarity
         cv::imshow(m_polWin0,polMat0);
@@ -470,10 +471,8 @@ void Visualizer::run()
         cv::imshow(m_filtWin1,filtMat1);
 
         // Display depth map
-        //====
         cv::cvtColor(depthMatHSV,depthMatRGB,CV_HSV2BGR);
         cv::imshow(m_depthWin,depthMatRGB);
-        //====
 
         // Reset the display matrices
         ageMatHSV0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);

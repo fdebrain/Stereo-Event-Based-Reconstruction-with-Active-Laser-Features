@@ -26,18 +26,12 @@ public:
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id) {}
-    //====
-    void run();
-    void process(DAVIS240CEvent e);
-    //====
 
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
     void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
-    void setDavis(DAVIS240C* davis) {m_davis = davis;}
-
     float getX() const {return m_xc;}
     float getY() const {return m_yc;}
 
