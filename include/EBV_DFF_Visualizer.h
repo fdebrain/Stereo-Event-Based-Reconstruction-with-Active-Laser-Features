@@ -20,7 +20,9 @@ class Visualizer : public DVS128USBListener,
 {
 
 public:
-    Visualizer(int rows, int cols, int nbCams,
+    Visualizer(const unsigned int rows,
+               const unsigned int cols,
+               const unsigned int nbCams,
                DAVIS240C* davis0 = nullptr,
                DAVIS240C* davis1 = nullptr,
                Filter* filter0 = nullptr,
@@ -29,44 +31,46 @@ public:
     ~Visualizer();
 
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
-    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
-    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id);
-    void receivedNewFilterEvent(DAVIS240CEvent& e, int id);
-    void receivedNewDepth(int &u, int &v, float &depth);
+    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                   const unsigned int id);
+    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
+                                   const unsigned int id);
+    void receivedNewFilterEvent(DAVIS240CEvent& e,
+                                const unsigned int id);
+    void receivedNewDepth(int &u, int &v, double &depth);
 
     void run();
 
 public:
     // Parameters for camera settings
-    int                 m_rows;
-    int                 m_cols;
-    int                 m_nbCams;
+    const unsigned int                 m_rows;
+    const unsigned int                 m_cols;
+    const unsigned int                 m_nbCams;
 
     // Parameters related to filtering events above threshold age
-    unsigned int        m_currenTime0;
-    unsigned int        m_currenTime1;
-    int                 m_thresh;
-    int                 m_max_trackbar_val=1e6;
+    int        m_currenTime0;
+    int        m_currenTime1;
+    int        m_thresh;
+    int        m_max_trackbar_val=1e6;
     //====
-    float                 m_min_depth = 0.1;
-    float                 m_max_depth = 0.3;
+    int        m_min_depth = 1000; // = 10 cm
+    int        m_max_depth = 2000; // = 20 cm
     //====
 
     // Structures for data storing (flattened matrices)
     std::vector<int>            m_polEvts0;
-    std::vector<unsigned int>   m_ageEvts0;
+    std::vector<int>            m_ageEvts0;
     std::vector<int>            m_filtEvts0;
     std::vector<int>            m_polEvts1;
-    std::vector<unsigned int>   m_ageEvts1;
+    std::vector<int>            m_ageEvts1;
     std::vector<int>            m_filtEvts1;
-    std::vector<float>          m_depthMap;
+    std::vector<double>         m_depthMap;
 
     // Thread-safety
     std::mutex                  m_evtMutex;
     std::mutex                  m_frameMutex;
     std::mutex                  m_filterEvtMutex;
     std::mutex                  m_depthMutex;
-
 
     // Structures for displaying camera frames
     cv::Mat                     m_grayFrame0;
@@ -103,8 +107,8 @@ public:
     MagneticMirrorLaser m_laser;
 
     // Davis object
-    DAVIS240C* m_davis0;
-    DAVIS240C* m_davis1;
+    DAVIS240C*          m_davis0;
+    DAVIS240C*          m_davis1;
 
     // Filter object
     Filter*             m_filter0;

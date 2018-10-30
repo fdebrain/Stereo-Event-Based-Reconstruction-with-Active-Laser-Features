@@ -3,7 +3,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-Filter::Filter(int rows, int cols,
+Filter::Filter(const unsigned int rows,
+               const unsigned int cols,
                DAVIS240C* davis) :
       m_rows(rows),
       m_cols(cols),
@@ -20,17 +21,19 @@ Filter::Filter(int rows, int cols,
     m_maxTimeToKeep = 1e4; //us (=>10ms)
 
     // Parameters for events filtering
-    m_frequency = 600; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+    m_frequency = 615; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+    m_targetPeriod = 1e6/m_frequency;
     m_eps = 10; // In percent of period T
+    m_epsPeriod = m_eps*m_targetPeriod/100.f;
     m_neighborSize = 3;//3; //2;
-    m_threshSupportsA = 3;//5; //3;
-    m_threshSupportsB = 3;//10;  //3;
+    m_threshSupportsA = 2;//5; //3;
+    m_threshSupportsB = 2;//10;  //3;
     m_threshAntiSupports = 2;//5; //2;
 
     // Center of mass tracker initialization
-    m_xc = 0;
-    m_yc = 0;
-    m_eta = 0.1;
+    m_xc = 0.0f;
+    m_yc = 0.0f;
+    m_eta = 0.1f;
 }
 
 Filter::~Filter()
@@ -38,26 +41,24 @@ Filter::~Filter()
     m_davis->deregisterEventListener(this);
 }
 
-void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
+void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                       const unsigned int id)
 {
-    int x = e.m_x;
-    int y = e.m_y;
-    int p = e.m_pol;
+    const unsigned int x = e.m_x;
+    const unsigned int y = e.m_y;
+    const unsigned int p = e.m_pol;
 
-    int t = e.m_timestamp;
+    const int t = e.m_timestamp;
     m_currTime = t;
-
-    const int targetPeriod = 1e6/m_frequency;
-    const int epsPeriod = m_eps*targetPeriod/100.;
 
     // Renaming for conveniency // DANGER SHARED RESOURCE
     std::list<DAVIS240CEvent>* eventsList = &(m_events[x*m_cols+y]);
 
     // Neighbor bounding box
-    const int xMin = std::max(0,x-m_neighborSize);
-    const int yMin = std::max(0,y-m_neighborSize);
-    const int xMax = std::min(m_rows-1,x+m_neighborSize);
-    const int yMax = std::min(m_cols-1,y+m_neighborSize);
+    const int xMin = std::max(0,int(x)-m_neighborSize);
+    const int yMin = std::max(0,int(y)-m_neighborSize);
+    const int xMax = std::min(int(m_rows-1),int(x)+m_neighborSize);
+    const int yMax = std::min(int(m_cols-1),int(y)+m_neighborSize);
 
     if (p<=0)
     {
@@ -83,17 +84,17 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
                     //printf("Delta: %d. \n\r",dt);
 
                     // Check if support event of type A: neighbor events with p=0 and t in [m_currTime-eps;m_currTime+eps]
-                    if (dt < epsPeriod){ nbSupportsA++; }
+                    if (dt < m_epsPeriod){ nbSupportsA++; }
 
                     // Check support events of type B: neighbor events with p=0 and t in [m_currTime+dt-eps;m_currTime+dt+eps]
-                    else if (std::abs(dt-targetPeriod)<epsPeriod)
+                    else if (std::abs(dt-m_targetPeriod)<m_epsPeriod)
                     {
                         nbSupportsB++;
                     }
 
                     // Check anti-support event: neighbor events with p=0
-                    else if (   (dt > epsPeriod)
-                             && (dt < targetPeriod - epsPeriod))
+                    else if (   (dt > m_epsPeriod)
+                             && (dt < m_targetPeriod - m_epsPeriod))
                     {
                         nbAntiSupports++;
                     }
@@ -157,7 +158,6 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id)
         }
         */ // === END DEBUG
     }
-
 }
 
 void Filter::registerFilterListener(FilterListener* listener)

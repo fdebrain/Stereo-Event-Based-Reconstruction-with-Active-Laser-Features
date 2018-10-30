@@ -15,37 +15,41 @@ class MatcherListener
 {
 public:
     MatcherListener(void) {}
-    virtual void receivedNewMatch(DAVIS240CEvent& e1, DAVIS240CEvent& e2) = 0;
+    virtual void receivedNewMatch(const DAVIS240CEvent& e1,
+                                  const DAVIS240CEvent& e2) = 0;
 };
 
 
 class Matcher: public FilterListener
 {
 public:
-    Matcher(int rows, int cols,
+    Matcher(const unsigned int rows,
+            const unsigned int cols,
             Filter* filter0 = nullptr,
             Filter* filter1 = nullptr);
     ~Matcher();
 
-    void receivedNewFilterEvent(DAVIS240CEvent& event, int id);
+    void receivedNewFilterEvent(DAVIS240CEvent& event,
+                                const unsigned int id) override;
     void runThread();
-    void process(DAVIS240CEvent e0, DAVIS240CEvent e1);
+    void process(DAVIS240CEvent& e0, DAVIS240CEvent& e1);
 
     void registerMatcherListener(MatcherListener* listener);
     void deregisterMatcherListener(MatcherListener* listener);
-    void warnMatch(DAVIS240CEvent& event0, DAVIS240CEvent& event1);
+    void warnMatch(const DAVIS240CEvent& event0,
+                   const DAVIS240CEvent& event1);
 
 public:
     // Thread this object runs in
     std::thread m_thread;
 
 private:
-    int m_rows;
-    int m_cols;
+    const unsigned int m_rows;
+    const unsigned int m_cols;
     int m_eps;
 
     // Flushing old events
-    unsigned int m_currTime;
+    int m_currTime;
     int m_maxTimeToKeep;
 
     // List of incoming filtered events for each camera (FIFO)

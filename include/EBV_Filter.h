@@ -14,32 +14,37 @@ class FilterListener
 {
 public:
     FilterListener(void) {}
-    virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,int id) = 0;
+    virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,
+                                        const unsigned int id) = 0;
 };
 
 class Filter : public DAVIS240CListener
 {
 public:
-    Filter(int rows, int cols,
+    Filter(const unsigned int rows,
+           const unsigned int cols,
            DAVIS240C* davis = nullptr);
     ~Filter();
 
-    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e, int id);
-    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, int id) {}
+    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                   const unsigned int id);
+    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, unsigned int id) {}
 
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
     void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
-    float getX() const {return m_xc;}
-    float getY() const {return m_yc;}
+    inline float getX() const {return m_xc;}
+    inline float getY() const {return m_yc;}
 
     int getFreq() const {return m_frequency;}
-    void setFreq(int freq) {m_frequency=freq;}
+    void setFreq(int freq) {m_frequency=freq;
+                            m_targetPeriod = 1e6/m_frequency;}
 
     int getEps() const {return m_eps;}
-    void setEps(int eps) {m_eps=eps;}
+    void setEps(int eps) {m_eps=eps;
+                          m_epsPeriod = m_eps*m_targetPeriod/100.;}
 
     int getNeighborSize() const {return m_neighborSize;}
     void setNeighborSize(int size) {m_neighborSize=size;}
@@ -58,7 +63,7 @@ public:
 
 //====
 public:
-    std::thread m_thread;
+    //std::thread m_thread;
 //====
 
 private:
@@ -66,8 +71,8 @@ private:
     DAVIS240C* m_davis;
 
     // Datastructure matrix of list of events
-    int m_rows;
-    int m_cols;
+    const unsigned int m_rows;
+    const unsigned int m_cols;
     std::vector<std::list<DAVIS240CEvent>> m_events;
 
     // Parameters for flushing old events
@@ -76,7 +81,9 @@ private:
 
     // Parameters for events filtering
     int m_frequency;
+    int m_targetPeriod;
     int m_eps;
+    int m_epsPeriod;
     int m_neighborSize;
     int m_threshSupportsA;
     int m_threshSupportsB;

@@ -24,8 +24,8 @@ public:
     {}
 
     DAVIS240CEvent(const unsigned int x, const unsigned int y,
-                   const int pol,
-                   const unsigned long timestamp)
+                   const unsigned int pol,
+                   const int timestamp)
         : m_x(x),
           m_y(y),
           m_pol(pol),
@@ -34,8 +34,8 @@ public:
 
     unsigned int m_x;
     unsigned int m_y;
-    int m_pol;
-    unsigned int m_timestamp;
+    unsigned int m_pol;
+    int m_timestamp;
 };
 
 struct DAVIS240CFrame
@@ -65,8 +65,10 @@ class DAVIS240CListener
 {
     public:
         DAVIS240CListener(void) {}
-        virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,int id) = 0;
-        virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,int id) = 0;
+        virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
+                                               const unsigned int id) = 0;
+        virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
+                                               const unsigned int id) = 0;
 };
 
 class DAVIS240C
@@ -75,7 +77,7 @@ public:
     DAVIS240C();
     ~DAVIS240C();
 
-    static int m_nbCams;
+    static unsigned int m_nbCams;
     static libcaer::devices::davis* m_davisMasterHandle;
 
     // Life cycle of a DAVIS240C
@@ -103,15 +105,15 @@ public:
     void resetMasterClock();
 
     // Id of the camera
-    const int m_id;
+    const unsigned int m_id;
 
 private:
     //Device handle
     libcaer::devices::davis m_davisHandle;
 
     // Device resolution
-    int m_rows = 180;
-    int m_cols = 240;
+    const unsigned int m_rows = 180;
+    const unsigned int m_cols = 240;
 
     // Reading thread related variables
     std::thread m_readThread;

@@ -1,6 +1,7 @@
 #include <EBV_Matcher.h>
 
-Matcher::Matcher(int rows, int cols,
+Matcher::Matcher(const unsigned int rows,
+                 const unsigned int cols,
                  Filter* filter0,
                  Filter* filter1)
     : m_rows(rows), m_cols(cols),
@@ -45,6 +46,8 @@ void Matcher::runThread()
             m_queueAccessMutex.lock();
                 event0 = m_evtQueue0.front();
                 event1 = m_evtQueue1.front();
+                m_evtQueue0.pop_front();
+                m_evtQueue1.pop_front();
 
                 // DEBUG - QUEUE SIZE SHOULD BE SIMILAR
                 //printf("Queue size: %d - %d.\n\r",
@@ -59,6 +62,8 @@ void Matcher::runThread()
             //printf("Delta-time: (%d).\n\r",t0-t1);
             // END DEBUG
 
+
+
             process(event0,event1);
         }
         else
@@ -71,7 +76,8 @@ void Matcher::runThread()
 }
 
 // Called by the thread of previous agent (here Filter)
-void Matcher::receivedNewFilterEvent(DAVIS240CEvent& event, int id)
+void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
+                                     const unsigned int id)
 {
     // DEBUG - CHECK IF EVENTS SYNCHRONIZED
     //printf("Camera %d - Timestamp %d. \n\r",id,event.m_timestamp);
@@ -84,6 +90,7 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent& event, int id)
         m_queueAccessMutex.lock();
             m_evtQueue0.push_back(event);
 
+            // Remove old events
             std::list<DAVIS240CEvent>::iterator it = m_evtQueue0.begin(); // DANGER SHARED RESOURCE
             while(    ((m_currTime-it->m_timestamp) > m_maxTimeToKeep)
                    && (it!=m_evtQueue0.end())
@@ -91,7 +98,6 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent& event, int id)
             {
                 m_evtQueue0.erase(it++);
             }
-
         m_queueAccessMutex.unlock();
     }
     else
@@ -99,6 +105,7 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent& event, int id)
         m_queueAccessMutex.lock();
             m_evtQueue1.push_back(event);
 
+            // Remove old events
             std::list<DAVIS240CEvent>::iterator it = m_evtQueue1.begin(); // DANGER SHARED RESOURCE
             while(    ((m_currTime-it->m_timestamp) > m_maxTimeToKeep)
                    && (it!=m_evtQueue1.end())
@@ -106,7 +113,6 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent& event, int id)
             {
                 m_evtQueue1.erase(it++);
             }
-
         m_queueAccessMutex.unlock();
     }
 
@@ -115,7 +121,7 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent& event, int id)
 }
 
 // Processing to be done for each event
-void Matcher::process(DAVIS240CEvent e0, DAVIS240CEvent e1)
+void Matcher::process(DAVIS240CEvent& e0, DAVIS240CEvent& e1)
 {
     // Positive match if similar timestamps
     if (std::abs(e0.m_timestamp - e1.m_timestamp)<m_eps)
@@ -123,7 +129,6 @@ void Matcher::process(DAVIS240CEvent e0, DAVIS240CEvent e1)
         warnMatch(e0,e1);
     }
 }
-
 
 void Matcher::registerMatcherListener(MatcherListener* listener)
 {
@@ -135,8 +140,8 @@ void Matcher::deregisterMatcherListener(MatcherListener* listener)
     m_matcherListeners.remove(listener);
 }
 
-void Matcher::warnMatch(DAVIS240CEvent& event0,
-                        DAVIS240CEvent& event1)
+void Matcher::warnMatch(const DAVIS240CEvent& event0,
+                        const DAVIS240CEvent& event1)
 {
     std::list<MatcherListener*>::iterator it;
     for(it = m_matcherListeners.begin(); it!=m_matcherListeners.end(); it++)

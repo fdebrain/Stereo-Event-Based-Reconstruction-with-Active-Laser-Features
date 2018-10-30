@@ -18,7 +18,7 @@ static void usbShutdownHandler(void *ptr) {
     globalShutdown.store(true);
 }
 
-int DAVIS240C::m_nbCams=0;
+unsigned int DAVIS240C::m_nbCams=0;
 libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
 
 DAVIS240C::DAVIS240C()
@@ -37,13 +37,13 @@ DAVIS240C::DAVIS240C()
     sigaddset(&shutdownAction.sa_mask, SIGTERM);
     sigaddset(&shutdownAction.sa_mask, SIGINT);
 
-    if (sigaction(SIGTERM, &shutdownAction, NULL) == -1) {
+    if (sigaction(SIGTERM, &shutdownAction, nullptr) == -1) {
         libcaer::log::log(libcaer::log::logLevel::CRITICAL, "ShutdownAction",
             "Failed to set signal handler for SIGTERM. Error: %d.", errno);
         return;
     }
 
-    if (sigaction(SIGINT, &shutdownAction, NULL) == -1) {
+    if (sigaction(SIGINT, &shutdownAction, nullptr) == -1) {
         libcaer::log::log(libcaer::log::logLevel::CRITICAL, "ShutdownAction",
             "Failed to set signal handler for SIGINT. Error: %d.", errno);
         return;
@@ -91,8 +91,8 @@ int DAVIS240C::init()
     m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP, caerBiasCoarseFineGenerate(coarseFineBias));
 
     // Let's verify they really changed!
-    uint32_t prBias   = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP);
-    uint32_t prsfBias = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP);
+    //uint32_t prBias   = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP);
+    //uint32_t prsfBias = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP);
 
     //printf("New bias values --- PR-coarse: %d, PR-fine: %d, PRSF-coarse: %d, PRSF-fine: %d.\n\r",
     //    caerBiasCoarseFineParse(prBias).coarseValue, caerBiasCoarseFineParse(prBias).fineValue,
@@ -175,7 +175,7 @@ void DAVIS240C::readThread()
                     e.m_y           = theEvent.getX();
                     e.m_x           = theEvent.getY();
                     e.m_timestamp   = theEvent.getTimestamp();
-                    e.m_pol         = theEvent.getPolarity();
+                    e.m_pol         = theEvent.getPolarity(); // {0,1}
 
                     events.push_back(e);
                 }
@@ -217,7 +217,7 @@ void DAVIS240C::readThread()
 
                 for (int row = 0; row < theFrame.getLengthY(); row++) {
                     for (int col = 0; col < theFrame.getLengthX(); col++) {
-                        f.m_frame[row*m_cols + col] = (unsigned char)(255.*theFrame.getPixel(col, row)/65535.);
+                        f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*theFrame.getPixel(col, row)/65535.);
                     }
                 }
 
@@ -270,7 +270,7 @@ void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
     std::list<DAVIS240CListener*>::iterator it;
     for(it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
     {
-        for(int i=0;i<events.size();i++)
+        for(unsigned int i=0;i<events.size();i++)
             (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
     }
 }

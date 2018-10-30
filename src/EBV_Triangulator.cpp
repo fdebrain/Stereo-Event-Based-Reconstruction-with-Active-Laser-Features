@@ -2,6 +2,22 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+StereoRectificationData::StereoRectificationData() {
+    for (auto &r : R) {
+        r.resize(0);
+    }
+    for (auto &p : P) {
+        p.resize(0);
+    }
+    Q.resize(0);
+}
+
+bool StereoRectificationData::is_valid() const {
+    return R[0].rows == 3 && R[0].cols == 3 && R[1].rows == 3 &&
+           R[1].cols == 3 && P[0].rows == 3 && P[0].cols == 4 &&
+           P[1].rows == 3 && P[1].cols == 4 && Q.rows == 4 && Q.cols == 4;
+}
+
 void Triangulator::importCalibration(std::string path)
 {
     cv::FileStorage fs;
@@ -28,6 +44,14 @@ void Triangulator::importCalibration(std::string path)
 
     fs["F"] >> m_F;
     std::cout << "F: " << m_F << std::endl;
+
+    cv::stereoRectify(m_K0,m_D0,
+                      m_K1,m_D1,
+                      cv::Size(m_rows,m_cols),
+                      m_R,m_T,
+                      m_rect.R[0], m_rect.R[1],
+                      m_rect.P[0], m_rect.P[1],
+                      m_rect.Q);
 }
 
 void Triangulator::computeProjMat()
@@ -43,10 +67,12 @@ void Triangulator::computeProjMat()
     std::cout << "P1: " << m_P1 << std::endl;
 }
 
-Triangulator::Triangulator(int rows, int cols,
-                           Matcher*  matcher):
-    m_rows(rows), m_cols(cols),
-    m_matcher(matcher)
+Triangulator::Triangulator(const unsigned int rows,
+                           const unsigned int cols,
+                           Matcher*  matcher)
+    : m_rows(rows),
+      m_cols(cols),
+      m_matcher(matcher)
 {
     // Initialize thread
     m_thread = std::thread(&Triangulator::run,this);
@@ -98,7 +124,8 @@ void Triangulator::run()
     }
 }
 
-void Triangulator::receivedNewMatch(DAVIS240CEvent& event0, DAVIS240CEvent& event1)
+void Triangulator::receivedNewMatch(const DAVIS240CEvent& event0,
+                                    const DAVIS240CEvent& event1)
 {
     m_queueAccessMutex.lock();
         m_evtQueue0.push_back(event0);
@@ -109,7 +136,7 @@ void Triangulator::receivedNewMatch(DAVIS240CEvent& event0, DAVIS240CEvent& even
     m_condWait.notify_one();
 }
 
-void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& event1)
+void Triangulator::process(const DAVIS240CEvent event0, const DAVIS240CEvent event1)
 {
     // DEBUG - CHECK EVENTS POSITION
     //m_queueAccessMutex.lock();
@@ -119,15 +146,10 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     // END DEBUG
 
     // Get 2D point coordinates - SLOW !
-    //cv::Mat coords0(2,1,CV_32FC1);
-    //cv::Mat coords1(2,1,CV_32FC1);
-    //cv::Mat undistCoords0(2,1,CV_32FC1);
-    //cv::Mat undistCoords1(2,1,CV_32FC1);
-    //cv::Mat triangCoords4D(4,1,CV_32FC1);
-
     std::vector<cv::Point2d> coords0, coords1;
     std::vector<cv::Point2d> undistCoords0, undistCoords1;
-    cv::Mat point3D_homo;
+    std::vector<cv::Point2d> undistCoordsCorrected0, undistCoordsCorrected1;
+    cv::Vec4d point3D;
 
     m_queueAccessMutex.lock();
         coords0.push_back(cv::Point2d(event0.m_x,event0.m_y));
@@ -136,25 +158,44 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
         //printf("Event1: (%f,%f). \n\r",coords1.back().x,coords1.back().y);
 
         // Undistort 2D points
-        cv::undistortPoints(coords0, undistCoords0, m_K0, m_D0);
-        cv::undistortPoints(coords1, undistCoords1, m_K1, m_D1);
+        cv::undistortPoints(coords0, undistCoords0,
+                            m_K0, m_D0,
+                            m_rect.R[0],
+                            m_rect.P[0]);
+        cv::undistortPoints(coords1, undistCoords1,
+                            m_K1, m_D1,
+                            m_rect.R[1],
+                            m_rect.P[1]);
         //printf("Undistorted Event0: (%f,%f). \n\r",undistCoords0.back().x,undistCoords0.back().y);
         //printf("Undistorted Event1: (%f,%f). \n\r",undistCoords1.back().x,undistCoords1.back().y);
 
+        const auto ydiff = std::fabs(coords0.at<float>(1) - coords1.at<float>(1));
+        // Check parallel epipolar constraint !
+
+        // Correct matches
+        cv::correctMatches(m_F,undistCoords0,undistCoords1,
+                           undistCoordsCorrected0,
+                           undistCoordsCorrected1);
+
         // Triangulate
-        cv::triangulatePoints(m_P0, m_P1,
+        cv::triangulatePoints(m_rect.P[0], m_rect.P[1],
                               undistCoords0,
                               undistCoords1,
-                              point3D_homo);
+                              point3D);
 
-        //printf("Point at: (%f,%f,%f,%f).\n\r",point3D_homo.at<double>(0),
-        //                                      point3D_homo.at<double>(1),
-        //                                      point3D_homo.at<double>(2),
-        //                                      point3D_homo.at<double>(3));
+        //printf("Point at: (%3.f,%3.f,%4.f).\n\r",
+        //        point3D[0]/point3D[3],
+        //        point3D[1]/point3D[3],
+        //        point3D[2]/point3D[3]);
 
-        //printf("Depth: %f.\n\r",100*(point3D_homo.at<double>(2)/point3D_homo.at<double>(3)-738));
+        //printf("Point at: (%3.f,%3.f,%4.f).\n\r",point3D.at<double>(0)/point3D.at<double>(3),
+        //                                   point3D.at<double>(1)/point3D.at<double>(3),
+        //                                   point3D.at<double>(2)/point3D.at<double>(3));
 
-        warnDepth(event0.m_x,event0.m_y,point3D_homo.at<double>(2)/point3D_homo.at<double>(3));
+        double depth = point3D[2]/point3D[3];
+        printf("Depth: %f.\n\r",depth);
+
+        warnDepth(event0.m_x,event0.m_y,depth);
     m_queueAccessMutex.unlock();
 
 }
@@ -169,7 +210,7 @@ void Triangulator::deregisterTriangulatorListener(TriangulatorListener* listener
     m_triangulatorListeners.remove(listener);
 }
 
-void Triangulator::warnDepth(int u, int v, float z)
+void Triangulator::warnDepth(int u, int v, double z)
 {
     std::list<TriangulatorListener*>::iterator it;
     for(it = m_triangulatorListeners.begin(); it!=m_triangulatorListeners.end(); it++)
