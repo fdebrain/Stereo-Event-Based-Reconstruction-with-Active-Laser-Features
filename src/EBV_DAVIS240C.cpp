@@ -48,11 +48,18 @@ DAVIS240C::DAVIS240C()
             "Failed to set signal handler for SIGINT. Error: %d.", errno);
         return;
     }
+
+    this->init();
+    this->start();
+    this->listen();
 }
 
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
+    this->stopListening();
+    this->stop();
+    this->close();
     // Close automatically done by destructor.
 }
 
@@ -112,14 +119,8 @@ int DAVIS240C::start()
     m_davisHandle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
 
     // Reset master clock when new device is added
-    if (m_id==0)
-    {
-        m_davisMasterHandle = &m_davisHandle;
-    }
-    else
-    {
-        resetMasterClock();
-    }
+    if (m_id==0) { m_davisMasterHandle = &m_davisHandle; }
+    else { resetMasterClock(); }
 
     return 0;
 }
@@ -286,7 +287,6 @@ void DAVIS240C::deregisterFrameListener(DAVIS240CListener* listener)
     m_frameListeners.remove(listener);
 }
 
-// Send new frame to all listeners
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 {
     std::list<DAVIS240CListener*>::iterator it;

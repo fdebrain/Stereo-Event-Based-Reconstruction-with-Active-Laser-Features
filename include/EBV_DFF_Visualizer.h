@@ -7,10 +7,11 @@
 #include <EBV_Filter.h>
 #include <EBV_Triangulator.h>
 
+#include <fstream>
 #include <string>
 #include <mutex>
 
-namespace cv { class Mat; }
+namespace cv { class Mat;}
 
 class Visualizer : public DVS128USBListener,
                    public DAVIS240CListener,
@@ -43,19 +44,17 @@ public:
 
 public:
     // Parameters for camera settings
-    const unsigned int                 m_rows;
-    const unsigned int                 m_cols;
-    const unsigned int                 m_nbCams;
+    const unsigned int          m_rows;
+    const unsigned int          m_cols;
+    const unsigned int          m_nbCams;
 
     // Parameters related to filtering events above threshold age
     int        m_currenTime0;
     int        m_currenTime1;
     int        m_thresh;
     int        m_max_trackbar_val=1e6;
-    //====
-    int        m_min_depth = 1000; // = 10 cm
-    int        m_max_depth = 2000; // = 20 cm
-    //====
+    int        m_min_depth = 1100; // = 10 cm
+    int        m_max_depth = 1600; // = 20 cm
 
     // Structures for data storing (flattened matrices)
     std::vector<int>            m_polEvts0;
@@ -67,9 +66,12 @@ public:
     std::vector<double>         m_depthMap;
 
     // Thread-safety
-    std::mutex                  m_evtMutex;
-    std::mutex                  m_frameMutex;
-    std::mutex                  m_filterEvtMutex;
+    std::mutex                  m_evtMutex0;
+    std::mutex                  m_frameMutex0;
+    std::mutex                  m_filterEvtMutex0;
+    std::mutex                  m_evtMutex1;
+    std::mutex                  m_frameMutex1;
+    std::mutex                  m_filterEvtMutex1;
     std::mutex                  m_depthMutex;
 
     // Structures for displaying camera frames
@@ -102,6 +104,11 @@ public:
     int m_threshB1;
     int m_threshAnti1;
     int m_etaInt1;
+
+    // Event recorder
+    std::ofstream m_recorder;
+
+    // Frame recordere
 
     // Laser object
     MagneticMirrorLaser m_laser;

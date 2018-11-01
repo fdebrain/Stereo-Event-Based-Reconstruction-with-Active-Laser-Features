@@ -37,8 +37,8 @@ public:
     void receivedNewMatch(const DAVIS240CEvent& event1,
                           const DAVIS240CEvent& event2) override;
     void run();
-    void process(const DAVIS240CEvent event0,
-                 const DAVIS240CEvent event1);
+    void process(const DAVIS240CEvent& event0,
+                 const DAVIS240CEvent& event1);
 
     void registerTriangulatorListener(TriangulatorListener* listener);
     void deregisterTriangulatorListener(TriangulatorListener* listener);

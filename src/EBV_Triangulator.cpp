@@ -136,7 +136,7 @@ void Triangulator::receivedNewMatch(const DAVIS240CEvent& event0,
     m_condWait.notify_one();
 }
 
-void Triangulator::process(const DAVIS240CEvent event0, const DAVIS240CEvent event1)
+void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& event1)
 {
     // DEBUG - CHECK EVENTS POSITION
     //m_queueAccessMutex.lock();
@@ -145,7 +145,6 @@ void Triangulator::process(const DAVIS240CEvent event0, const DAVIS240CEvent eve
     //m_queueAccessMutex.unlock();
     // END DEBUG
 
-    // Get 2D point coordinates - SLOW !
     std::vector<cv::Point2d> coords0, coords1;
     std::vector<cv::Point2d> undistCoords0, undistCoords1;
     std::vector<cv::Point2d> undistCoordsCorrected0, undistCoordsCorrected1;
@@ -167,11 +166,7 @@ void Triangulator::process(const DAVIS240CEvent event0, const DAVIS240CEvent eve
                             m_rect.R[1],
                             m_rect.P[1]);
         //printf("Undistorted Event0: (%f,%f). \n\r",undistCoords0.back().x,undistCoords0.back().y);
-        //printf("Undistorted Event1: (%f,%f). \n\r",undistCoords1.back().x,undistCoords1.back().y);
-
-        const auto ydiff = std::fabs(coords0.at<float>(1) - coords1.at<float>(1));
-        // Check parallel epipolar constraint !
-
+        //printf("Undistorted Event1: (%f,%f). \n\r",undistCoords1.back().x,undistCoords1.back().y);        
         // Correct matches
         cv::correctMatches(m_F,undistCoords0,undistCoords1,
                            undistCoordsCorrected0,
@@ -179,8 +174,8 @@ void Triangulator::process(const DAVIS240CEvent event0, const DAVIS240CEvent eve
 
         // Triangulate
         cv::triangulatePoints(m_rect.P[0], m_rect.P[1],
-                              undistCoords0,
-                              undistCoords1,
+                              undistCoordsCorrected0,
+                              undistCoordsCorrected1,
                               point3D);
 
         //printf("Point at: (%3.f,%3.f,%4.f).\n\r",

@@ -8,8 +8,8 @@
 int main(int argc, char** argv)
 {
     // Resolution
-    int rows = 180;
-    int cols = 240;
+    unsigned int rows = 180;
+    unsigned int cols = 240;
 
     DAVIS240C    davis_master;
     DAVIS240C    davis_slave;
@@ -24,27 +24,27 @@ int main(int argc, char** argv)
                       &triangulator);
 
     // Open Master
-    davis_master.init();
-    davis_master.start();
-    davis_master.listen();
+    //davis_master.init();
+    //davis_master.start();
+    //davis_master.listen();
 
     // Open Slave
-    davis_slave.init();
-    davis_slave.start();
-    davis_slave.listen();
+    //davis_slave.init();
+    //davis_slave.start();
+    //davis_slave.listen();
 
     // Visualize
     visu.run();
 
     // Close Slave
-    davis_slave.stopListening();
-    davis_slave.stop();
-    davis_slave.close();
+    //davis_slave.stopListening();
+    //davis_slave.stop();
+    //davis_slave.close();
 
     // Close Master
-    davis_master.stopListening();
-    davis_master.stop();
-    davis_master.close();
+    //davis_master.stopListening();
+    //davis_master.stop();
+    //davis_master.close();
 
     return 0;
 }

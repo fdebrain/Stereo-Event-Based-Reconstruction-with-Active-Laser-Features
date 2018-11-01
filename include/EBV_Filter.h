@@ -27,7 +27,7 @@ public:
     ~Filter();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id);
+                                   const unsigned int id) override;
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f, unsigned int id) {}
 
     void registerFilterListener(FilterListener* listener);
@@ -61,10 +61,8 @@ public:
     float getEta() const {return m_eta;}
     void setEta(float eta) {m_eta=eta;}
 
-//====
 public:
     //std::thread m_thread;
-//====
 
 private:
     // Id of the filter
