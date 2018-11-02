@@ -48,18 +48,11 @@ DAVIS240C::DAVIS240C()
             "Failed to set signal handler for SIGINT. Error: %d.", errno);
         return;
     }
-
-    this->init();
-    this->start();
-    this->listen();
 }
 
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
-    this->stopListening();
-    this->stop();
-    this->close();
     // Close automatically done by destructor.
 }
 

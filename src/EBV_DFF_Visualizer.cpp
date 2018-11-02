@@ -1,13 +1,12 @@
 #include <EBV_DFF_Visualizer.h>
 
 #include <string.h>
-
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/opencv.hpp>
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 cv::VideoWriter m_video0("../calibration/calibCircles0.avi",
                          CV_FOURCC('M', 'J', 'P', 'G'),
@@ -55,7 +54,7 @@ static void callbackTrackbarThreshAnti(int newThreshAnti, void *data)
 static void callbackTrackbarEta(int newEta, void *data)
 {
     Filter* filter = static_cast<Filter*>(data);
-    filter->setEta(newEta/100.);
+    filter->setEta(newEta/100.f);
 }
 
 Visualizer::Visualizer(const unsigned int rows,
@@ -72,6 +71,7 @@ Visualizer::Visualizer(const unsigned int rows,
     // Listen to Davis
     m_davis0->registerEventListener(this);
     m_davis0->registerFrameListener(this);
+
     m_davis1->registerEventListener(this);
     m_davis1->registerFrameListener(this);
 
@@ -196,22 +196,36 @@ Visualizer::Visualizer(const unsigned int rows,
     // Saving events in .txt
     //m_recorder.open("closer_bottom_vertical.txt");
 
-    // Saving frames
+    m_davis0->init();
+    m_davis0->start();
+    m_davis0->listen();
+    m_davis1->init();
+    m_davis1->start();
+    m_davis1->listen();
 }
 
 
 Visualizer::~Visualizer()
 {
+    m_laser.close();
+
     m_davis0->deregisterEventListener(this);
     m_davis0->deregisterFrameListener(this);
+    m_davis0->stopListening();
+    m_davis0->stop();
+    m_davis0->close();
     m_filter0->deregisterFilterListener(this);
 
-    m_davis1->deregisterEventListener(this);
-    m_filter1->deregisterFilterListener(this);
-    m_davis1->deregisterFrameListener(this);
 
-    m_laser.close();
+    m_davis1->deregisterEventListener(this);
+    m_davis1->deregisterFrameListener(this);
+    m_davis1->stopListening();
+    m_davis1->stop();
+    m_davis1->close();
+    m_filter1->deregisterFilterListener(this);
+
     m_triangulator->deregisterTriangulatorListener(this);
+
     //m_recorder.close();
     m_video0.release();
     m_video1.release();
@@ -220,9 +234,9 @@ Visualizer::~Visualizer()
 
 void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
 {
-    int x = e.m_x;
-    int y = e.m_y;
-    int p = e.m_pol; // p={0,1}
+    const unsigned int x = e.m_x;
+    const unsigned int y = e.m_y;
+    const unsigned int p = e.m_pol; // p={0,1}
 
     m_evtMutex0.lock();
         m_polEvts0[x*m_cols+y] += 2*p-1; // p={-1,1}
@@ -269,8 +283,8 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
             m_frameMutex0.lock();
                 m_currenTime0 = f.m_timestamp;
                 m_grayFrame0 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-                cv::Mat frame0;
-                cv::cvtColor(m_grayFrame0,frame0,cv::COLOR_GRAY2BGR);
+                //cv::Mat frame0;
+                //cv::cvtColor(m_grayFrame0,frame0,cv::COLOR_GRAY2BGR);
                 //m_video0.write(frame0);
             m_frameMutex0.unlock();
             break;
@@ -280,9 +294,9 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
         {
             m_frameMutex1.lock();
                 m_currenTime1 = f.m_timestamp;
-                cv::Mat frame1;
-                cv::cvtColor(m_grayFrame1,frame1,cv::COLOR_GRAY2BGR);
                 m_grayFrame1 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
+                //cv::Mat frame1;
+                //cv::cvtColor(m_grayFrame1,frame1,cv::COLOR_GRAY2BGR);
                 //m_video1.write(frame1);
             m_frameMutex1.unlock();
             break;
@@ -301,31 +315,32 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
 
     switch (id)
     {
-    case 0:
+        case 0:
         {
-        m_filterEvtMutex0.lock();
-            m_filtEvts0[x*m_cols+y] = t;
-            //m_recorder << id << "\t" << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
-         m_filterEvtMutex0.unlock();
-        break;
+            m_filterEvtMutex0.lock();
+                m_filtEvts0[x*m_cols+y] = t;
+                //m_recorder << id << "\t" << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+             m_filterEvtMutex0.unlock();
+            break;
         }
 
-    case 1:
+        case 1:
         {
-        m_filterEvtMutex1.lock();
-            m_filtEvts1[x*m_cols+y] = t;
-            //m_recorder << id << "\t" << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
-        m_filterEvtMutex1.unlock();
-        break;
+            m_filterEvtMutex1.lock();
+                m_filtEvts1[x*m_cols+y] = t;
+                //m_recorder << id << "\t" << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+            m_filterEvtMutex1.unlock();
+            break;
         }
     }
 }
 
 
-void Visualizer::receivedNewDepth(int &u, int &v, double &depth)
+void Visualizer::receivedNewDepth(const unsigned int &u,
+                                  const unsigned int &v,
+                                  const double &depth)
 {
     m_depthMutex.lock();
-        //printf("Depth at (%d,%d) = %f. \n\r",v,u,depth);
         m_depthMap[u*m_cols+v] = depth;
     m_depthMutex.unlock();
 }
@@ -348,7 +363,7 @@ void Visualizer::run()
 
     // Initialize laser position
     double t = 0;
-    unsigned int cx = 2048, cy=2048, r=1000; //r=1592;
+    unsigned int cx = 2048, cy=2048, r=500; //r=1592;
     unsigned int x, y;
     int freq = 600;
     m_laser.blink(1e6/(2*freq)); // T/2
@@ -357,14 +372,13 @@ void Visualizer::run()
     while(key != 'q')
     {
         // Laser control: draw a circle
-        t += 1./100; // Need 10 increments for full cycle = 200ms (10*20ms waitKey)
+        t += 1./10; // Need 10 increments for full cycle = 200ms (10*20ms waitKey)
         x = static_cast<unsigned int>(cx + r*cos(2.*3.14*t));
-        y = static_cast<unsigned int>(cx);
-        //y = static_cast<unsigned int>(cy + r*sin(2.*3.14*t));
+        //y = static_cast<unsigned int>(cx);
+        y = static_cast<unsigned int>(cy + r*sin(2.*3.14*t));
         m_laser.pos(x,y);
         //m_laser.vel(8e4,8e4);
 
-        //m_evtMutex.lock();
         for(unsigned int i=0; i<m_rows*m_cols; i++)
         {
             // Events by polarity - Master
@@ -480,8 +494,12 @@ void Visualizer::run()
         //cv::imshow(m_ageWin1,ageMatRGB1);
 
         // Display frame
-        cv::imshow(m_frameWin0,m_grayFrame0);
-        cv::imshow(m_frameWin1,m_grayFrame1);
+        m_frameMutex0.lock();
+            cv::imshow(m_frameWin0,m_grayFrame0);
+        m_frameMutex0.unlock();
+        m_frameMutex1.lock();
+            cv::imshow(m_frameWin1,m_grayFrame1);
+        m_frameMutex1.unlock();
 
         // Display trackers
         if(m_filter0 != nullptr)

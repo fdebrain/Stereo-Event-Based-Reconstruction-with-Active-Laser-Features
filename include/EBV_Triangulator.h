@@ -23,7 +23,9 @@ class TriangulatorListener
 {
 public:
     TriangulatorListener(void) {}
-    virtual void receivedNewDepth(int &u, int &v, double &depth) = 0;
+    virtual void receivedNewDepth(const unsigned int &u,
+                                  const unsigned int &v,
+                                  const double &depth) = 0;
 };
 
 class Triangulator : public MatcherListener
@@ -42,10 +44,11 @@ public:
 
     void registerTriangulatorListener(TriangulatorListener* listener);
     void deregisterTriangulatorListener(TriangulatorListener* listener);
-    void warnDepth(int u, int v, double depth);
+    void warnDepth(const unsigned int u,
+                   const unsigned int v,
+                   const double depth);
 
     void importCalibration(std::string path);
-    void computeProjMat();
 
 private:
     const unsigned int m_rows;
@@ -76,7 +79,8 @@ private:
     std::list<DAVIS240CEvent> m_evtQueue1;
 
     // Mutex to access the queue
-    std::mutex m_queueAccessMutex;
+    std::mutex m_queueAccessMutex0;
+    std::mutex m_queueAccessMutex1;
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;

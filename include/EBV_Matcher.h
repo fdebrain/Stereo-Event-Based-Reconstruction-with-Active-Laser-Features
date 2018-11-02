@@ -57,19 +57,20 @@ private:
     std::list<DAVIS240CEvent> m_evtQueue1;
 
     // Mutex to access the queue
-    std::mutex m_queueAccessMutex;
+    std::mutex m_queueAccessMutex0;
+    std::mutex m_queueAccessMutex1;
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
 
-
-    // Alternative: We access m_events by reference (setFilter here, getEvents in Filter)
+    // Who matcher listens to
     Filter* m_filter0;
     Filter* m_filter1;
 
     // List of matcher listeners
     std::list<MatcherListener*> m_matcherListeners;
+
 };
 
 #endif // EBV_MATCHER_H

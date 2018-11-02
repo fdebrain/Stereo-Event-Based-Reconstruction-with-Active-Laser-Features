@@ -38,7 +38,9 @@ public:
                                    const unsigned int id);
     void receivedNewFilterEvent(DAVIS240CEvent& e,
                                 const unsigned int id);
-    void receivedNewDepth(int &u, int &v, double &depth);
+    void receivedNewDepth(const unsigned int &u,
+                          const unsigned int &v,
+                          const double &depth);
 
     void run();
 
