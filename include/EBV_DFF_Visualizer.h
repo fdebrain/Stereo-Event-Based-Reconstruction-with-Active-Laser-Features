@@ -6,6 +6,7 @@
 #include <EBV_MagneticMirrorLaser.h>
 #include <EBV_Filter.h>
 #include <EBV_Triangulator.h>
+#include <EBV_LaserController.h>
 
 #include <fstream>
 #include <string>
@@ -28,7 +29,8 @@ public:
                DAVIS240C* davis1 = nullptr,
                Filter* filter0 = nullptr,
                Filter* filter1 = nullptr,
-               Triangulator* triangulator = nullptr);
+               Triangulator* triangulator = nullptr,
+               LaserController* laser = nullptr);
     ~Visualizer();
 
     void receivedNewDVS128USBEvent(DVS128USBEvent& e);
@@ -53,10 +55,6 @@ public:
     // Parameters related to filtering events above threshold age
     int        m_currenTime0;
     int        m_currenTime1;
-    int        m_thresh;
-    int        m_max_trackbar_val=1e6;
-    int        m_min_depth = 1100; // = 10 cm
-    int        m_max_depth = 1600; // = 20 cm
 
     // Structures for data storing (flattened matrices)
     std::vector<int>            m_polEvts0;
@@ -91,7 +89,18 @@ public:
     std::string         m_filtWin1;
     std::string         m_depthWin;
 
-    // Trackbar parameters
+    // Trackbar parameters (events age)
+    int        m_ageThresh;
+    int        m_max_trackbar_val=1e6;
+
+    // Trackbar parameters (laser)
+    int m_cx;
+    int m_cy;
+    int m_r;
+    int m_stepInt;
+    int m_laserFreq;
+
+    // Trackbar parameters (filter)
     int m_freq0;
     int m_eps0;
     int m_neighborSize0;
@@ -99,6 +108,7 @@ public:
     int m_threshB0;
     int m_threshAnti0;
     int m_etaInt0;
+
     int m_freq1;
     int m_eps1;
     int m_neighborSize1;
@@ -107,13 +117,18 @@ public:
     int m_threshAnti1;
     int m_etaInt1;
 
+    // Trackbar parameters (depth)
+    int        m_min_depth = 1100; // = 10 cm
+    int        m_max_depth = 1600; // = 20 cm
+
     // Event recorder
     std::ofstream m_recorder;
 
     // Frame recordere
 
     // Laser object
-    MagneticMirrorLaser m_laser;
+    //MagneticMirrorLaser m_laser;
+    LaserController* m_laser;
 
     // Davis object
     DAVIS240C*          m_davis0;

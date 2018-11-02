@@ -127,7 +127,7 @@ void Triangulator::receivedNewMatch(const DAVIS240CEvent& event0,
 
     m_queueAccessMutex1.lock();
         m_evtQueue1.push_back(event1);
-    m_queueAccessMutex1.lock();
+    m_queueAccessMutex1.unlock();
 
     std::unique_lock<std::mutex> condLock(m_condWaitMutex);
     m_condWait.notify_one();
@@ -136,14 +136,12 @@ void Triangulator::receivedNewMatch(const DAVIS240CEvent& event0,
 void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& event1)
 {
     // DEBUG - CHECK EVENTS POSITION
-    m_queueAccessMutex0.lock();
-        printf("Event0: (%d,%d). \n\r",event0.m_y,event0.m_x);
-    m_queueAccessMutex0.unlock();
-    m_queueAccessMutex1.lock();
-        printf("Event1: (%d,%d). \n\r",event1.m_y,event1.m_x);
-    m_queueAccessMutex1.unlock();
-
-
+    //m_queueAccessMutex0.lock();
+    //    printf("Event0: (%d,%d). \n\r",event0.m_y,event0.m_x);
+    //m_queueAccessMutex0.unlock();
+    //m_queueAccessMutex1.lock();
+    //    printf("Event1: (%d,%d). \n\r",event1.m_y,event1.m_x);
+    //m_queueAccessMutex1.unlock();
     // END DEBUG
 
     std::vector<cv::Point2d> coords0, coords1;
@@ -195,7 +193,7 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     //                                   point3D.at<double>(2)/point3D.at<double>(3));
 
     double depth = point3D[2]/point3D[3];
-    printf("Depth: %f.\n\r",depth);
+    //printf("Depth: %f.\n\r",depth);
 
     warnDepth(x0,y0,depth);
 }

@@ -15,6 +15,7 @@ cv::VideoWriter m_video1("../calibration/calibCircles1.avi",
                          CV_FOURCC('M', 'J', 'P', 'G'),
                          10, cv::Size(240,180),true);
 
+//=== TRACKBAR CALLBACKS ===//
 static void callbackTrackbarFreq(int newFreq, void *data)
 {
     Filter* filter = static_cast<Filter*>(data);
@@ -57,16 +58,48 @@ static void callbackTrackbarEta(int newEta, void *data)
     filter->setEta(newEta/100.f);
 }
 
+static void callbackTrackbarLaserCenterX(int cx, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setCenterX(cx);
+}
+
+static void callbackTrackbarLaserCenterY(int cy, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setCenterY(cy);
+}
+
+static void callbackTrackbarLaserRadius(int r, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setRadius(r);
+}
+
+static void callbackTrackbarLaserStep(int stepInt, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setStep(1./stepInt);
+}
+
+static void callbackTrackbarLaserFreq(int freq, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setStep(freq);
+}
+
 Visualizer::Visualizer(const unsigned int rows,
                        const unsigned int cols,
                        const unsigned int nbCams,
                        DAVIS240C* davis0, DAVIS240C* davis1,
                        Filter* filter0, Filter* filter1,
-                       Triangulator* triangulator)
+                       Triangulator* triangulator,
+                       LaserController* laser)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams),
       m_davis0(davis0), m_davis1(davis1),
       m_filter0(filter0), m_filter1(filter1),
-      m_triangulator(triangulator)
+      m_triangulator(triangulator),
+      m_laser(laser)
 {
     // Listen to Davis
     m_davis0->registerEventListener(this);
@@ -83,7 +116,8 @@ Visualizer::Visualizer(const unsigned int rows,
     m_triangulator->registerTriangulatorListener(this);
 
     // Initialize laser
-    m_laser.init("/dev/ttyUSB0");
+    m_laser->start();
+    //m_laser.init("/dev/ttyUSB0");
 
     // Initialize data structure to hold the events (flatten matrices)
     m_polEvts0.resize(m_rows*m_cols);
@@ -123,8 +157,8 @@ Visualizer::Visualizer(const unsigned int rows,
     cv::namedWindow(m_filtWin1,0);
     cv::namedWindow(m_depthWin,0);
 
-    // Initialize tuning parameters
-    m_thresh = 40e3; // 40ms
+    // Initialize tuning parameters (filter)
+    m_ageThresh = 40e3; // 40ms
     m_freq0 = m_filter0->getFreq();
     m_eps0 = m_filter0->getEps();
     m_neighborSize0 = m_filter0->getNeighborSize();
@@ -140,6 +174,13 @@ Visualizer::Visualizer(const unsigned int rows,
     m_threshB1 = m_filter1->getThreshB();
     m_threshAnti1 = m_filter1->getThreshAnti();
     m_etaInt1 = static_cast<int>(100*m_filter1->getEta());
+
+    // Initialize tuning parameters (laser)
+    m_cx = m_laser->getCenterX();
+    m_cy = m_laser->getCenterY();
+    m_r = m_laser->getRadius();
+    m_stepInt = static_cast<int>(1./m_laser->getStep());
+    m_laserFreq = m_laser->getFreq();
 
     printf("\rFreq set to: %d. \n\r",m_freq0);
     printf("Eps set to: %d. \n\r",m_eps0);
@@ -157,9 +198,23 @@ Visualizer::Visualizer(const unsigned int rows,
     printf("Anti-Supports set to: %d. \n\r",m_threshAnti1);
     printf("Eta set to: %d. \n\r\n",m_etaInt1);
 
-    // Filter tuning trackbars
-    cv::createTrackbar("Threshold",m_ageWin0,&m_thresh,m_max_trackbar_val,nullptr);
-    cv::createTrackbar("Frequency",m_filtWin0,&m_freq0,1000,
+    // Age trackbars
+    cv::createTrackbar("Threshold",m_polWin0,&m_ageThresh,m_max_trackbar_val,nullptr);
+
+    // Laser trackbars
+    cv::createTrackbar("c_x",m_polWin0,&m_cx,4096,
+                       &callbackTrackbarLaserCenterX,(void*)(m_laser));
+    cv::createTrackbar("c_y",m_polWin0,&m_cy,4096,
+                       &callbackTrackbarLaserCenterY,(void*)(m_laser));
+    cv::createTrackbar("radius",m_polWin0,&m_r,2048,
+                       &callbackTrackbarLaserRadius,(void*)(m_laser));
+    cv::createTrackbar("step",m_polWin0,&m_stepInt,1000,
+                       &callbackTrackbarLaserStep,(void*)(m_laser));
+    cv::createTrackbar("Laser frequency",m_polWin0,&m_laserFreq,1000,
+                       &callbackTrackbarLaserFreq,(void*)(m_laser));
+
+    // Filter trackbars
+    cv::createTrackbar("Filter frequency",m_filtWin0,&m_freq0,1000,
                        &callbackTrackbarFreq,(void*)(m_filter0));
     cv::createTrackbar("Epsilon",m_filtWin0,&m_eps0,20,
                        &callbackTrackbarEps,(void*)(m_filter0));
@@ -189,39 +244,41 @@ Visualizer::Visualizer(const unsigned int rows,
     cv::createTrackbar("Eta",m_filtWin1,&m_etaInt1,100,
                        &callbackTrackbarEta,(void*)(m_filter1));
 
-    // Slider depth
+    // Depth trackbars
     cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,10000,nullptr);
     cv::createTrackbar("maxDepth",m_depthWin,&m_max_depth,10000,nullptr);
 
     // Saving events in .txt
     //m_recorder.open("closer_bottom_vertical.txt");
 
+    // Starting the cameras
     m_davis0->init();
     m_davis0->start();
-    m_davis0->listen();
+    m_davis0->listenEvents();
+    //m_davis0->listenFrames();
     m_davis1->init();
     m_davis1->start();
-    m_davis1->listen();
+    m_davis1->listenEvents();
+    //m_davis1->listenFrames();
 }
 
 
 Visualizer::~Visualizer()
 {
-    m_laser.close();
+    //m_laser.close();
 
+    m_davis0->stopListeningEvents();
+    m_davis0->stopListeningFrames();
     m_davis0->deregisterEventListener(this);
     m_davis0->deregisterFrameListener(this);
-    m_davis0->stopListening();
     m_davis0->stop();
-    m_davis0->close();
     m_filter0->deregisterFilterListener(this);
 
-
+    m_davis1->stopListeningEvents();
+    m_davis1->stopListeningFrames();
     m_davis1->deregisterEventListener(this);
     m_davis1->deregisterFrameListener(this);
-    m_davis1->stopListening();
     m_davis1->stop();
-    m_davis1->close();
     m_filter1->deregisterFilterListener(this);
 
     m_triangulator->deregisterTriangulatorListener(this);
@@ -362,21 +419,21 @@ void Visualizer::run()
     cv::Mat depthMatRGB(m_rows,m_cols,CV_8UC3);
 
     // Initialize laser position
-    double t = 0;
-    unsigned int cx = 2048, cy=2048, r=500; //r=1592;
-    unsigned int x, y;
-    int freq = 600;
-    m_laser.blink(1e6/(2*freq)); // T/2
-    printf("Blinking frequency set to %d.\n\r\n",freq);
+    //double t = 0;
+    //unsigned int cx = 2048, cy=2048, r=1000; //r=1592;
+    //unsigned int x, y;
+    //int freq = 600;
+    //m_laser.blink(1e6/(2*freq)); // T/2
+    //printf("Blinking frequency set to %d.\n\r\n",freq);
 
     while(key != 'q')
     {
         // Laser control: draw a circle
-        t += 1./10; // Need 10 increments for full cycle = 200ms (10*20ms waitKey)
-        x = static_cast<unsigned int>(cx + r*cos(2.*3.14*t));
+        //t += 1./100; // Need 10 increments for full cycle = 200ms (10*20ms waitKey)
+        //x = static_cast<unsigned int>(cx + r*cos(2.*3.14*t));
         //y = static_cast<unsigned int>(cx);
-        y = static_cast<unsigned int>(cy + r*sin(2.*3.14*t));
-        m_laser.pos(x,y);
+        //y = static_cast<unsigned int>(cy + r*sin(2.*3.14*t));
+        //m_laser.pos(x,y);
         //m_laser.vel(8e4,8e4);
 
         for(unsigned int i=0; i<m_rows*m_cols; i++)
@@ -387,7 +444,7 @@ void Visualizer::run()
                 int dt = m_currenTime0 - m_ageEvts0[i];
             m_evtMutex0.unlock();
 
-            if(dt<m_thresh)
+            if(dt<m_ageThresh)
             {
                 polMat0.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
                 polMat0.data[3*i + 1] = static_cast<unsigned char>(pol>0?255:0);    // Green channel
@@ -400,7 +457,7 @@ void Visualizer::run()
                 dt = m_currenTime1 - m_ageEvts1[i];
             m_evtMutex1.unlock();
 
-            if(dt<m_thresh)
+            if(dt<m_ageThresh)
             {
                 polMat1.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
                 polMat1.data[3*i + 1] = static_cast<unsigned char>(pol>0?255:0);    // Green channel
@@ -412,27 +469,27 @@ void Visualizer::run()
                 dt = m_currenTime0 - m_ageEvts0[i];
             m_evtMutex0.unlock();
 
-            if(dt>m_thresh) { dt = m_thresh; }
-            ageMatHSV0.data[3*i + 0] = static_cast<unsigned char>(0.75*180*dt/float(m_thresh)); //H
+            if(dt>m_ageThresh) { dt = m_ageThresh; }
+            ageMatHSV0.data[3*i + 0] = static_cast<unsigned char>(0.75*180*dt/float(m_ageThresh)); //H
             ageMatHSV0.data[3*i + 1] = static_cast<unsigned char>(255); //S
-            ageMatHSV0.data[3*i + 2] = static_cast<unsigned char>(dt==m_thresh?0:255); //V
+            ageMatHSV0.data[3*i + 2] = static_cast<unsigned char>(dt==m_ageThresh?0:255); //V
 
             // Events by age - Slave
             m_evtMutex1.lock();
                 dt = m_currenTime1 - m_ageEvts1[i];
             m_evtMutex1.unlock();
 
-            if(dt>m_thresh) { dt = m_thresh; }
-            ageMatHSV1.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_thresh)); //H
+            if(dt>m_ageThresh) { dt = m_ageThresh; }
+            ageMatHSV1.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_ageThresh)); //H
             ageMatHSV1.data[3*i + 1] = static_cast<unsigned char>(255); //S
-            ageMatHSV1.data[3*i + 2] = static_cast<unsigned char>(dt==m_thresh?0:255); //V
+            ageMatHSV1.data[3*i + 2] = static_cast<unsigned char>(dt==m_ageThresh?0:255); //V
 
             // Filtered events - Master
             m_filterEvtMutex0.lock();
                 dt = m_currenTime0 - m_filtEvts0[i];
             m_filterEvtMutex0.unlock();
 
-            if(dt < m_thresh)
+            if(dt < m_ageThresh)
             {
                 filtMat0.data[3*i + 0] = static_cast<unsigned char>(0);
                 filtMat0.data[3*i + 1] = static_cast<unsigned char>(0);
@@ -450,7 +507,7 @@ void Visualizer::run()
                 dt = m_currenTime1 - m_filtEvts1[i];
             m_filterEvtMutex1.unlock();
 
-            if(dt < m_thresh)
+            if(dt < m_ageThresh)
             {
                 filtMat1.data[3*i + 0] = static_cast<unsigned char>(0);
                 filtMat1.data[3*i + 1] = static_cast<unsigned char>(0);
@@ -471,13 +528,13 @@ void Visualizer::run()
             {
                 if (z<m_min_depth){ z = m_min_depth; }
                 else if (z>m_max_depth){ z = m_max_depth; }
-                depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+                depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
                 depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(255);
                 depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(255);
             }
             else
             {
-                depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+                depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
                 depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(255);
                 depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(0);
             }
@@ -538,7 +595,7 @@ void Visualizer::run()
         polMat1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
         filtMat1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
 
-        // Wait for 20ms
-        key = cv::waitKey(20);
+        // Wait (in ms)
+        key = cv::waitKey(5);
     }
 }

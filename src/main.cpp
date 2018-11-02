@@ -4,6 +4,7 @@
 #include <EBV_Filter.h>
 #include <EBV_Matcher.h>
 #include <EBV_Triangulator.h>
+#include <EBV_LaserController.h>
 
 int main(int argc, char** argv)
 {
@@ -17,10 +18,12 @@ int main(int argc, char** argv)
     Filter       filter1(rows,cols,&davis_slave);
     Matcher      matcher(rows,cols,&filter0,&filter1);
     Triangulator triangulator(rows,cols,&matcher);
+    LaserController laser;
     Visualizer   visu(rows,cols,davis_master.m_nbCams,
                       &davis_master, &davis_slave,
                       &filter0, &filter1,
-                      &triangulator);
+                      &triangulator,
+                      &laser);
 
     visu.run();
 

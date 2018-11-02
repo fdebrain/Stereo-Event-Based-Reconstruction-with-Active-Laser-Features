@@ -8,7 +8,7 @@ Matcher::Matcher(const unsigned int rows,
       m_filter0(filter0), m_filter1(filter1)
 {
     // Matching parameters
-    m_eps = 5e4;
+    m_eps = 2e3;
     m_maxTimeToKeep = 1e4; // Keep 10ms buffer in each filtered events queue
 
     // Initialize filters listeners
@@ -38,7 +38,8 @@ void Matcher::runThread()
         m_queueAccessMutex0.lock();
             hasQueueEvent0  = !m_evtQueue0.empty();
         m_queueAccessMutex0.unlock();
-        m_queueAccessMutex1.unlock();
+
+        m_queueAccessMutex1.lock();
             hasQueueEvent1  = !m_evtQueue1.empty();
         m_queueAccessMutex1.unlock();
 
@@ -46,20 +47,20 @@ void Matcher::runThread()
         //CHANGE
         if(hasQueueEvent0 && hasQueueEvent1)
         {
-           m_queueAccessMutex0.lock();
+            m_queueAccessMutex0.lock();
+                //int s0 = m_evtQueue0.size();
                 event0 = m_evtQueue0.front();
                 m_evtQueue0.pop_front();
-           m_queueAccessMutex0.unlock();
+            m_queueAccessMutex0.unlock();
 
-           m_queueAccessMutex1.unlock();
+            m_queueAccessMutex1.lock();
+                //int s1 = m_evtQueue1.size();
                 event1 = m_evtQueue1.front();
                 m_evtQueue1.pop_front();
-           m_queueAccessMutex1.unlock();
+            m_queueAccessMutex1.unlock();
 
             // DEBUG - QUEUE SIZE SHOULD BE SIMILAR
-            //printf("Queue size: %d - %d.\n\r",
-            //       m_evtQueue0.size(),
-            //       m_evtQueue1.size());
+            //printf("Queue size: %d - %d.\n\r", s0, s1);
             // END DEBUG
 
 
@@ -88,8 +89,6 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
     //printf("Camera %d - Timestamp %d. \n\r",id,event.m_timestamp);
     // END DEBUG
 
-    m_currTime = event.m_timestamp;
-
     switch (id)
     {
         case 0:
@@ -98,8 +97,9 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
                 m_evtQueue0.push_back(event);
 
                 // Remove old events
+                m_currTime0 = event.m_timestamp;
                 std::list<DAVIS240CEvent>::iterator it = m_evtQueue0.begin(); // DANGER SHARED RESOURCE
-                while(    ((m_currTime-it->m_timestamp) > m_maxTimeToKeep)
+                while(    ((m_currTime0-it->m_timestamp) > m_maxTimeToKeep)
                        && (it!=m_evtQueue0.end())
                      )
                 {
@@ -115,8 +115,9 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
                 m_evtQueue1.push_back(event);
 
                 // Remove old events
+                m_currTime1 = event.m_timestamp;
                 std::list<DAVIS240CEvent>::iterator it = m_evtQueue1.begin(); // DANGER SHARED RESOURCE
-                while(    ((m_currTime-it->m_timestamp) > m_maxTimeToKeep)
+                while(    ((m_currTime1-it->m_timestamp) > m_maxTimeToKeep)
                        && (it!=m_evtQueue1.end())
                      )
                 {
@@ -127,51 +128,19 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
         }
     }
 
-    /*
-    if (id==0)
-    {
-        m_queueAccessMutex.lock();
-            m_evtQueue0.push_back(event);
-
-            // Remove old events
-            std::list<DAVIS240CEvent>::iterator it = m_evtQueue0.begin(); // DANGER SHARED RESOURCE
-            while(    ((m_currTime-it->m_timestamp) > m_maxTimeToKeep)
-                   && (it!=m_evtQueue0.end())
-                 )
-            {
-                m_evtQueue0.erase(it++);
-            }
-        m_queueAccessMutex.unlock();
-    }
-    else
-    {
-        m_queueAccessMutex.lock();
-            m_evtQueue1.push_back(event);
-
-            // Remove old events
-            std::list<DAVIS240CEvent>::iterator it = m_evtQueue1.begin(); // DANGER SHARED RESOURCE
-            while(    ((m_currTime-it->m_timestamp) > m_maxTimeToKeep)
-                   && (it!=m_evtQueue1.end())
-                 )
-            {
-                m_evtQueue1.erase(it++);
-            }
-        m_queueAccessMutex.unlock();
-    }
-    */
-
     std::unique_lock<std::mutex> condLock(m_condWaitMutex);
     m_condWait.notify_one();
 }
 
-// Processing to be done for each event
 void Matcher::process(DAVIS240CEvent& e0, DAVIS240CEvent& e1)
 {
-    int dt = std::abs(e0.m_timestamp - e1.m_timestamp);
-    printf("%d. \n\r",dt);
+    const int t0 = e0.m_timestamp;
+    const int t1 = e1.m_timestamp;
+    //int dt = std::abs(t0 - t1);
+    //printf("%d. \n\r",dt);
 
     // Positive match if similar timestamps
-    if (std::abs(e0.m_timestamp - e1.m_timestamp)<m_eps)
+    if (std::abs(t0 - t1)<m_eps)
     {
         warnMatch(e0,e1);
     }

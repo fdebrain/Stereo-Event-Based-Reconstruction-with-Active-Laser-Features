@@ -7,20 +7,16 @@
       <cols>3</cols>
       <dt>d</dt>
       <data>
-
-        5.77986013e+02 0.00000000e+00 9.22124047e+01
-        0.00000000e+00 4.76261520e+03 3.01889865e+02
-        0.00000000e+00 0.00000000e+00 1.00000000e+00
-      </data></camera_matrix>
+        2.2522403208244219e+02 0. 1.1257474485243401e+02 0.
+        2.2524227505087910e+02 6.8574888498531038e+01 0. 0. 1.</data></camera_matrix>
     <dist_coeffs type_id="opencv-matrix">
       <rows>1</rows>
       <cols>5</cols>
       <dt>d</dt>
       <data>
-        -5.62807601e+01  1.21824795e+04
-        9.02641448e-01  2.55153849e-01
-        -5.26808992e+05
-      </data></dist_coeffs>
+        -2.2975938718068692e-01 2.2699336563065392e-01
+        9.4154386816498164e-05 1.0755152979677314e-03
+        -9.6464704765260714e-02</data></dist_coeffs>
     <resolution>
       240 180</resolution>
     <use_complex_distortion_model>0</use_complex_distortion_model></_>
@@ -30,18 +26,16 @@
       <cols>3</cols>
       <dt>d</dt>
       <data>
-      157.76683047   0.          75.05548953
-      0.          29.13054603  89.68980028
-      0.           0.           1.
-      </data></camera_matrix>
+        2.2801786573346232e+02 0. 1.3342185193022206e+02 0.
+        2.2793401950005116e+02 9.8454821798966861e+01 0. 0. 1.</data></camera_matrix>
     <dist_coeffs type_id="opencv-matrix">
       <rows>1</rows>
       <cols>5</cols>
       <dt>d</dt>
       <data>
-        -4.15581481e-01  1.09961197e-02
-        1.37257445e-01  1.36520265e-03
-        -3.41444823e-05</data></dist_coeffs>
+        -2.3376378418687946e-01 2.4390680923932018e-01
+        -2.1044091754244387e-03 4.8205894120662474e-04
+        -1.1711367906483475e-01</data></dist_coeffs>
     <resolution>
       240 180</resolution>
     <use_complex_distortion_model>0</use_complex_distortion_model></_></camera_calib>

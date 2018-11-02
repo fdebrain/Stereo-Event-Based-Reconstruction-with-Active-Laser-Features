@@ -49,7 +49,8 @@ private:
     int m_eps;
 
     // Flushing old events
-    int m_currTime;
+    int m_currTime0;
+    int m_currTime1;
     int m_maxTimeToKeep;
 
     // List of incoming filtered events for each camera (FIFO)

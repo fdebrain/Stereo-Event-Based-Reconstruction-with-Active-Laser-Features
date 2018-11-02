@@ -8,6 +8,7 @@
 #include <csignal>
 #include <thread>
 #include <vector>
+#include <mutex>
 
 #include <libcaercpp/devices/davis.hpp>
 
@@ -81,43 +82,45 @@ public:
     static libcaer::devices::davis* m_davisMasterHandle;
 
     // Life cycle of a DAVIS240C
+    void resetMasterClock();
     int init();
     int start();
-    int listen();
-
-    int stopListening();
     int stop();
-    int close();
 
-    // Reading thread & related stuff
-    void readThread();
-    void warnEvent(std::vector<DAVIS240CEvent>& events);
-    void warnFrame(DAVIS240CFrame& frame);
-
-    // Register a listener to receive the new events
+    // Life cycle - events listening
     void registerEventListener(DAVIS240CListener* listener);
+    int listenEvents();
+    void readThreadEvents();
+    void warnEvent(std::vector<DAVIS240CEvent>& events);
+    int stopListeningEvents();
     void deregisterEventListener(DAVIS240CListener* listener);
 
-    // Register a listener to receive the new frames
+    // Life cycle - frames listening
     void registerFrameListener(DAVIS240CListener* listener);
+    int listenFrames();
+    void readThreadFrames();
+    void warnFrame(DAVIS240CFrame& frame);
+    int stopListeningFrames();
     void deregisterFrameListener(DAVIS240CListener* listener);
 
-    void resetMasterClock();
-
+public:
     // Id of the camera
     const unsigned int m_id;
 
 private:
-    //Device handle
-    libcaer::devices::davis m_davisHandle;
-
     // Device resolution
     const unsigned int m_rows = 180;
     const unsigned int m_cols = 240;
 
+    //Device handle
+    libcaer::devices::davis m_davisHandle;
+
     // Reading thread related variables
-    std::thread m_readThread;
-    bool m_stopreadThread;
+    std::thread m_readThreadEvents;
+    std::thread m_readThreadFrames;
+
+    bool m_stopreadThreadEvents;
+    bool m_stopreadThreadFrames;
 
     // Registered listeners
     std::list<DAVIS240CListener*> m_frameListeners;
