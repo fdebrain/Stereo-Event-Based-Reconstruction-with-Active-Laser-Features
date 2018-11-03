@@ -122,10 +122,10 @@ int MagneticMirrorLaser::vel(unsigned int x,unsigned int y)
 
 void MagneticMirrorLaser::close(void)
 {
-    this->toggle(true); // laser on
-    this->vel(0,0); // velocity 0
+    this->toggle(true);   // laser on
+    this->vel(0,0);       // velocity 0
     this->pos(2048,2048); // neutral position
-    this->blink(0); // don't blink
+    this->blink(0);       // don't blink
 
     std::cout << "> Closing " << m_device << " on " << m_ttyFd << std::endl;
     if(::close(m_ttyFd) < 0)

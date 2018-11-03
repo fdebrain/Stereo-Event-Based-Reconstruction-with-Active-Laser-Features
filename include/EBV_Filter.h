@@ -18,7 +18,7 @@ public:
                                         const unsigned int id) = 0;
 };
 
-class Filter : public DAVIS240CListener
+class Filter : public DAVIS240CEventListener
 {
 public:
     Filter(const unsigned int rows,
@@ -31,8 +31,6 @@ public:
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                    const unsigned int id) override;
-    void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
-                                   const unsigned int id) {}
 
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
@@ -94,8 +92,14 @@ private:
 
     std::mutex                m_evtMutex;
 
+    // Who filter listens to
+    DAVIS240C* m_davis;
+
+    // List of filter listeners
+    std::list<FilterListener*> m_filteredEventListeners;
+
     // Thread this object runs in.
-    std::thread m_thread;
+    //std::thread m_thread;
 
     // Mutex to access the queue
     std::mutex m_queueAccessMutex;
@@ -103,12 +107,6 @@ private:
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
-
-    // Who filter listens to
-    DAVIS240C* m_davis;
-
-    // List of filter listeners
-    std::list<FilterListener*> m_filteredEventListeners;
 };
 
 #endif // EBV_FILTER_H

@@ -25,7 +25,9 @@ libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
 
 DAVIS240C::DAVIS240C()
     // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
-    : m_id(m_nbCams),
+    : m_rows(180),
+      m_cols(240),
+      m_id(m_nbCams),
       m_davisHandle(libcaer::devices::davis(m_id)),
       m_stopreadThreadEvents(false),
       m_stopreadThreadFrames(false)
@@ -65,7 +67,7 @@ void DAVIS240C::resetMasterClock()
     if (m_davisMasterHandle->infoGet().deviceIsMaster)
     {
         m_davisMasterHandle->configSet(DAVIS_CONFIG_MUX,
-                                 DAVIS_CONFIG_MUX_TIMESTAMP_RESET, 2);
+                                       DAVIS_CONFIG_MUX_TIMESTAMP_RESET, 2);
         printf("Reset Master clock. \n\r");
     }
 }
@@ -93,7 +95,8 @@ int DAVIS240C::init()
     coarseFineBias.typeNormal         = true;
     coarseFineBias.currentLevelNormal = true;
 
-    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP, caerBiasCoarseFineGenerate(coarseFineBias));
+    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP,
+                            caerBiasCoarseFineGenerate(coarseFineBias));
 
     coarseFineBias.coarseValue        = 1;
     coarseFineBias.fineValue          = 33;
@@ -102,7 +105,8 @@ int DAVIS240C::init()
     coarseFineBias.typeNormal         = true;
     coarseFineBias.currentLevelNormal = true;
 
-    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP, caerBiasCoarseFineGenerate(coarseFineBias));
+    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
+                            caerBiasCoarseFineGenerate(coarseFineBias));
 
     return 0;
 }
@@ -115,7 +119,8 @@ int DAVIS240C::start()
     m_davisHandle.dataStart(nullptr, nullptr, nullptr, &usbShutdownHandler, nullptr);
 
     // Let's turn on blocking data-get mode to avoid wasting resources.
-    m_davisHandle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+    m_davisHandle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE,
+                            CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
 
     // Reset master clock when new device is added
     if (m_id==0) { m_davisMasterHandle = &m_davisHandle; }
@@ -125,7 +130,7 @@ int DAVIS240C::start()
 }
 
 //=== EVENT LISTENING ===//
-void DAVIS240C::registerEventListener(DAVIS240CListener* listener)
+void DAVIS240C::registerEventListener(DAVIS240CEventListener* listener)
 {
     m_eventListeners.push_back(listener);
 }
@@ -134,6 +139,14 @@ int DAVIS240C::listenEvents()
 {
     m_stopreadThreadEvents = false;
     m_readThreadEvents = std::thread(&DAVIS240C::readThreadEvents,this);
+
+    //=== Test
+    m_stopreadThreadFrames= false;
+    m_readThreadFrames = std::thread(&DAVIS240C::readThreadFrames,this);
+    m_readThreadEvents.join();
+    m_readThreadFrames.join();
+    //===
+
     return 0;
 }
 
@@ -143,7 +156,9 @@ void DAVIS240C::readThreadEvents()
 
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadEvents)
     {
-        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
+        m_lockerEvent.lock();
+            std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
+        m_lockerEvent.unlock();
 
         // Skip if nothing there.
         if (packetContainer == nullptr) { continue; }
@@ -179,7 +194,7 @@ void DAVIS240C::readThreadEvents()
 
 void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
 {
-    std::list<DAVIS240CListener*>::iterator it;
+    std::list<DAVIS240CEventListener*>::iterator it;
     for(it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
     {
         for(unsigned int i=0; i<events.size(); i++)
@@ -193,13 +208,13 @@ int DAVIS240C::stopListeningEvents()
     return 0;
 }
 
-void DAVIS240C::deregisterEventListener(DAVIS240CListener* listener)
+void DAVIS240C::deregisterEventListener(DAVIS240CEventListener* listener)
 {
     m_eventListeners.remove(listener);
 }
 
 //=== FRAME LISTENING ===//
-void DAVIS240C::registerFrameListener(DAVIS240CListener* listener)
+void DAVIS240C::registerFrameListener(DAVIS240CFrameListener* listener)
 {
     m_frameListeners.push_back(listener);
 }
@@ -219,7 +234,9 @@ void DAVIS240C::readThreadFrames()
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadFrames)
     {
         // Get data
-        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
+        m_lockerFrame.lock();
+            std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
+        m_lockerFrame.unlock();
 
         // Skip if nothing there.
         if (packetContainer == nullptr) { continue; }
@@ -254,7 +271,7 @@ void DAVIS240C::readThreadFrames()
 
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 {
-    std::list<DAVIS240CListener*>::iterator it;
+    std::list<DAVIS240CFrameListener*>::iterator it;
     for(it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
     {
         (*it)->receivedNewDAVIS240CFrame(frame,m_id);
@@ -267,7 +284,7 @@ int DAVIS240C::stopListeningFrames()
     return 0;
 }
 
-void DAVIS240C::deregisterFrameListener(DAVIS240CListener* listener)
+void DAVIS240C::deregisterFrameListener(DAVIS240CFrameListener* listener)
 {
     m_frameListeners.remove(listener);
 }

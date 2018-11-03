@@ -15,7 +15,8 @@
 namespace cv { class Mat;}
 
 class Visualizer : public DVS128USBListener,
-                   public DAVIS240CListener,
+                   public DAVIS240CEventListener,
+                   public DAVIS240CFrameListener,
                    public FilterListener,
                    public TriangulatorListener
 

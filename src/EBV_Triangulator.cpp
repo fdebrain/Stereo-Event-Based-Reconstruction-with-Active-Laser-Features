@@ -156,8 +156,8 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
         const unsigned int y1 = event1.m_y;
     m_queueAccessMutex0.unlock();
 
-    coords0.push_back(cv::Point2d(x0,y0));
-    coords1.push_back(cv::Point2d(x1,y1));
+    coords0.push_back(cv::Point2d(y0,x0)); // Warning: x = column, y = row
+    coords1.push_back(cv::Point2d(y1,x1));
     //printf("Event0: (%f,%f). \n\r",coords0.back().x,coords0.back().y);
     //printf("Event1: (%f,%f). \n\r",coords1.back().x,coords1.back().y);
 

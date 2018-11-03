@@ -36,9 +36,10 @@ public:
                  Matcher* matcher = nullptr);
     ~Triangulator();
 
+    void importCalibration(std::string path);
+    void run();
     void receivedNewMatch(const DAVIS240CEvent& event1,
                           const DAVIS240CEvent& event2) override;
-    void run();
     void process(const DAVIS240CEvent& event0,
                  const DAVIS240CEvent& event1);
 
@@ -47,8 +48,6 @@ public:
     void warnDepth(const unsigned int u,
                    const unsigned int v,
                    const double depth);
-
-    void importCalibration(std::string path);
 
 private:
     const unsigned int m_rows;

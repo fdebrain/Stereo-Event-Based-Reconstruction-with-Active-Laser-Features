@@ -61,13 +61,18 @@ public:
      int m_timestamp;
 };
 
-
-class DAVIS240CListener
+class DAVIS240CEventListener
 {
     public:
-        DAVIS240CListener(void) {}
+        DAVIS240CEventListener(void) {}
         virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
                                                const unsigned int id) = 0;
+};
+
+class DAVIS240CFrameListener
+{
+    public:
+        DAVIS240CFrameListener(void) {}
         virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
                                                const unsigned int id) = 0;
 };
@@ -88,20 +93,20 @@ public:
     int stop();
 
     // Life cycle - events listening
-    void registerEventListener(DAVIS240CListener* listener);
+    void registerEventListener(DAVIS240CEventListener* listener);
     int listenEvents();
     void readThreadEvents();
     void warnEvent(std::vector<DAVIS240CEvent>& events);
     int stopListeningEvents();
-    void deregisterEventListener(DAVIS240CListener* listener);
+    void deregisterEventListener(DAVIS240CEventListener* listener);
 
     // Life cycle - frames listening
-    void registerFrameListener(DAVIS240CListener* listener);
+    void registerFrameListener(DAVIS240CFrameListener* listener);
     int listenFrames();
     void readThreadFrames();
     void warnFrame(DAVIS240CFrame& frame);
     int stopListeningFrames();
-    void deregisterFrameListener(DAVIS240CListener* listener);
+    void deregisterFrameListener(DAVIS240CFrameListener* listener);
 
 public:
     // Id of the camera
@@ -109,8 +114,8 @@ public:
 
 private:
     // Device resolution
-    const unsigned int m_rows = 180;
-    const unsigned int m_cols = 240;
+    const unsigned int m_rows;
+    const unsigned int m_cols;
 
     //Device handle
     libcaer::devices::davis m_davisHandle;
@@ -122,9 +127,12 @@ private:
     bool m_stopreadThreadEvents;
     bool m_stopreadThreadFrames;
 
+    std::mutex m_lockerEvent;
+    std::mutex m_lockerFrame;
+
     // Registered listeners
-    std::list<DAVIS240CListener*> m_frameListeners;
-    std::list<DAVIS240CListener*> m_eventListeners;
+    std::list<DAVIS240CEventListener*> m_eventListeners;
+    std::list<DAVIS240CFrameListener*> m_frameListeners;
 };
 
 #endif // EBV_DAVIS240C_H

@@ -109,7 +109,7 @@ list(APPEND 3RD_PARTY_LIBS ${LIBCAER_LIBRARIES})
 #------------------------------------------------------------
 
 # COMPILER FLAGS---------------------------------------------
-set(GCC_COVERAGE_COMPILE_FLAGS "-std=c++11 -Ofast -O3")
+set(GCC_COVERAGE_COMPILE_FLAGS "-std=c++11 -Ofast -O3 -pthread") # Added -pthread
 set(GCC_COVERAGE_LINK_FLAGS    "")
 
 list(APPEND CMAKE_CXX_FLAGS ${GCC_COVERAGE_COMPILE_FLAGS} )

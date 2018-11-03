@@ -361,7 +361,6 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
     }
 }
 
-
 void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
                                         const unsigned int id)
 {
@@ -391,7 +390,6 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
         }
     }
 }
-
 
 void Visualizer::receivedNewDepth(const unsigned int &u,
                                   const unsigned int &v,

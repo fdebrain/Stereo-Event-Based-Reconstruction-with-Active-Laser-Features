@@ -29,7 +29,7 @@ public:
     {}
 
     DVS128USBEvent(const unsigned int x, const unsigned int y,
-                   const int pol,
+                   const unsigned int pol,
                    const unsigned long timestamp)
         : m_x(x),
           m_y(y),

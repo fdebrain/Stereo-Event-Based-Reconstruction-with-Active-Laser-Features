@@ -2,7 +2,6 @@
 #define EBV_MAGNETICMIRRORLASER_H
 
 #include <iostream>
-
 #include <cstring>
 #include <stdlib.h>
 #include <stdio.h>
