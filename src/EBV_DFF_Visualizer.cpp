@@ -203,46 +203,46 @@ Visualizer::Visualizer(const unsigned int rows,
 
     // Laser trackbars
     cv::createTrackbar("c_x",m_polWin0,&m_cx,4096,
-                       &callbackTrackbarLaserCenterX,(void*)(m_laser));
+                       &callbackTrackbarLaserCenterX,static_cast<void*>(m_laser));
     cv::createTrackbar("c_y",m_polWin0,&m_cy,4096,
-                       &callbackTrackbarLaserCenterY,(void*)(m_laser));
+                       &callbackTrackbarLaserCenterY,static_cast<void*>(m_laser));
     cv::createTrackbar("radius",m_polWin0,&m_r,2048,
-                       &callbackTrackbarLaserRadius,(void*)(m_laser));
+                       &callbackTrackbarLaserRadius,static_cast<void*>(m_laser));
     cv::createTrackbar("step",m_polWin0,&m_stepInt,1000,
-                       &callbackTrackbarLaserStep,(void*)(m_laser));
+                       &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
     cv::createTrackbar("Laser frequency",m_polWin0,&m_laserFreq,1000,
-                       &callbackTrackbarLaserFreq,(void*)(m_laser));
+                       &callbackTrackbarLaserFreq,static_cast<void*>(m_laser));
 
     // Filter trackbars
     cv::createTrackbar("Filter frequency",m_filtWin0,&m_freq0,1000,
-                       &callbackTrackbarFreq,(void*)(m_filter0));
+                       &callbackTrackbarFreq,static_cast<void*>(m_filter0));
     cv::createTrackbar("Epsilon",m_filtWin0,&m_eps0,20,
-                       &callbackTrackbarEps,(void*)(m_filter0));
+                       &callbackTrackbarEps,static_cast<void*>(m_filter0));
     cv::createTrackbar("Neighbor Size",m_filtWin0,&m_neighborSize0,100,
-                       &callbackTrackbarNeighborSize,(void*)(m_filter0));
+                       &callbackTrackbarNeighborSize,static_cast<void*>(m_filter0));
     cv::createTrackbar("SupportsA",m_filtWin0,&m_threshA0,100,
-                       &callbackTrackbarThreshA,(void*)(m_filter0));
+                       &callbackTrackbarThreshA,static_cast<void*>(m_filter0));
     cv::createTrackbar("SupportsB",m_filtWin0,&m_threshB0,100,
-                       &callbackTrackbarThreshB,(void*)(m_filter0));
+                       &callbackTrackbarThreshB,static_cast<void*>(m_filter0));
     cv::createTrackbar("Anti-Supports",m_filtWin0,&m_threshAnti0,100,
-                       &callbackTrackbarThreshAnti,(void*)(m_filter0));
+                       &callbackTrackbarThreshAnti,static_cast<void*>(m_filter0));
     cv::createTrackbar("Eta",m_filtWin0,&m_etaInt0,100,
-                       &callbackTrackbarEta,(void*)(m_filter0));
+                       &callbackTrackbarEta,static_cast<void*>(m_filter0));
 
     cv::createTrackbar("Frequency",m_filtWin1,&m_freq1,1000,
-                       &callbackTrackbarFreq,(void*)(m_filter1));
+                       &callbackTrackbarFreq,static_cast<void*>(m_filter1));
     cv::createTrackbar("Epsilon",m_filtWin1,&m_eps1,20,
-                       &callbackTrackbarEps,(void*)(m_filter1));
+                       &callbackTrackbarEps,static_cast<void*>(m_filter1));
     cv::createTrackbar("Neighbor Size",m_filtWin1,&m_neighborSize1,100,
-                       &callbackTrackbarNeighborSize,(void*)(m_filter1));
+                       &callbackTrackbarNeighborSize,static_cast<void*>(m_filter1));
     cv::createTrackbar("SupportsA",m_filtWin1,&m_threshA1,100,
-                       &callbackTrackbarThreshA,(void*)(m_filter1));
+                       &callbackTrackbarThreshA,static_cast<void*>(m_filter1));
     cv::createTrackbar("SupportsB",m_filtWin1,&m_threshB1,100,
-                       &callbackTrackbarThreshB,(void*)(m_filter1));
+                       &callbackTrackbarThreshB,static_cast<void*>(m_filter1));
     cv::createTrackbar("Anti-Supports",m_filtWin1,&m_threshAnti1,100,
-                       &callbackTrackbarThreshAnti,(void*)(m_filter1));
+                       &callbackTrackbarThreshAnti,static_cast<void*>(m_filter1));
     cv::createTrackbar("Eta",m_filtWin1,&m_etaInt1,100,
-                       &callbackTrackbarEta,(void*)(m_filter1));
+                       &callbackTrackbarEta,static_cast<void*>(m_filter1));
 
     // Depth trackbars
     cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,10000,nullptr);
@@ -288,7 +288,7 @@ Visualizer::~Visualizer()
     m_video1.release();
 }
 
-
+/*
 void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
 {
     const unsigned int x = e.m_x;
@@ -299,6 +299,7 @@ void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
         m_polEvts0[x*m_cols+y] += 2*p-1; // p={-1,1}
     m_evtMutex0.unlock();
 }
+*/
 
 
 void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,

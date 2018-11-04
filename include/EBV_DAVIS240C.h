@@ -123,10 +123,8 @@ private:
     // Reading thread related variables
     std::thread m_readThreadEvents;
     std::thread m_readThreadFrames;
-
     bool m_stopreadThreadEvents;
     bool m_stopreadThreadFrames;
-
     std::mutex m_lockerEvent;
     std::mutex m_lockerFrame;
 

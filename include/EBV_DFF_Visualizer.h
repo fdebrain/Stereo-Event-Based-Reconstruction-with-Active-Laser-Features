@@ -12,14 +12,14 @@
 #include <string>
 #include <mutex>
 
+// Forward declaration
 namespace cv { class Mat;}
 
-class Visualizer : public DVS128USBListener,
+class Visualizer : //public DVS128USBListener,
                    public DAVIS240CEventListener,
                    public DAVIS240CFrameListener,
                    public FilterListener,
                    public TriangulatorListener
-
 {
 
 public:
@@ -34,7 +34,7 @@ public:
                LaserController* laser = nullptr);
     ~Visualizer();
 
-    void receivedNewDVS128USBEvent(DVS128USBEvent& e);
+    //void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                    const unsigned int id);
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
