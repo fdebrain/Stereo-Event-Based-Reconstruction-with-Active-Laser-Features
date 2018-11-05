@@ -21,8 +21,8 @@ imgpoints0 = [] # 2d points in image plane.
 imgpoints1 = [] # 2d points in image plane.
 
 
-davis0 = cv2.VideoCapture('data/calibChess0.avi')
-davis1 = cv2.VideoCapture('data/calibChess1.avi')
+davis0 = cv2.VideoCapture('data/calib0.avi')
+davis1 = cv2.VideoCapture('data/calib1.avi')
 
 ret0, frame0 = davis0.read()
 ret1, frame1 = davis1.read()
