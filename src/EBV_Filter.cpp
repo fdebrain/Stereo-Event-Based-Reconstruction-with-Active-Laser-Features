@@ -13,44 +13,24 @@ Filter::Filter(const unsigned int rows,
       m_cols(cols),
       m_davis(davis),
       m_maxTimeToKeep(1e4), //When to flush old events = 10ms
-      m_frequency(615),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_frequency(600),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
       m_targetPeriod(1e6/m_frequency),
-      m_eps(10),            // In percent of period T
+      m_eps(5),            // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
-      m_neighborSize(3),    //3; //2;
-      m_threshSupportsA(2), //5; //3;
-      m_threshSupportsB(2), //10;  //3;
-      m_threshAntiSupports(2),//5; //2;
+      m_neighborSize(4),    //3; //2;
+      m_threshSupportsA(3), //5; //3;
+      m_threshSupportsB(3), //10;  //3;
+      m_threshAntiSupports(20),//5; //2;
       m_xc(0.0f),
       m_yc(0.0f),
       m_eta(0.1f)
 {
+    // Listen to Davis
+    m_events.resize(m_rows*m_cols);
+    m_davis->registerEventListener(this);
+
     // Initialize thread
     //m_thread = std::thread(&Filter::runThread,this);
-
-    // Listen to Davis
-    m_davis->registerEventListener(this);
-    m_events.resize(m_rows*m_cols);
-
-    /*
-    // Parameters for flushing old events
-    m_maxTimeToKeep = 1e4; //us (=>10ms)
-
-    // Parameters for events filtering
-    m_frequency = 615; //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
-    m_targetPeriod = 1e6/m_frequency;
-    m_eps = 10; // In percent of period T
-    m_epsPeriod = (m_eps*m_targetPeriod)/100.f;
-    m_neighborSize = 3;//3; //2;
-    m_threshSupportsA = 2;//5; //3;
-    m_threshSupportsB = 2;//10;  //3;
-    m_threshAntiSupports = 2;//5; //2;
-
-    // Center of mass tracker initialization
-    m_xc = 0.0f;
-    m_yc = 0.0f;
-    m_eta = 0.1f;
-    */
 }
 
 Filter::~Filter()
@@ -83,7 +63,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
         {
             for (int col=yMin; col<=yMax; col++)
             {
-                m_evtMutex.lock();
+                //m_evtMutex.lock();
                 // Get list of events at neighbor pixel // DANGER SHARED RESOURCE
                 std::list<DAVIS240CEvent>* neighborList = &(m_events[row*m_cols+col]);
 
@@ -118,7 +98,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                     // Avoid unnecessary computation
                     if (nbAntiSupports>m_threshAntiSupports){ break; }
                 }
-                m_evtMutex.unlock();
+                //m_evtMutex.unlock();
             }
         }
 
@@ -129,14 +109,14 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
            )
         {
             // Center of mass tracker
-            m_evtMutex.lock();
+            //m_evtMutex.lock();
                 m_xc = m_eta*m_xc + (1.f-m_eta)*x;
                 m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
                 // We send CoG coordinates
-                e.m_x = static_cast<unsigned int>(m_xc);
-                e.m_y = static_cast<unsigned int>(m_yc);
-            m_evtMutex.unlock();
+                //e.m_x = static_cast<unsigned int>(m_xc);
+                //e.m_y = static_cast<unsigned int>(m_yc);
+            //m_evtMutex.unlock();
 
             //printf("Camera %d - Timestamp %d. \n\r",m_davis->m_id,e.m_timestamp);
             this->warnFilteredEvent(e);
@@ -149,7 +129,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     }
 
     // Queue new event
-    m_evtMutex.lock();
+    //m_evtMutex.lock();
         std::list<DAVIS240CEvent>* eventsList = &(m_events[x*m_cols+y]);
         eventsList->push_back(e);
 
@@ -160,7 +140,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
         {
             eventsList->erase(it++);
         }
-    m_evtMutex.unlock();
+    //m_evtMutex.unlock();
 }
 
 void Filter::registerFilterListener(FilterListener* listener)

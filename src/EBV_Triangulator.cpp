@@ -62,14 +62,14 @@ Triangulator::Triangulator(const unsigned int rows,
       m_cols(cols),
       m_matcher(matcher)
 {
-    // Initialize thread
-    m_thread = std::thread(&Triangulator::run,this);
-
     // Listen to matcher
     m_matcher->registerMatcherListener(this);
 
     // Get camera settings
     this->importCalibration(m_pathCalib);
+
+    // Initialize thread
+    m_thread = std::thread(&Triangulator::run,this);
 }
 
 Triangulator::~Triangulator()

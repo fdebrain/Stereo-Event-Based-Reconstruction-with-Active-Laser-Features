@@ -24,7 +24,8 @@ public:
           m_timestamp(0)
     {}
 
-    DAVIS240CEvent(const unsigned int x, const unsigned int y,
+    DAVIS240CEvent(const unsigned int x,
+                   const unsigned int y,
                    const unsigned int pol,
                    const int timestamp)
         : m_x(x),
@@ -63,18 +64,16 @@ public:
 
 class DAVIS240CEventListener
 {
-    public:
-        DAVIS240CEventListener(void) {}
-        virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
-                                               const unsigned int id) = 0;
+public:
+    DAVIS240CEventListener(void) {}
+    virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,                                           const unsigned int id) = 0;
 };
 
 class DAVIS240CFrameListener
 {
-    public:
-        DAVIS240CFrameListener(void) {}
-        virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
-                                               const unsigned int id) = 0;
+public:
+    DAVIS240CFrameListener(void) {}
+    virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,                                               const unsigned int id) = 0;
 };
 
 class DAVIS240C

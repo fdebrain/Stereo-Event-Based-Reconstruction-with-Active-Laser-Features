@@ -14,6 +14,7 @@ public:
 
     void start();
     void draw();
+    void stop();
 
     int getCenterX() const { return m_cx; }
     void setCenterX(const int cx) { m_cx= cx; }
@@ -28,7 +29,7 @@ public:
     void setStep(const double step) { m_step = step; }
 
     int getFreq() const { return m_freq; }
-    void setFreq(const int freq) { m_freq = freq; }
+    void setFreq(const int freq);
 
 public:
     std::thread m_thread;
@@ -36,9 +37,11 @@ public:
 private:
     MagneticMirrorLaser* m_laser;
 
-    int m_freq = 600;
-    double m_step = 1/100.;
-    int m_cx = 2048, m_cy=2048, m_r=1000;
+    int m_freq;
+    double m_step;
+    int m_cx;
+    int m_cy;
+    int m_r;
 };
 
 #endif // EBV_LASERCONTROLLER_H

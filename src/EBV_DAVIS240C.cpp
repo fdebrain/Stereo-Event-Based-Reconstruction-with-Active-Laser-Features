@@ -58,6 +58,8 @@ DAVIS240C::DAVIS240C()
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
+    m_readThreadEvents.join();
+    m_readThreadFrames.join();
 }
 
 
@@ -139,26 +141,19 @@ int DAVIS240C::listenEvents()
 {
     m_stopreadThreadEvents = false;
     m_readThreadEvents = std::thread(&DAVIS240C::readThreadEvents,this);
-
-    //=== Test
-    m_stopreadThreadFrames= false;
-    m_readThreadFrames = std::thread(&DAVIS240C::readThreadFrames,this);
-    m_readThreadEvents.join();
-    m_readThreadFrames.join();
-    //===
-
     return 0;
 }
 
 void DAVIS240C::readThreadEvents()
 {
-    std::vector<DAVIS240CEvent> events;
+    //m_lockerEvent.lock();
 
+    std::vector<DAVIS240CEvent> events;
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadEvents)
     {
-        m_lockerEvent.lock();
+        //m_lockerEvent.lock();
             std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
-        m_lockerEvent.unlock();
+        //m_lockerEvent.unlock();
 
         // Skip if nothing there.
         if (packetContainer == nullptr) { continue; }
@@ -188,8 +183,31 @@ void DAVIS240C::readThreadEvents()
                 }
                 this->warnEvent(events);
             }
+
+            else if (packet == nullptr) { continue; }
+
+            if (packet->getEventType() == FRAME_EVENT)
+            {
+                std::shared_ptr<const libcaer::events::FrameEventPacket> frame
+                    = std::static_pointer_cast<libcaer::events::FrameEventPacket>(packet);
+
+                const libcaer::events::FrameEvent &theFrame = (*frame)[0];
+
+                DAVIS240CFrame f;
+                f.m_timestamp = theFrame.getTimestamp();
+
+                for (int row = 0; row < theFrame.getLengthY(); row++)
+                {
+                    for (int col = 0; col < theFrame.getLengthX(); col++)
+                    {
+                        f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*theFrame.getPixel(col, row)/65535.);
+                    }
+                }
+                this->warnFrame(f);
+            }
         }
     }
+    //m_lockerEvent.unlock();
 }
 
 void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
@@ -223,20 +241,20 @@ int DAVIS240C::listenFrames()
 {
     m_stopreadThreadFrames= false;
     m_readThreadFrames= std::thread(&DAVIS240C::readThreadFrames,this);
-    m_readThreadFrames.join();
     return 0;
 }
 
 void DAVIS240C::readThreadFrames()
 {
-    std::vector<DAVIS240CEvent> events;
+    //m_lockerFrame.lock();
 
+    std::vector<DAVIS240CEvent> events;
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadFrames)
     {
         // Get data
-        m_lockerFrame.lock();
+        //m_lockerFrame.lock();
             std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
-        m_lockerFrame.unlock();
+        //m_lockerFrame.unlock();
 
         // Skip if nothing there.
         if (packetContainer == nullptr) { continue; }
@@ -267,6 +285,7 @@ void DAVIS240C::readThreadFrames()
             }
         }
     }
+    //m_lockerFrame.unlock();
 }
 
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)

@@ -54,8 +54,8 @@ public:
     const unsigned int          m_nbCams;
 
     // Parameters related to filtering events above threshold age
-    int        m_currenTime0;
-    int        m_currenTime1;
+    int                         m_currenTime0;
+    int                         m_currenTime1;
 
     // Structures for data storing (flattened matrices)
     std::vector<int>            m_polEvts0;
@@ -80,19 +80,19 @@ public:
     cv::Mat                     m_grayFrame1;
 
     // Display window related variables
-    std::string         m_polWin0;
-    std::string         m_ageWin0;
-    std::string         m_frameWin0;
-    std::string         m_filtWin0;
-    std::string         m_polWin1;
-    std::string         m_ageWin1;
-    std::string         m_frameWin1;
-    std::string         m_filtWin1;
-    std::string         m_depthWin;
+    std::string                 m_polWin0;
+    std::string                 m_ageWin0;
+    std::string                 m_frameWin0;
+    std::string                 m_filtWin0;
+    std::string                 m_polWin1;
+    std::string                 m_ageWin1;
+    std::string                 m_frameWin1;
+    std::string                 m_filtWin1;
+    std::string                 m_depthWin;
 
     // Trackbar parameters (events age)
     int        m_ageThresh;
-    int        m_max_trackbar_val=1e6;
+    int        m_max_trackbar_val;
 
     // Trackbar parameters (laser)
     int m_cx;
@@ -118,9 +118,9 @@ public:
     int m_threshAnti1;
     int m_etaInt1;
 
-    // Trackbar parameters (depth)
-    int        m_min_depth = 1100; // = 10 cm
-    int        m_max_depth = 1600; // = 20 cm
+    // Trackbar parameters (depth in c,)
+    int        m_min_depth;
+    int        m_max_depth;
 
     // Event recorder
     std::ofstream m_recorder;

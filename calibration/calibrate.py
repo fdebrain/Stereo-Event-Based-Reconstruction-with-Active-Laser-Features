@@ -8,7 +8,7 @@ import cv2
 # termination criteria
 criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-# prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+# World points
 X = [ i for i in range(0,8*3,3) ]
 Y = [ i for i in range(0,5*3,3) ]
 Z = 0
@@ -20,13 +20,13 @@ objpoints = [] # 3d point in real world space
 imgpoints0 = [] # 2d points in image plane.
 imgpoints1 = [] # 2d points in image plane.
 
+
 davis0 = cv2.VideoCapture('data/calibChess0.avi')
 davis1 = cv2.VideoCapture('data/calibChess1.avi')
 
 ret0, frame0 = davis0.read()
 ret1, frame1 = davis1.read()
 cnt = 0
-c = 0
 
 while(ret0==True and ret1==True):
 
@@ -37,7 +37,6 @@ while(ret0==True and ret1==True):
 	if cnt%20!=0:
 		continue
 
-	c += 1
 	gray0 = cv2.cvtColor(frame0,cv2.COLOR_BGR2GRAY)
 	gray1 = cv2.cvtColor(frame1,cv2.COLOR_BGR2GRAY)
 
@@ -63,7 +62,6 @@ while(ret0==True and ret1==True):
 	if cv2.waitKey(1) & 0xFF == ord('q'):
 		break
 
-print(cnt, c)
 davis0.release()
 davis1.release()
 cv2.destroyAllWindows()
@@ -94,5 +92,20 @@ for i in range(len(objpoints)):
 	tot_error0 += error0
 	tot_error1 += error1
 
-print("total error0: ", tot_error0/len(objpoints))
-print("total error1: ", tot_error1/len(objpoints))
+mean_error0 = tot_error0/len(objpoints)
+mean_error1 = tot_error1/len(objpoints)
+
+print("Mean error0: ", mean_error0)
+print("Mean error1: ", mean_error1)
+
+# Save calibration parameters in JSON
+import json
+fname = "calib.json"
+data = { 'camera_matrix0':K0.tolist(), 'dist_coeffs0':D0.tolist(),
+         'camera_matrix1':K1.tolist(), 'dist_coeffs1':D1.tolist(),
+         'R':R.tolist(), 'T':T.tolist(), 'E':E.tolist(), 'F':F.tolist(),
+         'error0':mean_error0,
+         'error1':mean_error1 }
+
+with open(fname, "w") as f:
+	json.dump(data, f,indent=4)
