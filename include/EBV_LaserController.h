@@ -4,6 +4,8 @@
 #include <thread>
 #include <mutex>
 
+static const char* modesList[] = {"circle", "swipe"};
+
 class MagneticMirrorLaser;
 
 class LaserController
@@ -33,15 +35,18 @@ public:
 
 public:
     std::thread m_thread;
+    std::string m_mode;
 
 private:
     MagneticMirrorLaser* m_laser;
-
     int m_freq;
     double m_step;
     int m_cx;
     int m_cy;
     int m_r;
+    unsigned int m_max_x;
+    unsigned int m_max_y;
+
 };
 
 #endif // EBV_LASERCONTROLLER_H

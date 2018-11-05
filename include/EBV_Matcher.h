@@ -39,6 +39,12 @@ public:
     void warnMatch(const DAVIS240CEvent& event0,
                    const DAVIS240CEvent& event1);
 
+    int getEps() const { return m_eps; }
+    void setEps(const int eps) { m_eps = eps; }
+
+    int getMaxBuffer() const { return m_maxTimeToKeep; }
+    void setMaxBuffer(const int maxBuffer) { m_maxTimeToKeep = maxBuffer; }
+
 public:
     // Thread this object runs in
     std::thread m_thread;

@@ -3,7 +3,6 @@
 
 #include <EBV_Matcher.h>
 
-//====
 class StereoRectificationData {
   public:
     std::array<cv::Mat_<double>, 2> R;
@@ -17,7 +16,6 @@ class StereoRectificationData {
     StereoRectificationData();
     bool is_valid() const;
 };
-//====
 
 class TriangulatorListener
 {
@@ -48,6 +46,9 @@ public:
     void warnDepth(const unsigned int u,
                    const unsigned int v,
                    const double depth);
+
+    // Who triangulator is listening to
+        Matcher* m_matcher;
 
 private:
     const unsigned int m_rows;
@@ -84,9 +85,6 @@ private:
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
-
-    // Who triangulator is listening to
-    Matcher* m_matcher;
 
     // List of triangulator listeners
     std::list<TriangulatorListener*> m_triangulatorListeners;

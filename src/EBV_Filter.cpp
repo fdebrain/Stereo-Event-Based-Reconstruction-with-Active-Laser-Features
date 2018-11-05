@@ -1,10 +1,9 @@
 #include <EBV_Filter.h>
+#include <EBV_Matcher.h>
+#include <EBV_DFF_Visualizer.h>
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
-
-#include <EBV_Matcher.h>
-#include <EBV_DFF_Visualizer.h>
 
 Filter::Filter(const unsigned int rows,
                const unsigned int cols,
@@ -15,7 +14,7 @@ Filter::Filter(const unsigned int rows,
       m_maxTimeToKeep(1e4), //When to flush old events = 10ms
       m_frequency(600),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
       m_targetPeriod(1e6/m_frequency),
-      m_eps(5),            // In percent of period T
+      m_eps(10),            // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
       m_neighborSize(4),    //3; //2;
       m_threshSupportsA(3), //5; //3;
@@ -23,7 +22,7 @@ Filter::Filter(const unsigned int rows,
       m_threshAntiSupports(20),//5; //2;
       m_xc(0.0f),
       m_yc(0.0f),
-      m_eta(0.1f)
+      m_eta(0.01f)
 {
     // Listen to Davis
     m_events.resize(m_rows*m_cols);
@@ -114,8 +113,8 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                 m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
                 // We send CoG coordinates
-                //e.m_x = static_cast<unsigned int>(m_xc);
-                //e.m_y = static_cast<unsigned int>(m_yc);
+                e.m_x = static_cast<unsigned int>(m_xc);
+                e.m_y = static_cast<unsigned int>(m_yc);
             //m_evtMutex.unlock();
 
             //printf("Camera %d - Timestamp %d. \n\r",m_davis->m_id,e.m_timestamp);

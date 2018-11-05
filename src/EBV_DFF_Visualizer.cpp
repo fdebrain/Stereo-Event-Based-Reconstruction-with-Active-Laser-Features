@@ -11,16 +11,16 @@
 
 //=== RECORDINGS ===//
 constexpr bool recordEvents(false);
-constexpr char eventRecordFile[] = "recordedEvents.txt";
+constexpr char eventRecordFile[] = "../calibration/recordedEvents.txt";
 
-constexpr bool recordFrames(true);
-constexpr char frameRecordFile0[] = "../calibration/calibCircles0.avi";
-constexpr char frameRecordFile1[] = "../calibration/calibCircles1.avi";
+constexpr bool recordFrames(false);
+constexpr char frameRecordFile0[] = "../calibration/calib0.avi";
+constexpr char frameRecordFile1[] = "../calibration/calib1.avi";
 
-cv::VideoWriter m_video0("../calibration/calibCircles0.avi",
+cv::VideoWriter m_video0(frameRecordFile0,
                          CV_FOURCC('M', 'J', 'P', 'G'),
                          10, cv::Size(240,180),true);
-cv::VideoWriter m_video1("../calibration/calibCircles1.avi",
+cv::VideoWriter m_video1(frameRecordFile1,
                          CV_FOURCC('M', 'J', 'P', 'G'),
                          10, cv::Size(240,180),true);
 
@@ -97,6 +97,18 @@ static void callbackTrackbarLaserFreq(int freq, void *data)
     laser->setFreq(freq);
 }
 
+static void callbackTrackbarMatcherEps(int eps, void *data)
+{
+    Matcher* matcher = static_cast<Matcher*>(data);
+    matcher->setEps(eps);
+}
+
+static void callbackTrackbarMatcherMaxBuffer(int maxBuffer, void *data)
+{
+    Matcher* matcher = static_cast<Matcher*>(data);
+    matcher->setMaxBuffer(maxBuffer);
+}
+
 Visualizer::Visualizer(const unsigned int rows,
                        const unsigned int cols,
                        const unsigned int nbCams,
@@ -106,7 +118,7 @@ Visualizer::Visualizer(const unsigned int rows,
                        LaserController* laser)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams),
       m_ageThresh(40e3), m_max_trackbar_val(1e6),
-      m_min_depth(20),m_max_depth(30),
+      m_min_depth(25),m_max_depth(40),
       m_davis0(davis0), m_davis1(davis1),
       m_filter0(filter0), m_filter1(filter1),
       m_triangulator(triangulator),
@@ -265,6 +277,16 @@ Visualizer::Visualizer(const unsigned int rows,
         // Initialize window
         m_depthWin = "Depth Map";
         cv::namedWindow(m_depthWin,0);
+
+        // Initialize matcher parameters
+        m_matcherEps = m_triangulator->m_matcher->getEps();
+        m_matcherMaxBuffer = m_triangulator->m_matcher->getMaxBuffer();
+
+        // Matcher trackbars
+        cv::createTrackbar("Matcher eps",m_depthWin,&m_matcherEps,1e5,
+                           &callbackTrackbarMatcherEps,static_cast<void*>(m_triangulator->m_matcher));
+        cv::createTrackbar("Matcher max buffer",m_depthWin,&m_matcherMaxBuffer,1e5,
+                           &callbackTrackbarMatcherMaxBuffer,static_cast<void*>(m_triangulator->m_matcher));
 
         // Depth trackbars
         cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,10000,nullptr);
@@ -659,6 +681,7 @@ void Visualizer::run()
         // Wait (in ms)
         key = cv::waitKey(1);
 
+        // Reset depth map
         if (key=='r')
         {
             m_depthMap.clear();

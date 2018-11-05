@@ -7,6 +7,7 @@
 #include <EBV_Filter.h>
 #include <EBV_Triangulator.h>
 #include <EBV_LaserController.h>
+#include <EBV_Matcher.h>
 
 #include <fstream>
 #include <string>
@@ -121,6 +122,8 @@ public:
     // Trackbar parameters (depth in c,)
     int        m_min_depth;
     int        m_max_depth;
+    int        m_matcherEps;
+    int        m_matcherMaxBuffer;
 
     // Event recorder
     std::ofstream m_recorder;

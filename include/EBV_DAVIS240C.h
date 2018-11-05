@@ -66,14 +66,16 @@ class DAVIS240CEventListener
 {
 public:
     DAVIS240CEventListener(void) {}
-    virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,                                           const unsigned int id) = 0;
+    virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
+                                           const unsigned int id) = 0;
 };
 
 class DAVIS240CFrameListener
 {
 public:
     DAVIS240CFrameListener(void) {}
-    virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,                                               const unsigned int id) = 0;
+    virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
+                                           const unsigned int id) = 0;
 };
 
 class DAVIS240C
