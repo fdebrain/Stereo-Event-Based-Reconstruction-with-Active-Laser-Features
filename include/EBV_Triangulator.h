@@ -2,7 +2,6 @@
 #define EBV_TRIANGULATOR_H
 
 #include <EBV_Matcher.h>
-#include <EBV_LaserController.h>
 
 class StereoRectificationData {
   public:
@@ -24,7 +23,9 @@ public:
     TriangulatorListener(void) {}
     virtual void receivedNewDepth(const unsigned int &u,
                                   const unsigned int &v,
-                                  const double &depth) = 0;
+                                  const double &X,
+                                  const double &Y,
+                                  const double &Z) = 0;
 };
 
 class Triangulator : public MatcherListener
@@ -46,18 +47,19 @@ public:
     void deregisterTriangulatorListener(TriangulatorListener* listener);
     void warnDepth(const unsigned int u,
                    const unsigned int v,
-                   const double depth);
+                   const double X,
+                   const double Y,
+                   const double Z);
 
     // Who triangulator is listening to
         Matcher* m_matcher;
-        LaserController* m_laser;
 
 private:
     const unsigned int m_rows;
     const unsigned int m_cols;
 
     // Calibration related
-    std::string m_pathCalib = "../calibration/calib.xml";
+    std::string m_pathCalib = "../calibration/calib.yaml";
     cv::Mat m_K0 = cv::Mat(3,3,CV_32FC1);
     cv::Mat m_D0 = cv::Mat(1,5,CV_32FC1);
     cv::Mat m_P0 = cv::Mat(3,4,CV_32FC1);

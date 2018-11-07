@@ -21,8 +21,8 @@ imgpoints0 = [] # 2d points in image plane.
 imgpoints1 = [] # 2d points in image plane.
 
 
-davis0 = cv2.VideoCapture('data/calib0.avi')
-davis1 = cv2.VideoCapture('data/calib1.avi')
+davis0 = cv2.VideoCapture('data/calibChess0.avi')
+davis1 = cv2.VideoCapture('data/calibChess1.avi')
 
 ret0, frame0 = davis0.read()
 ret1, frame1 = davis1.read()
@@ -99,13 +99,25 @@ print("Mean error0: ", mean_error0)
 print("Mean error1: ", mean_error1)
 
 # Save calibration parameters in JSON
-import json
-fname = "calib.json"
-data = { 'camera_matrix0':K0.tolist(), 'dist_coeffs0':D0.tolist(),
-         'camera_matrix1':K1.tolist(), 'dist_coeffs1':D1.tolist(),
-         'R':R.tolist(), 'T':T.tolist(), 'E':E.tolist(), 'F':F.tolist(),
-         'error0':mean_error0,
-         'error1':mean_error1 }
+import yaml
+fname = "calib.yaml"
+save = cv2.FileStorage(fname, cv2.FileStorage_WRITE)
 
-with open(fname, "w") as f:
-	json.dump(data, f,indent=4)
+save.write('camera_matrix0',K0)
+save.write('dist_coeffs0',D0)
+save.write('camera_matrix1',K1)
+save.write('dist_coeffs1',D1)
+save.write('R',R)
+save.write('T',T)
+save.write('E',E)
+save.write('F',F)
+save.release()
+
+#data = { 'camera_matrix0':K0.tolist(), 'dist_coeffs0':D0.tolist(),
+#          'camera_matrix1':K1.tolist(), 'dist_coeffs1':D1.tolist(),
+#          'R':R.tolist(), 'T':T.tolist(), 'E':E.tolist(), 'F':F.tolist(),
+#          'error0':mean_error0,
+#          'error1':mean_error1 }
+#
+# with open(fname, "w") as f:
+# 	yaml.dump(data, f,default_flow_style=False)#indent=4)

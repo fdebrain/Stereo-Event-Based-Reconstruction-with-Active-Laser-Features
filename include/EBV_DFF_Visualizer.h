@@ -44,7 +44,9 @@ public:
                                 const unsigned int id);
     void receivedNewDepth(const unsigned int &u,
                           const unsigned int &v,
-                          const double &depth);
+                          const double &X,
+                          const double &Y,
+                          const double &Z);
 
     void run();
 

@@ -12,13 +12,13 @@ Filter::Filter(const unsigned int rows,
       m_cols(cols),
       m_davis(davis),
       m_maxTimeToKeep(1e4), //When to flush old events = 10ms
-      m_frequency(600),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_frequency(530),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
       m_targetPeriod(1e6/m_frequency),
       m_eps(10),            // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
-      m_neighborSize(4),    //3; //2;
-      m_threshSupportsA(3), //5; //3;
-      m_threshSupportsB(3), //10;  //3;
+      m_neighborSize(3),    //3; //2;
+      m_threshSupportsA(2), //5; //3;
+      m_threshSupportsB(2), //10;  //3;
       m_threshAntiSupports(20),//5; //2;
       m_xc(0.0f),
       m_yc(0.0f),

@@ -19,10 +19,10 @@ constexpr char frameRecordFile1[] = "../calibration/data/calib1.avi";
 
 cv::VideoWriter m_video0(frameRecordFile0,
                          CV_FOURCC('M', 'J', 'P', 'G'),
-                         10, cv::Size(240,180),false);
+                         10, cv::Size(240,180),true);
 cv::VideoWriter m_video1(frameRecordFile1,
                          CV_FOURCC('M', 'J', 'P', 'G'),
-                         10, cv::Size(240,180),false);
+                         10, cv::Size(240,180),true);
 
 //=== TRACKBAR CALLBACKS ===//
 static void callbackTrackbarFreq(int newFreq, void *data)
@@ -369,13 +369,14 @@ Visualizer::~Visualizer()
 
     if (recordEvents) { m_recorder.close(); }
 
-    /*
-    if (recordFrames)
-    {
-        m_video0.release();
-        m_video1.release();
-    }
-    */
+    m_video0.release();
+    m_video1.release();
+
+//    if (recordFrames)
+//    {
+//        m_video0.release();
+//        m_video1.release();
+//    }
 }
 
 /*
@@ -496,10 +497,12 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
 
 void Visualizer::receivedNewDepth(const unsigned int &u,
                                   const unsigned int &v,
-                                  const double &depth)
+                                  const double &X,
+                                  const double &Y,
+                                  const double &Z)
 {
     //m_depthMutex.lock();
-        m_depthMap[u*m_cols+v] = depth;
+        m_depthMap[u*m_cols+v] = Z;
     //m_depthMutex.unlock();
 }
 

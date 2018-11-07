@@ -2,22 +2,15 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-//=== RECORDINGS ===//
-std::ofstream m_recorder;
-constexpr bool recordTriangulation(false);
-constexpr char eventRecordFile[] = "../calibration/laserCalibPoints.txt";
-
-StereoRectificationData::StereoRectificationData() {
-    for (auto &r : R) {
-        r.resize(0);
-    }
-    for (auto &p : P) {
-        p.resize(0);
-    }
+StereoRectificationData::StereoRectificationData()
+{
+    for (auto &r : R) { r.resize(0); }
+    for (auto &p : P) { p.resize(0); }
     Q.resize(0);
 }
 
-bool StereoRectificationData::is_valid() const {
+bool StereoRectificationData::is_valid() const
+{
     return R[0].rows == 3 && R[0].cols == 3 && R[1].rows == 3 &&
            R[1].cols == 3 && P[0].rows == 3 && P[0].cols == 4 &&
            P[1].rows == 3 && P[1].cols == 4 && Q.rows == 4 && Q.cols == 4;
@@ -28,17 +21,17 @@ void Triangulator::importCalibration(std::string path)
     cv::FileStorage fs;
     fs.open(path, cv::FileStorage::READ);
 
-    cv::FileNode calibs = fs["camera_calib"];
-    calibs[0]["camera_matrix"] >> m_K0;
+    //cv::FileNode calibs = fs["camera_calib"];
+    fs["camera_matrix0"] >> m_K0;
     std::cout << "K0: " << m_K0 << std::endl;
 
-    calibs[0]["dist_coeffs"] >> m_D0;
+    fs["dist_coeffs0"] >> m_D0;
     std::cout << "D0: " << m_D0 << std::endl;
 
-    calibs[1]["camera_matrix"] >> m_K1;
+    fs["camera_matrix1"] >> m_K1;
     std::cout << "K1: " << m_K1 << std::endl;
 
-    calibs[1]["dist_coeffs"] >> m_D1;
+    fs["dist_coeffs1"] >> m_D1;
     std::cout << "D1: " << m_D1 << std::endl;
 
     fs["R"] >> m_R;
@@ -72,11 +65,6 @@ Triangulator::Triangulator(const unsigned int rows,
 
     // Get camera settings
     this->importCalibration(m_pathCalib);
-
-    if (recordTriangulation)
-    {
-        m_recorder.open(eventRecordFile);
-    }
 
     // Initialize thread
     m_thread = std::thread(&Triangulator::run,this);
@@ -193,21 +181,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                           undistCoordsCorrected1,
                           point3D);
 
-    double depth = point3D[2]/point3D[3];
-
-    // Record event position/timestamp in each camera + laser position/timestamp
-    if (recordTriangulation)
-    {
-        m_recorder << x0 << '\t'
-                   << y0 << '\t'
-                   << event0.m_timestamp << '\t'
-                   << x1 << '\t'
-                   << y1 << '\t'
-                   << event1.m_timestamp << '\t'
-                   << m_laser << '\t';
-                   //<<  << '\t'
-                   //<<  << '\t'
-    }
+    double X = point3D[0]/point3D[3];
+    double Y = point3D[1]/point3D[3];
+    double Z = point3D[2]/point3D[3];
 
     // DEBUG - CHECK 3D POINT POSITION
     //printf("Point at: (%3.f,%3.f,%4.f).\n\r",
@@ -221,7 +197,7 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     //printf("Depth: %f.\n\r",depth);
     // END DEBUG
 
-    warnDepth(x0,y0,depth);
+    warnDepth(x0,y0,X,Y,Z);
 }
 
 void Triangulator::registerTriangulatorListener(TriangulatorListener* listener)
@@ -236,11 +212,13 @@ void Triangulator::deregisterTriangulatorListener(TriangulatorListener* listener
 
 void Triangulator::warnDepth(const unsigned int u,
                              const unsigned int v,
-                             const double z)
+                             const double X,
+                             const double Y,
+                             const double Z)
 {
     std::list<TriangulatorListener*>::iterator it;
     for(it = m_triangulatorListeners.begin(); it!=m_triangulatorListeners.end(); it++)
     {
-        (*it)->receivedNewDepth(u,v,z);
+        (*it)->receivedNewDepth(u,v,X,Y,Z);
     }
 }
