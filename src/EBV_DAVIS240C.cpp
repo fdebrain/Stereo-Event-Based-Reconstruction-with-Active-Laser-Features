@@ -3,7 +3,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include <libcaercpp/devices/davis.hpp>
+// QUESTION: How do we forward declare this so it doesn't appear in the header ?
+//#include <libcaercpp/devices/davis.hpp>
 
 static void globalShutdownSignalHandler(int signal)
 {
@@ -146,8 +147,9 @@ int DAVIS240C::listenEvents()
 
 void DAVIS240C::readThreadEvents()
 {
+    // QUESTION: Do we need mutex lockers ? If yes, where ?
+    // Frame is sent to warn function as a reference, I don't see how a mutex is benefitial here
     //m_lockerEvent.lock();
-
     std::vector<DAVIS240CEvent> events;
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadEvents)
     {
@@ -200,6 +202,7 @@ void DAVIS240C::readThreadEvents()
                 {
                     for (int col = 0; col < theFrame.getLengthX(); col++)
                     {
+                        // Probably faulty
                         f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*theFrame.getPixel(col, row)/65535.);
                     }
                 }
@@ -232,6 +235,7 @@ void DAVIS240C::deregisterEventListener(DAVIS240CEventListener* listener)
 }
 
 //=== FRAME LISTENING ===//
+// QUESTION: I cannot launch both events and frames threads (double free or corruption)
 void DAVIS240C::registerFrameListener(DAVIS240CFrameListener* listener)
 {
     m_frameListeners.push_back(listener);
@@ -247,7 +251,6 @@ int DAVIS240C::listenFrames()
 void DAVIS240C::readThreadFrames()
 {
     //m_lockerFrame.lock();
-
     std::vector<DAVIS240CEvent> events;
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadFrames)
     {

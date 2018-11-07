@@ -37,6 +37,11 @@ public:
     std::thread m_thread;
     std::string m_mode;
 
+    // For laser calibration (WHY NOT MAKE LASER CONTROLLER A LISTENER TO TRIANGULATOR?)
+    int m_x;
+    int m_y;
+    int m_current;
+
 private:
     MagneticMirrorLaser* m_laser;
     int m_freq;

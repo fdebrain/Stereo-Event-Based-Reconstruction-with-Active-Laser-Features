@@ -2,6 +2,7 @@
 #define EBV_TRIANGULATOR_H
 
 #include <EBV_Matcher.h>
+#include <EBV_LaserController.h>
 
 class StereoRectificationData {
   public:
@@ -49,6 +50,7 @@ public:
 
     // Who triangulator is listening to
         Matcher* m_matcher;
+        LaserController* m_laser;
 
 private:
     const unsigned int m_rows;

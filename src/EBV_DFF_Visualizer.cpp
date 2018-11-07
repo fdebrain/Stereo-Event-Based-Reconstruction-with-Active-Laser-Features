@@ -14,15 +14,15 @@ constexpr bool recordEvents(false);
 constexpr char eventRecordFile[] = "../calibration/recordedEvents.txt";
 
 constexpr bool recordFrames(false);
-constexpr char frameRecordFile0[] = "../calibration/calib0.avi";
-constexpr char frameRecordFile1[] = "../calibration/calib1.avi";
+constexpr char frameRecordFile0[] = "../calibration/data/calib0.avi";
+constexpr char frameRecordFile1[] = "../calibration/data/calib1.avi";
 
 cv::VideoWriter m_video0(frameRecordFile0,
                          CV_FOURCC('M', 'J', 'P', 'G'),
-                         10, cv::Size(240,180),true);
+                         10, cv::Size(240,180),false);
 cv::VideoWriter m_video1(frameRecordFile1,
                          CV_FOURCC('M', 'J', 'P', 'G'),
-                         10, cv::Size(240,180),true);
+                         10, cv::Size(240,180),false);
 
 //=== TRACKBAR CALLBACKS ===//
 static void callbackTrackbarFreq(int newFreq, void *data)
@@ -158,7 +158,7 @@ Visualizer::Visualizer(const unsigned int rows,
         m_davis0->start();
         m_davis0->registerEventListener(this);
         m_davis0->registerFrameListener(this);
-        m_davis0->listenEvents();
+        m_davis0->listenEvents(); // Actually listens to both events and frames (until we debug the double thread problem of DAVIS240C)
         //m_davis0->listenFrames();
     }
 
@@ -289,8 +289,8 @@ Visualizer::Visualizer(const unsigned int rows,
                            &callbackTrackbarMatcherMaxBuffer,static_cast<void*>(m_triangulator->m_matcher));
 
         // Depth trackbars
-        cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,10000,nullptr);
-        cv::createTrackbar("maxDepth",m_depthWin,&m_max_depth,10000,nullptr);
+        cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,100,nullptr);
+        cv::createTrackbar("maxDepth",m_depthWin,&m_max_depth,100,nullptr);
     }
 
     if (m_laser!=nullptr)
@@ -368,11 +368,14 @@ Visualizer::~Visualizer()
     }
 
     if (recordEvents) { m_recorder.close(); }
+
+    /*
     if (recordFrames)
     {
         m_video0.release();
         m_video1.release();
     }
+    */
 }
 
 /*
@@ -521,10 +524,11 @@ void Visualizer::run()
         for(unsigned int i=0; i<m_rows*m_cols; i++)
         {
             // Events by polarity - Master
-            m_evtMutex0.lock();
+            // QUESTION: Where do we need mutex lock ?
+            //m_evtMutex0.lock();
                 int pol = m_polEvts0[i];
                 int dt = m_currenTime0 - m_ageEvts0[i];
-            m_evtMutex0.unlock();
+            //m_evtMutex0.unlock();
 
             if(dt<m_ageThresh)
             {
@@ -539,10 +543,10 @@ void Visualizer::run()
             ageMatHSV0.data[3*i + 2] = static_cast<unsigned char>(dt==m_ageThresh?0:255); //V
 
             // Events by polarity - Slave
-            m_evtMutex1.lock();
+            //m_evtMutex1.lock();
                 pol = m_polEvts1[i];
                 dt = m_currenTime1 - m_ageEvts1[i];
-            m_evtMutex1.unlock();
+            //m_evtMutex1.unlock();
 
             if(dt<m_ageThresh)
             {
@@ -557,9 +561,9 @@ void Visualizer::run()
             ageMatHSV1.data[3*i + 2] = static_cast<unsigned char>(dt==m_ageThresh?0:255); //V
 
             // Filtered events - Master
-            m_filterEvtMutex0.lock();
+            //m_filterEvtMutex0.lock();
                 dt = m_currenTime0 - m_filtEvts0[i];
-            m_filterEvtMutex0.unlock();
+            //m_filterEvtMutex0.unlock();
 
             if(dt < m_ageThresh)
             {
@@ -575,9 +579,9 @@ void Visualizer::run()
             }
 
             // Filtered events - Slave
-            m_filterEvtMutex1.lock();
+            //m_filterEvtMutex1.lock();
                 dt = m_currenTime1 - m_filtEvts1[i];
-            m_filterEvtMutex1.unlock();
+            //m_filterEvtMutex1.unlock();
 
             if(dt < m_ageThresh)
             {
@@ -593,9 +597,9 @@ void Visualizer::run()
             }
 
             // Depth map
-            m_depthMutex.lock();
+            //m_depthMutex.lock();
                 double z = m_depthMap[i];
-            m_depthMutex.unlock();
+            //m_depthMutex.unlock();
             if (z>0)
             {
                 if (z<m_min_depth){ z = m_min_depth; }
@@ -688,5 +692,7 @@ void Visualizer::run()
             m_depthMap.resize(m_rows*m_cols);
             printf("Reset depth map.\n\r");
         }
+
+        // TODO: Record events/frames key + calibration
     }
 }

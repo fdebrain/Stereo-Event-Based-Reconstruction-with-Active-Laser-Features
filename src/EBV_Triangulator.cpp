@@ -2,6 +2,11 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+//=== RECORDINGS ===//
+std::ofstream m_recorder;
+constexpr bool recordTriangulation(false);
+constexpr char eventRecordFile[] = "../calibration/laserCalibPoints.txt";
+
 StereoRectificationData::StereoRectificationData() {
     for (auto &r : R) {
         r.resize(0);
@@ -68,6 +73,11 @@ Triangulator::Triangulator(const unsigned int rows,
     // Get camera settings
     this->importCalibration(m_pathCalib);
 
+    if (recordTriangulation)
+    {
+        m_recorder.open(eventRecordFile);
+    }
+
     // Initialize thread
     m_thread = std::thread(&Triangulator::run,this);
 }
@@ -87,11 +97,11 @@ void Triangulator::run()
     while(true)
     {
         m_queueAccessMutex0.lock();
-            hasQueueEvent0  =!m_evtQueue0.empty();
+            hasQueueEvent0 =! m_evtQueue0.empty();
         m_queueAccessMutex0.unlock();
 
         m_queueAccessMutex1.lock();
-            hasQueueEvent1  =!m_evtQueue1.empty();
+            hasQueueEvent1 =! m_evtQueue1.empty();
         m_queueAccessMutex1.unlock();
 
         // Process only if incoming filtered events in both cameras
@@ -183,6 +193,23 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                           undistCoordsCorrected1,
                           point3D);
 
+    double depth = point3D[2]/point3D[3];
+
+    // Record event position/timestamp in each camera + laser position/timestamp
+    if (recordTriangulation)
+    {
+        m_recorder << x0 << '\t'
+                   << y0 << '\t'
+                   << event0.m_timestamp << '\t'
+                   << x1 << '\t'
+                   << y1 << '\t'
+                   << event1.m_timestamp << '\t'
+                   << m_laser << '\t';
+                   //<<  << '\t'
+                   //<<  << '\t'
+    }
+
+    // DEBUG - CHECK 3D POINT POSITION
     //printf("Point at: (%3.f,%3.f,%4.f).\n\r",
     //        point3D[0]/point3D[3],
     //        point3D[1]/point3D[3],
@@ -191,9 +218,8 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     //printf("Point at: (%3.f,%3.f,%4.f).\n\r",point3D.at<double>(0)/point3D.at<double>(3),
     //                                   point3D.at<double>(1)/point3D.at<double>(3),
     //                                   point3D.at<double>(2)/point3D.at<double>(3));
-
-    double depth = point3D[2]/point3D[3];
     //printf("Depth: %f.\n\r",depth);
+    // END DEBUG
 
     warnDepth(x0,y0,depth);
 }

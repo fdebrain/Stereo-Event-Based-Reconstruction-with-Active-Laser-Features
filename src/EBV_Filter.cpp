@@ -30,6 +30,7 @@ Filter::Filter(const unsigned int rows,
 
     // Initialize thread
     //m_thread = std::thread(&Filter::runThread,this);
+    //printf("Starting filter in thread %d. \n\r",m_thread.get_id());
 }
 
 Filter::~Filter()
@@ -53,6 +54,8 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     const int xMax = std::min(int(m_rows-1),int(x)+m_neighborSize);
     const int yMax = std::min(int(m_cols-1),int(y)+m_neighborSize);
 
+
+    // QUESTION: When I try p>0 events, the master is always lagging behing the slave (about 1s), but many more events pass through the filter
     if (p<=0)
     {
         int nbSupportsA = 0;
@@ -62,6 +65,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
         {
             for (int col=yMin; col<=yMax; col++)
             {
+                // QUESTION: Do we really need to lock a mutex here ? Seems expansive and already works well without
                 //m_evtMutex.lock();
                 // Get list of events at neighbor pixel // DANGER SHARED RESOURCE
                 std::list<DAVIS240CEvent>* neighborList = &(m_events[row*m_cols+col]);
@@ -133,7 +137,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
         eventsList->push_back(e);
 
         // Remove old events from list O(1) assuming constant generation rate.
-        std::list<DAVIS240CEvent>::iterator it = eventsList->begin(); // DANGER SHARED RESOURCE
+        std::list<DAVIS240CEvent>::iterator it = eventsList->begin();
         const int t = it->m_timestamp;
         while(((m_currTime-t) > m_maxTimeToKeep) && (it!=eventsList->end()))
         {
@@ -161,7 +165,6 @@ void Filter::warnFilteredEvent(DAVIS240CEvent& filtEvent)
     }
 }
 
-
 /*
 void Filter::runThread()
 {
@@ -171,7 +174,7 @@ void Filter::runThread()
     while(true)
     {
         m_queueAccessMutex.lock();
-            hasQueueEvent  = !m_evtQueue.empty();
+            hasQueueEvent = !m_evtQueue.empty();
         m_queueAccessMutex.unlock();
 
         if(hasQueueEvent)

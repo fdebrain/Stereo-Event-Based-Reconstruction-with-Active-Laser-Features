@@ -5,7 +5,7 @@
 
 LaserController::LaserController()
     : m_laser(new MagneticMirrorLaser()),
-      m_freq(600),
+      m_freq(500), // Fix the offset
       m_step(1/100.),
       m_cx(2048),
       m_cy(2048),
