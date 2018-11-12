@@ -1,66 +1,37 @@
 #include <EBV_LaserController.h>
 #include <EBV_MagneticMirrorLaser.h>
 
-LaserController::LaserController(Triangulator* triangulator)
+LaserController::LaserController()//Triangulator* triangulator)
     : m_laser(new MagneticMirrorLaser()),
-      m_triangulator(triangulator),
       m_freq(500), // Fix the offset
-      m_step(1/100.),
+      //m_step(1/100.),
+      m_step(50),
       m_cx(2048),
       m_cy(2048),
       m_r(1000),
       m_vx(1.5e4),
       m_vy(4e5),
       m_mode(modesList[1]),
-      m_max_x(4000),
-      m_max_y(4000),
-      m_calibrateLaser(true),
-      m_x(0),
-      m_y(0)
+      m_min_x(1000),
+      m_min_y(500),
+      m_max_x(3000),
+      m_max_y(3000),
+      m_calibrateLaser(false)
 { 
     // Initialize laser
     m_laser->init("/dev/ttyUSB0");
-    m_laser->toggle(0);
-
-    // Calibration mode
-    if (m_calibrateLaser)
-    {
-        m_triangulator->registerTriangulatorListener(this);
-        m_recorder.open(m_eventRecordFile);
-    }
+    m_laser->toggle(1);
+    m_x = m_min_x;
+    m_y = m_min_y;
+    m_laser->pos(m_x,m_y);
 }
 
 LaserController::~LaserController()
 {
-    if (m_calibrateLaser)
-    {
-        m_triangulator->deregisterTriangulatorListener(this);
-        m_recorder.close();
-    }
-
-    m_laser->close();
+    printf("Call laser destructor ! \n\r");
+    m_laser->~MagneticMirrorLaser();
     delete m_laser;
 }
-
-void LaserController::receivedNewDepth(const unsigned int &u,
-                                  const unsigned int &v,
-                                  const double &X,
-                                  const double &Y,
-                                  const double &Z)
-{
-    // Record event position/timestamp in each camera + laser position/timestamp
-    if (m_calibrateLaser)
-    {
-        m_recorder << u << '\t'
-                   << v << '\t'
-                   << m_x << '\t'
-                   << m_y << '\t'
-                   << X << '\t'
-                   << Y << '\t'
-                   << Z << '\n';
-    }
-}
-
 
 void LaserController::setFreq(const int freq)
 {
@@ -78,6 +49,7 @@ void LaserController::start()
 void LaserController::stop()
 {
     m_laser->toggle(0);
+    m_laser->vel(0,0);
 }
 
 void LaserController::draw()
@@ -109,55 +81,40 @@ void LaserController::draw()
     }
     */
 
-    if(m_calibrateLaser)
+    while(true)
     {
-        while(true)
+        while(m_y<m_max_y)
         {
-
-            m_x = m_max_x/4;
-            m_y = m_max_y/4;
-            m_calibrateLaser = true;
+            m_y += m_step;
             m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(5));
-            m_calibrateLaser = false;
-            std::this_thread::sleep_for (std::chrono::milliseconds(500));
+            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+        }
 
-            m_x = m_max_x/4;
-            m_y = 3*m_max_y/4;
-            m_calibrateLaser = true;
+        while(m_x<m_max_x)
+        {
+            m_x += m_step;
             m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(5));
-            m_calibrateLaser = false;
-            std::this_thread::sleep_for (std::chrono::milliseconds(500));
+            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+        }
 
-            m_x = 3*m_max_x/4;
-            m_y = 3*m_max_y/4;
-            m_calibrateLaser = true;
+        while(m_y>m_min_y)
+        {
+            m_y -= m_step;
             m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(5));
-            m_calibrateLaser = false;
-            std::this_thread::sleep_for (std::chrono::milliseconds(500));
+            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+        }
 
-            m_x = 3*m_max_x/4;
-            m_y = m_max_y/4;
-            m_calibrateLaser = true;
+        while(m_x>m_min_x)
+        {
+            m_x -= m_step;
             m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(5));
-            m_calibrateLaser = false;
-            std::this_thread::sleep_for (std::chrono::milliseconds(500));
-
-            m_x = m_max_x/2;
-            m_y = m_max_y/2;
-            m_calibrateLaser = true;
-            m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(5));
-            m_calibrateLaser = false;
-            std::this_thread::sleep_for (std::chrono::milliseconds(500));
+            std::this_thread::sleep_for (std::chrono::milliseconds(10));
         }
     }
-    else
-    {
+
+    //else
+    //{
         // Method 2: Velocity control
-        m_laser->vel(m_vx,m_vy);
-    }
+    //m_laser->vel(m_vx,m_vy);
+    //}
 }

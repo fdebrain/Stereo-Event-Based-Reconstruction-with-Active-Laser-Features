@@ -122,7 +122,7 @@ int MagneticMirrorLaser::vel(unsigned int x,unsigned int y)
 
 void MagneticMirrorLaser::close(void)
 {
-    this->toggle(true);   // laser on
+    this->toggle(false);   // laser off
     this->vel(0,0);       // velocity 0
     this->pos(2048,2048); // neutral position
     this->blink(0);       // don't blink

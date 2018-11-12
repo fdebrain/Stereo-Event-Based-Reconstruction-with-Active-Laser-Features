@@ -17,8 +17,11 @@ int main(int argc, char** argv)
     Filter       filter0(rows,cols,&davis_master);
     Filter       filter1(rows,cols,&davis_slave);
     Matcher      matcher(rows,cols,&filter0,&filter1);
-    Triangulator triangulator(rows,cols,&matcher);
-    LaserController laser(&triangulator);
+    LaserController laser;
+    Triangulator triangulator(rows,cols,
+                              &davis_master,
+                              &davis_slave,
+                              &matcher,&laser);
     Visualizer   visu(rows,cols,davis_master.m_nbCams,
                       &davis_master, &davis_slave,
                       &filter0, &filter1,

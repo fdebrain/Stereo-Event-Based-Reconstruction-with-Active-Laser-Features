@@ -13,17 +13,6 @@
 constexpr bool recordEvents(false);
 constexpr char eventRecordFile[] = "../calibration/recordedEvents.txt";
 
-constexpr bool recordFrames(false);
-constexpr char frameRecordFile0[] = "../calibration/data/calib0.avi";
-constexpr char frameRecordFile1[] = "../calibration/data/calib1.avi";
-
-cv::VideoWriter m_video0(frameRecordFile0,
-                         CV_FOURCC('M', 'J', 'P', 'G'),
-                         10, cv::Size(240,180),true);
-cv::VideoWriter m_video1(frameRecordFile1,
-                         CV_FOURCC('M', 'J', 'P', 'G'),
-                         10, cv::Size(240,180),true);
-
 //=== TRACKBAR CALLBACKS ===//
 static void callbackTrackbarFreq(int newFreq, void *data)
 {
@@ -124,7 +113,6 @@ Visualizer::Visualizer(const unsigned int rows,
       m_triangulator(triangulator),
       m_laser(laser)
 {
-
     // Initialize data structure
     m_polEvts0.resize(m_rows*m_cols);
     m_ageEvts0.resize(m_rows*m_cols);
@@ -327,8 +315,6 @@ Visualizer::Visualizer(const unsigned int rows,
 
 Visualizer::~Visualizer()
 {
-    //m_laser.close();
-
     if (m_davis0!=nullptr)
     {
         m_davis0->stopListeningEvents();
@@ -366,17 +352,9 @@ Visualizer::~Visualizer()
     {
         m_laser->stop();
     }
+    printf("Calling destructor !");
 
     if (recordEvents) { m_recorder.close(); }
-
-    m_video0.release();
-    m_video1.release();
-
-//    if (recordFrames)
-//    {
-//        m_video0.release();
-//        m_video1.release();
-//    }
 }
 
 /*
@@ -432,12 +410,6 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
             //m_frameMutex0.lock();
                 m_currenTime0 = f.m_timestamp;
                 m_grayFrame0 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-                if (recordFrames)
-                {
-                    cv::Mat frame0;
-                    cv::cvtColor(m_grayFrame0,frame0,cv::COLOR_GRAY2BGR);
-                    m_video0.write(frame0);
-                }
             //m_frameMutex0.unlock();
             break;
         }
@@ -447,12 +419,6 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
             //m_frameMutex1.lock();
                 m_currenTime1 = f.m_timestamp;
                 m_grayFrame1 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-                if (recordFrames)
-                {
-                    cv::Mat frame1;
-                    cv::cvtColor(m_grayFrame1,frame1,cv::COLOR_GRAY2BGR);
-                    m_video1.write(frame1);
-                }
             //m_frameMutex1.unlock();
             break;
         }
@@ -475,7 +441,8 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
                 m_filtEvts0[x*m_cols+y] = t;
                 if (recordEvents)
                 {
-                    m_recorder << id << "\t" << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+                    m_recorder << id << "\t" << x << "\t"
+                               << y << "\t" << e.m_timestamp << std::endl;
                 }
             //m_filterEvtMutex0.unlock();
             break;
@@ -487,7 +454,8 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
                 m_filtEvts1[x*m_cols+y] = t;
                 if (recordEvents)
                 {
-                    m_recorder << id << "\t" << x << "\t" << y << "\t" << e.m_timestamp << std::endl;
+                    m_recorder << id << "\t" << x << "\t"
+                               << y << "\t" << e.m_timestamp << std::endl;
                 }
             //m_filterEvtMutex1.unlock();
             break;

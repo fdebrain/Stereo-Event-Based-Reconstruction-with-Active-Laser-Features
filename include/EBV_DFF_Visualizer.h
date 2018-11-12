@@ -37,16 +37,16 @@ public:
 
     //void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id);
+                                   const unsigned int id) override;
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
-                                   const unsigned int id);
+                                   const unsigned int id) override;
     void receivedNewFilterEvent(DAVIS240CEvent& e,
-                                const unsigned int id);
+                                const unsigned int id) override;
     void receivedNewDepth(const unsigned int &u,
                           const unsigned int &v,
                           const double &X,
                           const double &Y,
-                          const double &Z);
+                          const double &Z) override;
 
     void run();
 
@@ -130,10 +130,7 @@ public:
     // Event recorder
     std::ofstream m_recorder;
 
-    // Frame recordere
-
     // Laser object
-    //MagneticMirrorLaser m_laser;
     LaserController* m_laser;
 
     // Davis object

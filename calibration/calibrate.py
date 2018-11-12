@@ -4,6 +4,7 @@ import sys
 sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
 print(sys.path)
 import cv2
+import matplotlib.pyplot as plt
 
 # termination criteria
 criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -21,8 +22,8 @@ imgpoints0 = [] # 2d points in image plane.
 imgpoints1 = [] # 2d points in image plane.
 
 
-davis0 = cv2.VideoCapture('data/calibChess0.avi')
-davis1 = cv2.VideoCapture('data/calibChess1.avi')
+davis0 = cv2.VideoCapture('data/calib0.avi')
+davis1 = cv2.VideoCapture('data/calib1.avi')
 
 ret0, frame0 = davis0.read()
 ret1, frame1 = davis1.read()
@@ -69,8 +70,9 @@ cv2.destroyAllWindows()
 ret, K0, D0, rvec0, tvec0 = cv2.calibrateCamera(objpoints, imgpoints0, (240,180),None,None)
 ret, K1, D1, rvec1, tvec1 = cv2.calibrateCamera(objpoints, imgpoints1, (240,180),None,None)
 
-ret, K0, D0, K1, D1, R, T, E, F = cv2.stereoCalibrate(objpoints,imgpoints0,imgpoints1, K0, D0, K1, D1, (240,180))
-
+rms, K0, D0, K1, D1, R, T, E, F = cv2.stereoCalibrate(objpoints,imgpoints0,imgpoints1, K0, D0, K1, D1, (240,180),
+                                                      criteria=criteria,
+                                                      flags=cv2.CALIB_FIX_INTRINSIC)
 print('K0: ', K0)
 print('D0: ', D0)
 print('K1: ', K1)
@@ -79,8 +81,9 @@ print('R: ', R)
 print('T: ', T)
 print('E: ', E)
 print('F: ', F)
+print('rms: ', rms)
 
-# Compute reprojection error
+# Compute reprojection error (check intrinsics)
 tot_error0 = 0.
 tot_error1 = 0.
 for i in range(len(objpoints)):
@@ -98,7 +101,18 @@ mean_error1 = tot_error1/len(objpoints)
 print("Mean error0: ", mean_error0)
 print("Mean error1: ", mean_error1)
 
-# Save calibration parameters in JSON
+
+
+#
+fig3 = plt.figure()
+ax3 = plt.axes()
+plt.title("Reprojection of 3D points into 2D image")
+plt.scatter([ptn[0][0] for ptn in imgpointsRep0],[ptn[0][1] for ptn in imgpointsRep0])
+plt.scatter([ptn[0][0] for ptn in imgpoints0[-1]],[ptn[0][1] for ptn in imgpoints0[-1]],c='r')
+plt.legend(["Projected 3D points","True 2D image points"])
+plt.show()
+
+# Save calibration parameters in YAML
 import yaml
 fname = "calib.yaml"
 save = cv2.FileStorage(fname, cv2.FileStorage_WRITE)
@@ -112,12 +126,3 @@ save.write('T',T)
 save.write('E',E)
 save.write('F',F)
 save.release()
-
-#data = { 'camera_matrix0':K0.tolist(), 'dist_coeffs0':D0.tolist(),
-#          'camera_matrix1':K1.tolist(), 'dist_coeffs1':D1.tolist(),
-#          'R':R.tolist(), 'T':T.tolist(), 'E':E.tolist(), 'F':F.tolist(),
-#          'error0':mean_error0,
-#          'error1':mean_error1 }
-#
-# with open(fname, "w") as f:
-# 	yaml.dump(data, f,default_flow_style=False)#indent=4)
