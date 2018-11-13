@@ -14,6 +14,35 @@ bool StereoRectificationData::is_valid() const
            P[1].rows == 3 && P[1].cols == 4 && Q.rows == 4 && Q.cols == 4;
 }
 
+void Triangulator::calibrateCameras()
+{
+    m_video0 = cv::VideoWriter(m_frameRecordFile0,
+            CV_FOURCC('M', 'J', 'P', 'G'),
+            10, cv::Size(m_cols,m_rows),true);
+    m_video1 = cv::VideoWriter(m_frameRecordFile1,
+            CV_FOURCC('M', 'J', 'P', 'G'),
+            10, cv::Size(m_cols,m_rows),true);
+    m_davis0->registerFrameListener(this);
+    m_davis1->registerFrameListener(this);
+
+/**
+    TODO: Insert equivalent of python pipeline code here
+    Receive frame every 1-2s,
+    Check for checkerboard corners and save them,
+    Extract intrinsics of each camera,
+    Extract extrinsics (stereo),
+    Compute error,
+    Export in yaml file
+**/
+
+}
+
+void Triangulator::calibrateLaser()
+{
+    m_recorder.open(m_eventRecordFile);
+    //m_laser->setCalibrationMode(true); // Doesn't work -> to debug
+}
+
 void Triangulator::importCalibration()
 {
     // Import camera calibration
@@ -58,7 +87,7 @@ void Triangulator::importCalibration()
     // Compute projection matrices + stereo-rectification rotations
     cv::stereoRectify(m_K0,m_D0,
                       m_KLaser,m_DLaser,
-                      cv::Size(m_rows,m_cols),
+                      cv::Size(m_cols,m_rows),
                       m_R0,m_T0,
                       m_rect.R[0], m_rect.R[2],
                       m_rect.P[0], m_rect.P[2],
@@ -66,11 +95,11 @@ void Triangulator::importCalibration()
 
     cv::stereoRectify(m_K0,m_D0,
                       m_K1,m_D1,
-                      cv::Size(m_rows,m_cols),
+                      cv::Size(m_cols,m_rows),
                       m_R,m_T,
                       m_rect.R[0], m_rect.R[1],
                       m_rect.P[0], m_rect.P[1],
-                      m_rect.Q);
+                      m_rect.Q, cv::CALIB_ZERO_DISPARITY);
 }
 
 Triangulator::Triangulator(const unsigned int rows,
@@ -91,24 +120,10 @@ Triangulator::Triangulator(const unsigned int rows,
     m_matcher->registerMatcherListener(this);
 
     // Laser calibration
-    if (m_laser->m_calibrateLaser)
-    {
-        m_recorder.open(m_eventRecordFile);
-        //m_laser->setCalibrationMode(true); // Doesn't work -> to debug
-    }
+    if (m_laser->m_calibrateLaser) { calibrateLaser(); }
 
     // Camera calibration
-    if (m_calibrateCamera)
-    {
-        m_video0 = cv::VideoWriter(m_frameRecordFile0,
-                CV_FOURCC('M', 'J', 'P', 'G'),
-                10, cv::Size(240,180),true);
-        m_video1 = cv::VideoWriter(m_frameRecordFile1,
-                CV_FOURCC('M', 'J', 'P', 'G'),
-                10, cv::Size(240,180),true);
-        m_davis0->registerFrameListener(this);
-        m_davis1->registerFrameListener(this);
-    }
+    if (m_calibrateCamera) { calibrateCameras(); }
     else
     {
         this->importCalibration();
@@ -249,12 +264,13 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     m_queueAccessMutex0.unlock();
 
     // Remapping laser points
-    xLaser = static_cast<int>(180.f*(float(xLaser)-1000.f)/(2000.f));
-    yLaser = static_cast<int>(240.f*(float(yLaser)-500.f)/(2500.f));
-    //printf("xLaser: %d - yLaser: %d. \n\r",xLaser,yLaser);
+    //xLaser = static_cast<int>(180.f*(float(xLaser)-1000.f)/(2000.f));
+    //yLaser = static_cast<int>(240.f*(float(yLaser)-500.f)/(2500.f));
+    //printf("xLaser: %d - yLaser: %d - xEvent: %d - yEvent: %d. \n\r",
+    //       xLaser,yLaser, x0, y0);
 
+    ///*
     // Camera0-Camera1 stereo
-    /*
     coords0.push_back(cv::Point2d(y0,x0)); // Warning: x = column, y = row
     coords1.push_back(cv::Point2d(y1,x1));
 
@@ -278,8 +294,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                           undistCoordsCorrected0,
                           undistCoordsCorrected1,
                           point3D);
-    */
+    //*/
 
+    /*
     // Camera0-Laser stereo
     coords0.push_back(cv::Point2d(y0,x0)); // Warning: Point2d(column,row)
     coords1.push_back(cv::Point2d(yLaser,xLaser));
@@ -290,22 +307,25 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                         m_rect.R[0],
                         m_rect.P[0]);
 
-    //undistCoords1 = coords1;
-    cv::undistortPoints(coords1, undistCoords1,
-                        m_KLaser, m_DLaser,
-                        m_rect.R[2],
-                        m_rect.P[2]);
+    undistCoords1 = coords1;
+    //cv::undistortPoints(coords1, undistCoords1,
+    //                    m_KLaser, m_DLaser,
+    //                    m_rect.R[2],
+    //                    m_rect.P[2]);
 
     // Correct matches
-    cv::correctMatches(m_F0,undistCoords0,undistCoords1,
-                      undistCoordsCorrected0,
-                      undistCoordsCorrected1);
+    //cv::correctMatches(m_F0,undistCoords0,undistCoords1,
+    //                  undistCoordsCorrected0,
+    //                  undistCoordsCorrected1);
 
     // Triangulate
     cv::triangulatePoints(m_rect.P[0], m_rect.P[2],
                           undistCoords0,
                           undistCoords1,
+                          //undistCoordsCorrected0,
+                          //undistCoordsCorrected1,
                           point3D);
+    */
 
     double X = point3D[0]/point3D[3];
     double Y = point3D[1]/point3D[3];

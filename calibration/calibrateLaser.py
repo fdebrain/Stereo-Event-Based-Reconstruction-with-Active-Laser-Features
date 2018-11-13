@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 
 # termination criteria
-criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 60, 0.001)
 
 # Import data points
 data = np.loadtxt("laserCalibPoints.txt")
@@ -63,13 +63,15 @@ objpoints = np.reshape(objp.astype(np.float32),(1,-1,1,3))
 # plt.show()
 
 # Get the laser intrinsics
-ret, K, D, rvec, tvec = cv2.calibrateCamera(objpoints, lasercmd, (240,180),None,None)
+ret, K, D, rvec, tvec = cv2.calibrateCamera(objpoints, lasercmd, (3000,3000),None,None)
 print('K: ', K)
 print('D: ', D)
 
 # Get the extrinsics
-rms1, _, _, _, _, R0, T0, E0, F0 = cv2.stereoCalibrate(objpoints,lasercmd,imgpoints0, K0, D0, K, D, (240,180))
-rms2, _, _, _, _, R1, T1, E1, F1 = cv2.stereoCalibrate(objpoints,lasercmd,imgpoints1, K1, D1, K, D, (240,180))
+rms1, _, _, _, _, R0, T0, E0, F0 = cv2.stereoCalibrate(objpoints,lasercmd,imgpoints0, K0, D0, K, D, (240,180),
+                                                       flags=cv2.CALIB_FIX_INTRINSIC,criteria=criteria)
+rms2, _, _, _, _, R1, T1, E1, F1 = cv2.stereoCalibrate(objpoints,lasercmd,imgpoints1, K1, D1, K, D, (240,180),
+                                                       flags=cv2.CALIB_FIX_INTRINSIC, criteria=criteria)
 print('R0: ', R0)
 print('T0: ', T0)
 print('E0: ', E0)
@@ -78,8 +80,8 @@ print('R1: ', R1)
 print('T1: ', T1)
 print('E1: ', E1)
 print('F1: ', F1)
-print('rms1: ',rms1)
-print('rms2: ',rms2)
+print('rms1: ',rms1/len(objpoints[0]))
+print('rms2: ',rms2/len(objpoints[0]))
 
 # Compute projection error
 imgpointsRep, _ = cv2.projectPoints(objpoints[0], rvec[0], tvec[0], K, D)

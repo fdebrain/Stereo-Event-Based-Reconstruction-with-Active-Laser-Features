@@ -45,6 +45,8 @@ public:
                  LaserController* laser = nullptr);
     ~Triangulator();
 
+    void calibrateCameras();
+    void calibrateLaser();
     void importCalibration();
     void run();
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,

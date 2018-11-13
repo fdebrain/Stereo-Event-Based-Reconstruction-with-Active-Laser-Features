@@ -8,6 +8,7 @@
 #include <EBV_Triangulator.h>
 #include <EBV_LaserController.h>
 #include <EBV_Matcher.h>
+#include <EBV_Stereo_Calibration.h>
 
 #include <fstream>
 #include <string>
@@ -31,6 +32,7 @@ public:
                DAVIS240C* davis1 = nullptr,
                Filter* filter0 = nullptr,
                Filter* filter1 = nullptr,
+               StereoCalibrator* calibrator = nullptr,
                Triangulator* triangulator = nullptr,
                LaserController* laser = nullptr);
     ~Visualizer();
@@ -142,6 +144,7 @@ public:
     Filter*             m_filter1;
 
     // Triangulator (depth estimator)
+    StereoCalibrator*    m_calibrator;
     Triangulator*       m_triangulator;
 };
 

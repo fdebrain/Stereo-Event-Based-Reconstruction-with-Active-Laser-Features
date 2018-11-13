@@ -8,7 +8,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-
 //=== RECORDINGS ===//
 constexpr bool recordEvents(false);
 constexpr char eventRecordFile[] = "../calibration/recordedEvents.txt";
@@ -103,6 +102,7 @@ Visualizer::Visualizer(const unsigned int rows,
                        const unsigned int nbCams,
                        DAVIS240C* davis0, DAVIS240C* davis1,
                        Filter* filter0, Filter* filter1,
+                       StereoCalibrator* calibrator,
                        Triangulator* triangulator,
                        LaserController* laser)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams),
@@ -110,6 +110,7 @@ Visualizer::Visualizer(const unsigned int rows,
       m_min_depth(25),m_max_depth(40),
       m_davis0(davis0), m_davis1(davis1),
       m_filter0(filter0), m_filter1(filter1),
+      m_calibrator(calibrator),
       m_triangulator(triangulator),
       m_laser(laser)
 {
@@ -352,7 +353,6 @@ Visualizer::~Visualizer()
     {
         m_laser->stop();
     }
-    printf("Calling destructor !");
 
     if (recordEvents) { m_recorder.close(); }
 }
@@ -598,7 +598,11 @@ void Visualizer::run()
 
             // Display frame
             //m_frameMutex0.lock();
-                cv::imshow(m_frameWin0,m_grayFrame0);
+            if (m_calibrator->m_calibrateCameras)
+            {
+                m_calibrator->calibrate(m_grayFrame0,0);
+            }
+            cv::imshow(m_frameWin0,m_grayFrame0);
             //m_frameMutex0.unlock();
         }
 
@@ -607,8 +611,13 @@ void Visualizer::run()
             cv::imshow(m_polWin1,polMat1);
             //cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
             //cv::imshow(m_ageWin1,ageMatRGB1);
+
             //m_frameMutex1.lock();
-                cv::imshow(m_frameWin1,m_grayFrame1);
+            if (m_calibrator->m_calibrateCameras)
+            {
+                m_calibrator->calibrate(m_grayFrame1,1);
+            }
+            cv::imshow(m_frameWin1,m_grayFrame1);
             //m_frameMutex1.unlock();
         }
 
@@ -664,6 +673,10 @@ void Visualizer::run()
             printf("Reset depth map.\n\r");
         }
 
+        if (key=='c')
+        {
+            m_calibrator->m_calibrateCameras = true;
+        }
         // TODO: Record events/frames key + calibration
     }
 }

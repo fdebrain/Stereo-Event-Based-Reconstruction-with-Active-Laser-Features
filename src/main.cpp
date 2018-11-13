@@ -5,6 +5,7 @@
 #include <EBV_Matcher.h>
 #include <EBV_Triangulator.h>
 #include <EBV_LaserController.h>
+#include <EBV_Stereo_Calibration.h>
 
 int main(int argc, char** argv)
 {
@@ -14,10 +15,12 @@ int main(int argc, char** argv)
 
     DAVIS240C    davis_master;
     DAVIS240C    davis_slave;
+
     Filter       filter0(rows,cols,&davis_master);
     Filter       filter1(rows,cols,&davis_slave);
     Matcher      matcher(rows,cols,&filter0,&filter1);
     LaserController laser;
+    StereoCalibrator calibrator;
     Triangulator triangulator(rows,cols,
                               &davis_master,
                               &davis_slave,
@@ -25,6 +28,7 @@ int main(int argc, char** argv)
     Visualizer   visu(rows,cols,davis_master.m_nbCams,
                       &davis_master, &davis_slave,
                       &filter0, &filter1,
+                      &calibrator,
                       &triangulator,
                       &laser);
 
