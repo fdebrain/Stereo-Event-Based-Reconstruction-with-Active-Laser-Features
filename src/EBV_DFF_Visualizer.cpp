@@ -107,7 +107,7 @@ Visualizer::Visualizer(const unsigned int rows,
                        LaserController* laser)
     : m_rows(rows), m_cols(cols), m_nbCams(nbCams),
       m_ageThresh(40e3), m_max_trackbar_val(1e6),
-      m_min_depth(25),m_max_depth(40),
+      m_min_depth(20),m_max_depth(40),
       m_davis0(davis0), m_davis1(davis1),
       m_filter0(filter0), m_filter1(filter1),
       m_calibrator(calibrator),
@@ -115,18 +115,18 @@ Visualizer::Visualizer(const unsigned int rows,
       m_laser(laser)
 {
     // Initialize data structure
-    m_polEvts0.resize(m_rows*m_cols);
-    m_ageEvts0.resize(m_rows*m_cols);
-    m_grayFrame0.resize(m_rows*m_cols);
-    m_grayFrame0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
+    m_polEvts[0].resize(m_rows*m_cols);
+    m_ageEvts[0].resize(m_rows*m_cols);
+    m_grayFrame[0].resize(m_rows*m_cols);
+    m_grayFrame[0] = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
 
-    m_polEvts1.resize(m_rows*m_cols);
-    m_ageEvts1.resize(m_rows*m_cols);
-    m_grayFrame1.resize(m_rows*m_cols);
-    m_grayFrame1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
+    m_polEvts[1].resize(m_rows*m_cols);
+    m_ageEvts[1].resize(m_rows*m_cols);
+    m_grayFrame[1].resize(m_rows*m_cols);
+    m_grayFrame[1] = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
 
-    m_filtEvts0.resize(m_rows*m_cols);
-    m_filtEvts1.resize(m_rows*m_cols);
+    m_filtEvts[0].resize(m_rows*m_cols);
+    m_filtEvts[1].resize(m_rows*m_cols);
     m_depthMap.resize(m_rows*m_cols);
 
     if (m_davis0!=nullptr)
@@ -147,8 +147,7 @@ Visualizer::Visualizer(const unsigned int rows,
         m_davis0->start();
         m_davis0->registerEventListener(this);
         m_davis0->registerFrameListener(this);
-        m_davis0->listenEvents(); // Actually listens to both events and frames (until we debug the double thread problem of DAVIS240C)
-        //m_davis0->listenFrames();
+        m_davis0->listen();
     }
 
     if (m_davis1!=nullptr)
@@ -162,13 +161,11 @@ Visualizer::Visualizer(const unsigned int rows,
         cv::namedWindow(m_frameWin1,0);
 
         // Listen to davis
-        m_davis1->registerEventListener(this);
-        m_davis1->registerFrameListener(this);
-
         m_davis1->init();
         m_davis1->start();
-        m_davis1->listenEvents();
-        //m_davis1->listenFrames();
+        m_davis1->registerEventListener(this);
+        m_davis1->registerFrameListener(this);
+        m_davis1->listen();
     }
 
     // Listen to filter
@@ -318,8 +315,7 @@ Visualizer::~Visualizer()
 {
     if (m_davis0!=nullptr)
     {
-        m_davis0->stopListeningEvents();
-        m_davis0->stopListeningFrames();
+        m_davis0->stopListening();
         m_davis0->deregisterEventListener(this);
         m_davis0->deregisterFrameListener(this);
         m_davis0->stop();
@@ -332,8 +328,7 @@ Visualizer::~Visualizer()
 
     if (m_davis1!=nullptr)
     {
-        m_davis1->stopListeningEvents();
-        m_davis1->stopListeningFrames();
+        m_davis1->stopListening();
         m_davis1->deregisterEventListener(this);
         m_davis1->deregisterFrameListener(this);
         m_davis1->stop();
@@ -357,19 +352,6 @@ Visualizer::~Visualizer()
     if (recordEvents) { m_recorder.close(); }
 }
 
-/*
-void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
-{
-    const unsigned int x = e.m_x;
-    const unsigned int y = e.m_y;
-    const unsigned int p = e.m_pol; // p={0,1}
-
-    m_evtMutex0.lock();
-        m_polEvts0[x*m_cols+y] += 2*p-1; // p={-1,1}
-    m_evtMutex0.unlock();
-}
-*/
-
 // Runs in DAVIS240 thread
 void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                            const unsigned int id)
@@ -378,51 +360,17 @@ void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     const unsigned int y = e.m_y;
     const unsigned int p = e.m_pol; // p={0,1}
     const int t = e.m_timestamp;
-
-    switch(id)
-    {
-        case 0:
-            //m_evtMutex0.lock();
-                m_currenTime0 = t;
-                m_polEvts0[x*m_cols+y] = 2*p-1; // p={-1,1}
-                m_ageEvts0[x*m_cols+y] = t;
-            //m_evtMutex0.unlock();
-        break;
-
-        case 1:
-            //m_evtMutex1.lock();
-                m_currenTime1 = t;
-                m_polEvts1[x*m_cols+y] = 2*p-1; // p={-1,1}
-                m_ageEvts1[x*m_cols+y] = t;
-            //m_evtMutex1.unlock();
-        break;
-    }
+    m_currenTime[id] = t;
+    m_polEvts[id][x*m_cols+y] = p; //2*p-1; // p={-1,1}
+    m_ageEvts[id][x*m_cols+y] = t;
 }
 
 // Runs in DAVIS240 thread
 void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
                                            const unsigned int id)
 {
-    switch(id)
-    {
-        case 0:
-        {
-            //m_frameMutex0.lock();
-                m_currenTime0 = f.m_timestamp;
-                m_grayFrame0 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-            //m_frameMutex0.unlock();
-            break;
-        }
-
-        case 1:
-        {
-            //m_frameMutex1.lock();
-                m_currenTime1 = f.m_timestamp;
-                m_grayFrame1 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-            //m_frameMutex1.unlock();
-            break;
-        }
-    }
+    m_currenTime[id] = f.m_timestamp;
+    m_grayFrame[id] = f.m_frame;
 }
 
 void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
@@ -433,33 +381,11 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
     const int t = e.m_timestamp;
     //printf("Camera %d - Timestamp %f. \n\r",id,1e-3*e.m_timestamp);
 
-    switch (id)
+    m_filtEvts[id][x*m_cols+y] = t;
+    if (recordEvents)
     {
-        case 0:
-        {
-            //m_filterEvtMutex0.lock();
-                m_filtEvts0[x*m_cols+y] = t;
-                if (recordEvents)
-                {
-                    m_recorder << id << "\t" << x << "\t"
-                               << y << "\t" << e.m_timestamp << std::endl;
-                }
-            //m_filterEvtMutex0.unlock();
-            break;
-        }
-
-        case 1:
-        {
-            //m_filterEvtMutex1.lock();
-                m_filtEvts1[x*m_cols+y] = t;
-                if (recordEvents)
-                {
-                    m_recorder << id << "\t" << x << "\t"
-                               << y << "\t" << e.m_timestamp << std::endl;
-                }
-            //m_filterEvtMutex1.unlock();
-            break;
-        }
+        m_recorder << id << "\t" << x << "\t"
+                   << y << "\t" << e.m_timestamp << std::endl;
     }
 }
 
@@ -469,9 +395,7 @@ void Visualizer::receivedNewDepth(const unsigned int &u,
                                   const double &Y,
                                   const double &Z)
 {
-    //m_depthMutex.lock();
-        m_depthMap[u*m_cols+v] = Z;
-    //m_depthMutex.unlock();
+    m_depthMap[u*m_cols+v] = Z;
 }
 
 void Visualizer::run()
@@ -489,6 +413,8 @@ void Visualizer::run()
     cv::Mat filtMat1(m_rows,m_cols,CV_8UC3);
     cv::Mat depthMatHSV(m_rows,m_cols,CV_8UC3);
     cv::Mat depthMatRGB(m_rows,m_cols,CV_8UC3);
+    int pol,dt;
+    double z;
 
     while(key != 'q')
     {
@@ -497,8 +423,8 @@ void Visualizer::run()
             // Events by polarity - Master
             // QUESTION: Where do we need mutex lock ?
             //m_evtMutex0.lock();
-                int pol = m_polEvts0[i];
-                int dt = m_currenTime0 - m_ageEvts0[i];
+                pol = m_polEvts[0][i];
+                dt = m_currenTime[0] - m_ageEvts[0][i];
             //m_evtMutex0.unlock();
 
             if(dt<m_ageThresh)
@@ -515,8 +441,8 @@ void Visualizer::run()
 
             // Events by polarity - Slave
             //m_evtMutex1.lock();
-                pol = m_polEvts1[i];
-                dt = m_currenTime1 - m_ageEvts1[i];
+                pol = m_polEvts[1][i];
+                dt = m_currenTime[1] - m_ageEvts[1][i];
             //m_evtMutex1.unlock();
 
             if(dt<m_ageThresh)
@@ -533,7 +459,7 @@ void Visualizer::run()
 
             // Filtered events - Master
             //m_filterEvtMutex0.lock();
-                dt = m_currenTime0 - m_filtEvts0[i];
+                dt = m_currenTime[0] - m_filtEvts[0][i];
             //m_filterEvtMutex0.unlock();
 
             if(dt < m_ageThresh)
@@ -551,7 +477,7 @@ void Visualizer::run()
 
             // Filtered events - Slave
             //m_filterEvtMutex1.lock();
-                dt = m_currenTime1 - m_filtEvts1[i];
+                dt = m_currenTime[1] - m_filtEvts[1][i];
             //m_filterEvtMutex1.unlock();
 
             if(dt < m_ageThresh)
@@ -569,7 +495,7 @@ void Visualizer::run()
 
             // Depth map
             //m_depthMutex.lock();
-                double z = m_depthMap[i];
+                z = m_depthMap[i];
             //m_depthMutex.unlock();
             if (z>0)
             {
@@ -600,9 +526,10 @@ void Visualizer::run()
             //m_frameMutex0.lock();
             if (m_calibrator->m_calibrateCameras)
             {
-                m_calibrator->calibrate(m_grayFrame0,0);
+                //cv::equalizeHist(m_grayFrame0,m_grayFrame0);
+                m_calibrator->calibrate(m_grayFrame[0],0);
             }
-            cv::imshow(m_frameWin0,m_grayFrame0);
+            cv::imshow(m_frameWin0,m_grayFrame[0]);
             //m_frameMutex0.unlock();
         }
 
@@ -615,9 +542,10 @@ void Visualizer::run()
             //m_frameMutex1.lock();
             if (m_calibrator->m_calibrateCameras)
             {
-                m_calibrator->calibrate(m_grayFrame1,1);
+                //cv::equalizeHist(m_grayFrame1,m_grayFrame1);
+                m_calibrator->calibrate(m_grayFrame[1],1);
             }
-            cv::imshow(m_frameWin1,m_grayFrame1);
+            cv::imshow(m_frameWin1,m_grayFrame[1]);
             //m_frameMutex1.unlock();
         }
 

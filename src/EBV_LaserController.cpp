@@ -80,7 +80,7 @@ void LaserController::draw()
         }
     }
     */
-
+    /*
     while(true)
     {
         while(m_y<m_max_y)
@@ -111,10 +111,6 @@ void LaserController::draw()
             std::this_thread::sleep_for (std::chrono::milliseconds(10));
         }
     }
-
-    //else
-    //{
-        // Method 2: Velocity control
-    //m_laser->vel(m_vx,m_vy);
-    //}
+    */
+    m_laser->vel(m_vx,m_vy);
 }

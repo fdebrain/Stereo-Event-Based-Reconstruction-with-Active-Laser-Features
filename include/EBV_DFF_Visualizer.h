@@ -59,16 +59,15 @@ public:
     const unsigned int          m_nbCams;
 
     // Parameters related to filtering events above threshold age
-    int                         m_currenTime0;
-    int                         m_currenTime1;
+    std::array<int,2>           m_currenTime;
 
     // Structures for data storing (flattened matrices)
-    std::vector<int>            m_polEvts0;
-    std::vector<int>            m_ageEvts0;
-    std::vector<int>            m_filtEvts0;
-    std::vector<int>            m_polEvts1;
-    std::vector<int>            m_ageEvts1;
-    std::vector<int>            m_filtEvts1;
+    std::array<std::vector<int>,2>        m_polEvts;
+    std::array<std::vector<int>,2>        m_ageEvts;
+    std::array<std::vector<int>,2>        m_filtEvts;
+    //std::vector<int>            m_polEvts1;
+    //std::vector<int>            m_ageEvts1;
+    //std::vector<int>            m_filtEvts1;
     std::vector<double>         m_depthMap;
 
     // Thread-safety
@@ -81,8 +80,7 @@ public:
     std::mutex                  m_depthMutex;
 
     // Structures for displaying camera frames
-    cv::Mat                     m_grayFrame0;
-    cv::Mat                     m_grayFrame1;
+    std::array<cv::Mat,2>         m_grayFrame;
 
     // Display window related variables
     std::string                 m_polWin0;

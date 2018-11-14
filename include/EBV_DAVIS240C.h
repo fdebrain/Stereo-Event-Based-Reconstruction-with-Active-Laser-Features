@@ -12,6 +12,8 @@
 
 #include <libcaercpp/devices/davis.hpp>
 
+namespace cv {class Mat;}
+
 static std::atomic_bool globalShutdown(false);
 
 struct DAVIS240CEvent
@@ -26,7 +28,7 @@ public:
 
     DAVIS240CEvent(const unsigned int x,
                    const unsigned int y,
-                   const unsigned int pol,
+                   const bool pol,
                    const int timestamp)
         : m_x(x),
           m_y(y),
@@ -36,29 +38,20 @@ public:
 
     unsigned int m_x;
     unsigned int m_y;
-    unsigned int m_pol;
+    bool m_pol;
     int m_timestamp;
 };
 
 struct DAVIS240CFrame
 {
 public:
-    DAVIS240CFrame()
-        : m_frame(0),
-          m_timestamp(0)
-    {
-        m_frame.resize(240*180);
-    }
+    DAVIS240CFrame(): m_frame{}, m_timestamp(0) {}
 
-    DAVIS240CFrame(const std::vector<unsigned char> frame,
+    DAVIS240CFrame(const cv::Mat frame,
                    const int timestamp)
-        : m_frame(frame),
-          m_timestamp(timestamp)
-    {
-        m_frame.resize(240*180);
-    }
+        : m_frame(frame), m_timestamp(timestamp) {}
 
-     std::vector<unsigned char> m_frame;
+     cv::Mat m_frame;
      int m_timestamp;
 };
 
@@ -91,43 +84,36 @@ public:
     void resetMasterClock();
     int init();
     int start();
+    int listen();
+    int stopListening();
+    void readThread();
     int stop();
 
     // Life cycle - events listening
     void registerEventListener(DAVIS240CEventListener* listener);
-    int listenEvents();
-    void readThreadEvents();
     void warnEvent(std::vector<DAVIS240CEvent>& events);
-    int stopListeningEvents();
     void deregisterEventListener(DAVIS240CEventListener* listener);
 
     // Life cycle - frames listening
     void registerFrameListener(DAVIS240CFrameListener* listener);
-    int listenFrames();
-    void readThreadFrames();
     void warnFrame(DAVIS240CFrame& frame);
-    int stopListeningFrames();
     void deregisterFrameListener(DAVIS240CFrameListener* listener);
 
 public:
     // Id of the camera
     const unsigned int m_id;
 
-private:
     // Device resolution
     const unsigned int m_rows;
     const unsigned int m_cols;
 
+private:
     //Device handle
     libcaer::devices::davis m_davisHandle;
 
     // Reading thread related variables
-    std::thread m_readThreadEvents;
-    std::thread m_readThreadFrames;
-    bool m_stopreadThreadEvents;
-    bool m_stopreadThreadFrames;
-    std::mutex m_lockerEvent;
-    std::mutex m_lockerFrame;
+    std::thread m_readThread;
+    bool m_stopreadThread;
 
     // Registered listeners
     std::list<DAVIS240CEventListener*> m_eventListeners;

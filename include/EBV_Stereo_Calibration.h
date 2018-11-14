@@ -7,7 +7,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-#include <EBV_DAVIS240C.h>
+#include <EBV_LaserController.h>
+#include <EBV_Triangulator.h>
 
 class IntrinsicsData
 {
@@ -21,8 +22,15 @@ public:
 class StereoCalibrator
 {
 public:
+    StereoCalibrator(Triangulator* triangulator=nullptr);
+    ~StereoCalibrator();
+
+    void calibrate(cv::Mat &frame, const int id);
+    void saveCalibration();
+    const std::vector<cv::Point3f> calculateWorldPoints();
+
     const cv::Size2i m_resolution{240,180};
-    bool m_calibrateCameras;
+    bool m_calibrateCameras{false};
     std::string m_pathCalib = "../calibration/calib2.yaml";
 
     // Intrinsics
@@ -37,13 +45,7 @@ public:
 
     // Stereo extrinsics
     cv::Mat_<double> m_R, m_T, m_E, m_F;
-
-    StereoCalibrator();
-    ~StereoCalibrator();
-
-    void calibrate(cv::Mat &frame, const int id);
-    void saveCalibration();
-    const std::vector<cv::Point3f> calculateWorldPoints();
+    Triangulator* m_triangulator;
 };
 
 #endif // EBV_STEREO_CALIBRATION_H

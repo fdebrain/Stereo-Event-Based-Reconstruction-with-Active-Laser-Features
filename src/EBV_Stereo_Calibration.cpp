@@ -6,11 +6,12 @@ IntrinsicsData::IntrinsicsData()
     m_D.resize(0);
 }
 
-StereoCalibrator::StereoCalibrator()
+StereoCalibrator::StereoCalibrator(Triangulator* triangulator)
     : m_calibrateCameras(false),
       m_camera_intrinsics{IntrinsicsData{},IntrinsicsData{}},
       m_last_frame_captured{std::chrono::high_resolution_clock::time_point{},
-                            std::chrono::high_resolution_clock::time_point{}}
+                            std::chrono::high_resolution_clock::time_point{}},
+      m_triangulator(triangulator)
 {
     m_R.resize(0);
     m_T.resize(0);
@@ -31,7 +32,6 @@ void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
     if (m_intrinsic_calib_image_points[id].size()<m_min_frames_to_capture)
     {
         std::vector<cv::Point2f> points;
-        //cv::equalizeHist(frame, frame);
         bool ret = cv::findChessboardCorners(frame,
                                              m_pattern_size,
                                              points);
@@ -39,7 +39,7 @@ void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
         {
             cv::cornerSubPix(frame,points,cv::Size(5,5),cv::Size(-1,-1),
                              cv::TermCriteria(cv::TermCriteria::COUNT
-                             + cv::TermCriteria::EPS,60, DBL_EPSILON));
+                             + cv::TermCriteria::EPS,30, DBL_EPSILON));
             m_intrinsic_calib_image_points[id].push_back(points);
             cv::drawChessboardCorners(frame,m_pattern_size,points,ret);
             printf("Calibrating camera %d: %d frames retrieved. \n\r",id,
@@ -96,9 +96,11 @@ void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
                              DBL_EPSILON));
 
         saveCalibration();
+        m_triangulator->importCalibration();
         m_calibrateCameras = false;
         printf("Finished extracting the extrinsics with a rms per frame of %f \n\r",
                rms/m_min_frames_to_capture);
+
         return;
     }
 }

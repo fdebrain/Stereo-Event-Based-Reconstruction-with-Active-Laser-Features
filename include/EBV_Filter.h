@@ -67,11 +67,10 @@ private:
     // Datastructure matrix of list of events
     const unsigned int m_rows;
     const unsigned int m_cols;
-    std::vector<std::list<DAVIS240CEvent>> m_events;
+    std::vector<std::list<int>> m_events;
 
-    // Parameters for flushing old events
-    int m_currTime;
-    int m_maxTimeToKeep;
+    // Who filter listens to
+    DAVIS240C* m_davis;
 
     // Parameters for events filtering
     int m_frequency;
@@ -83,23 +82,20 @@ private:
     int m_threshSupportsB;
     int m_threshAntiSupports;
 
+    // Parameters for flushing old events
+    int m_currTime;
+    int m_maxTimeToKeep;
+
     // Center of mass tracker
     float m_xc, m_yc;
     float m_eta;
 
     // List of incoming raw events
     std::list<DAVIS240CEvent> m_evtQueue;
-
     std::mutex                m_evtMutex;
-
-    // Who filter listens to
-    DAVIS240C* m_davis;
 
     // List of filter listeners
     std::list<FilterListener*> m_filteredEventListeners;
-
-    // Thread this object runs in.
-    //std::thread m_thread;
 
     // Mutex to access the queue
     std::mutex m_queueAccessMutex;

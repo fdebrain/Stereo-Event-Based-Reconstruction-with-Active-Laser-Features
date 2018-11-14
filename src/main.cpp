@@ -20,11 +20,10 @@ int main(int argc, char** argv)
     Filter       filter1(rows,cols,&davis_slave);
     Matcher      matcher(rows,cols,&filter0,&filter1);
     LaserController laser;
-    StereoCalibrator calibrator;
     Triangulator triangulator(rows,cols,
-                              &davis_master,
-                              &davis_slave,
-                              &matcher,&laser);
+                              &matcher,
+                              &laser);
+    StereoCalibrator calibrator(&triangulator);
     Visualizer   visu(rows,cols,davis_master.m_nbCams,
                       &davis_master, &davis_slave,
                       &filter0, &filter1,

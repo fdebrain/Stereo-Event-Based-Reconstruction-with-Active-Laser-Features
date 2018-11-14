@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
+
 // QUESTION: How do we forward declare this so it doesn't appear in the header ?
 //#include <libcaercpp/devices/davis.hpp>
 
@@ -26,12 +29,11 @@ libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
 
 DAVIS240C::DAVIS240C()
     // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
-    : m_rows(180),
+    : m_id(m_nbCams),
+      m_rows(180),
       m_cols(240),
-      m_id(m_nbCams),
       m_davisHandle(libcaer::devices::davis(m_id)),
-      m_stopreadThreadEvents(false),
-      m_stopreadThreadFrames(false)
+      m_stopreadThread(true)
 {
     m_nbCams += 1;
 
@@ -59,8 +61,6 @@ DAVIS240C::DAVIS240C()
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
-    m_readThreadEvents.join();
-    m_readThreadFrames.join();
 }
 
 
@@ -138,24 +138,21 @@ void DAVIS240C::registerEventListener(DAVIS240CEventListener* listener)
     m_eventListeners.push_back(listener);
 }
 
-int DAVIS240C::listenEvents()
+int DAVIS240C::listen()
 {
-    m_stopreadThreadEvents = false;
-    m_readThreadEvents = std::thread(&DAVIS240C::readThreadEvents,this);
+    m_stopreadThread= false;
+    m_readThread = std::thread(&DAVIS240C::readThread,this);
     return 0;
 }
 
-void DAVIS240C::readThreadEvents()
+void DAVIS240C::readThread()
 {
     // QUESTION: Do we need mutex lockers ? If yes, where ?
     // Frame is sent to warn function as a reference, I don't see how a mutex is benefitial here
-    //m_lockerEvent.lock();
     std::vector<DAVIS240CEvent> events;
-    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadEvents)
+    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThread)
     {
-        //m_lockerEvent.lock();
-            std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
-        //m_lockerEvent.unlock();
+        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
 
         // Skip if nothing there.
         if (packetContainer == nullptr) { continue; }
@@ -173,14 +170,13 @@ void DAVIS240C::readThreadEvents()
                 events.clear();
                 for(int n=0; n<nEvents ; n++)
                 {
-                    const libcaer::events::PolarityEvent &theEvent = (*polarity)[n];
+                    const libcaer::events::PolarityEvent &polarityEvent = (*polarity)[n];
 
                     DAVIS240CEvent e;
-                    e.m_y           = theEvent.getX();
-                    e.m_x           = theEvent.getY();
-                    e.m_timestamp   = theEvent.getTimestamp();
-                    e.m_pol         = theEvent.getPolarity(); // {0,1}
-
+                    e.m_y           = polarityEvent.getX();
+                    e.m_x           = polarityEvent.getY();
+                    e.m_timestamp   = polarityEvent.getTimestamp();
+                    e.m_pol         = polarityEvent.getPolarity(); // {0,1}
                     events.push_back(e);
                 }
                 this->warnEvent(events);
@@ -193,24 +189,21 @@ void DAVIS240C::readThreadEvents()
                 std::shared_ptr<const libcaer::events::FrameEventPacket> frame
                     = std::static_pointer_cast<libcaer::events::FrameEventPacket>(packet);
 
-                const libcaer::events::FrameEvent &theFrame = (*frame)[0];
+                const libcaer::events::FrameEvent &frameEvent = (*frame)[0];
 
                 DAVIS240CFrame f;
-                f.m_timestamp = theFrame.getTimestamp();
-
-                for (int row = 0; row < theFrame.getLengthY(); row++)
-                {
-                    for (int col = 0; col < theFrame.getLengthX(); col++)
-                    {
-                        // Probably faulty
-                        f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*theFrame.getPixel(col, row)/65535.);
-                    }
-                }
+                f.m_timestamp = frameEvent.getTimestamp();
+                f.m_frame = frameEvent.getOpenCVMat();
                 this->warnFrame(f);
             }
         }
     }
-    //m_lockerEvent.unlock();
+}
+
+int DAVIS240C::stopListening()
+{
+    m_stopreadThread = true;
+    return 0;
 }
 
 void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
@@ -221,12 +214,6 @@ void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
         for(unsigned int i=0; i<events.size(); i++)
             (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
     }
-}
-
-int DAVIS240C::stopListeningEvents()
-{
-    m_stopreadThreadEvents = true;
-    return 0;
 }
 
 void DAVIS240C::deregisterEventListener(DAVIS240CEventListener* listener)
@@ -241,56 +228,6 @@ void DAVIS240C::registerFrameListener(DAVIS240CFrameListener* listener)
     m_frameListeners.push_back(listener);
 }
 
-int DAVIS240C::listenFrames()
-{
-    m_stopreadThreadFrames= false;
-    m_readThreadFrames= std::thread(&DAVIS240C::readThreadFrames,this);
-    return 0;
-}
-
-void DAVIS240C::readThreadFrames()
-{
-    //m_lockerFrame.lock();
-    std::vector<DAVIS240CEvent> events;
-    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThreadFrames)
-    {
-        // Get data
-        //m_lockerFrame.lock();
-            std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
-        //m_lockerFrame.unlock();
-
-        // Skip if nothing there.
-        if (packetContainer == nullptr) { continue; }
-
-        for (auto &packet : *packetContainer)
-        {
-            // Skip if nothing there.
-            if (packet == nullptr) { continue; }
-
-            if (packet->getEventType() == FRAME_EVENT)
-            {
-                std::shared_ptr<const libcaer::events::FrameEventPacket> frame
-                    = std::static_pointer_cast<libcaer::events::FrameEventPacket>(packet);
-
-                const libcaer::events::FrameEvent &theFrame = (*frame)[0];
-
-                DAVIS240CFrame f;
-                f.m_timestamp = theFrame.getTimestamp();
-
-                for (int row = 0; row < theFrame.getLengthY(); row++)
-                {
-                    for (int col = 0; col < theFrame.getLengthX(); col++)
-                    {
-                        f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*theFrame.getPixel(col, row)/65535.);
-                    }
-                }
-                this->warnFrame(f);
-            }
-        }
-    }
-    //m_lockerFrame.unlock();
-}
-
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 {
     std::list<DAVIS240CFrameListener*>::iterator it;
@@ -300,17 +237,10 @@ void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
     }
 }
 
-int DAVIS240C::stopListeningFrames()
-{
-    m_stopreadThreadFrames = true;
-    return 0;
-}
-
 void DAVIS240C::deregisterFrameListener(DAVIS240CFrameListener* listener)
 {
     m_frameListeners.remove(listener);
 }
-
 
 //=== CLOSING ===/
 int DAVIS240C::stop()
