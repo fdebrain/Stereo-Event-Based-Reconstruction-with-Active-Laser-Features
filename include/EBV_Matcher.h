@@ -8,9 +8,6 @@
 #include <mutex>
 #include <condition_variable>
 
-
-//class Triangulator;
-
 class MatcherListener
 {
 public:
@@ -23,9 +20,7 @@ public:
 class Matcher: public FilterListener
 {
 public:
-    Matcher(const unsigned int rows,
-            const unsigned int cols,
-            Filter* filter0 = nullptr,
+    Matcher(Filter* filter0 = nullptr,
             Filter* filter1 = nullptr);
     ~Matcher();
 
@@ -77,7 +72,6 @@ private:
 
     // List of matcher listeners
     std::list<MatcherListener*> m_matcherListeners;
-
 };
 
 #endif // EBV_MATCHER_H

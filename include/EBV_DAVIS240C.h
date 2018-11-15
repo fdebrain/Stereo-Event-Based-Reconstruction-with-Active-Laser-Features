@@ -19,25 +19,15 @@ static std::atomic_bool globalShutdown(false);
 struct DAVIS240CEvent
 {
 public:
-    DAVIS240CEvent()
-        : m_x(0),
-          m_y(0),
-          m_pol(0),
-          m_timestamp(0)
-    {}
+    DAVIS240CEvent(): m_x(0), m_y(0), m_pol(0), m_timestamp(0) {}
 
-    DAVIS240CEvent(const unsigned int x,
-                   const unsigned int y,
-                   const bool pol,
-                   const int timestamp)
-        : m_x(x),
-          m_y(y),
-          m_pol(pol),
-          m_timestamp(timestamp)
-    {}
+    DAVIS240CEvent(const int x, const int y,
+                   const bool pol, const int timestamp)
+        : m_x(x), m_y(y), m_pol(pol), m_timestamp(timestamp) {}
 
-    unsigned int m_x;
-    unsigned int m_y;
+public:
+    int m_x;
+    int m_y;
     bool m_pol;
     int m_timestamp;
 };
@@ -45,13 +35,14 @@ public:
 struct DAVIS240CFrame
 {
 public:
-    DAVIS240CFrame(): m_frame{}, m_timestamp(0) {}
+    DAVIS240CFrame(): m_frame{}, m_timestamp{} {}
 
-    DAVIS240CFrame(const cv::Mat frame,
+    DAVIS240CFrame(const cv::Mat_<uchar> frame,
                    const int timestamp)
         : m_frame(frame), m_timestamp(timestamp) {}
 
-     cv::Mat m_frame;
+public:
+     cv::Mat_<uint8_t> m_frame;
      int m_timestamp;
 };
 
@@ -59,6 +50,7 @@ class DAVIS240CEventListener
 {
 public:
     DAVIS240CEventListener(void) {}
+    virtual ~DAVIS240CEventListener() {}
     virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
                                            const unsigned int id) = 0;
 };
@@ -67,6 +59,7 @@ class DAVIS240CFrameListener
 {
 public:
     DAVIS240CFrameListener(void) {}
+    virtual ~DAVIS240CFrameListener() {}
     virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
                                            const unsigned int id) = 0;
 };
@@ -89,7 +82,7 @@ public:
     void readThread();
     int stop();
 
-    // Life cycle - events listening
+    // Life cycle - events listening // Question: Why not adding const for argument ?
     void registerEventListener(DAVIS240CEventListener* listener);
     void warnEvent(std::vector<DAVIS240CEvent>& events);
     void deregisterEventListener(DAVIS240CEventListener* listener);
@@ -104,8 +97,8 @@ public:
     const unsigned int m_id;
 
     // Device resolution
-    const unsigned int m_rows;
-    const unsigned int m_cols;
+    const int m_rows;
+    const int m_cols;
 
 private:
     //Device handle

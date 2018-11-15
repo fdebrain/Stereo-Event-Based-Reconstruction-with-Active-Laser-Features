@@ -97,169 +97,99 @@ static void callbackTrackbarMatcherMaxBuffer(int maxBuffer, void *data)
     matcher->setMaxBuffer(maxBuffer);
 }
 
-Visualizer::Visualizer(const unsigned int rows,
-                       const unsigned int cols,
-                       const unsigned int nbCams,
+Visualizer::Visualizer(const unsigned int nbCams,
                        DAVIS240C* davis0, DAVIS240C* davis1,
                        Filter* filter0, Filter* filter1,
                        StereoCalibrator* calibrator,
                        Triangulator* triangulator,
                        LaserController* laser)
-    : m_rows(rows), m_cols(cols), m_nbCams(nbCams),
-      m_ageThresh(40e3), m_max_trackbar_val(1e6),
-      m_min_depth(20),m_max_depth(40),
-      m_davis0(davis0), m_davis1(davis1),
-      m_filter0(filter0), m_filter1(filter1),
-      m_calibrator(calibrator),
+    : m_rows(180), m_cols(240), m_nbCams(nbCams),
+      m_ageThresh(40e3),
+      m_max_trackbar_val(1e6),
+      m_min_depth(20),
+      m_max_depth(40),
+      m_laser(laser),
+      m_davis{davis0,davis1},
+      m_filter{filter0,filter1},
       m_triangulator(triangulator),
-      m_laser(laser)
+      m_calibrator(calibrator)
 {
     // Initialize data structure
-    m_polEvts[0].resize(m_rows*m_cols);
-    m_ageEvts[0].resize(m_rows*m_cols);
-    m_grayFrame[0].resize(m_rows*m_cols);
-    m_grayFrame[0] = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
-
-    m_polEvts[1].resize(m_rows*m_cols);
-    m_ageEvts[1].resize(m_rows*m_cols);
-    m_grayFrame[1].resize(m_rows*m_cols);
-    m_grayFrame[1] = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
-
-    m_filtEvts[0].resize(m_rows*m_cols);
-    m_filtEvts[1].resize(m_rows*m_cols);
+    for (auto& v : m_polEvts) { v.resize(m_rows*m_cols); }
+    for (auto& v : m_ageEvts) { v.resize(m_rows*m_cols); }
+    for (auto& v : m_filtEvts) { v.resize(m_rows*m_cols); }
+    for (auto& v : m_grayFrame) { v = cv::Mat::zeros(m_rows,m_cols,CV_16UC1); }
     m_depthMap.resize(m_rows*m_cols);
 
-    if (m_davis0!=nullptr)
+    for (unsigned int idx; idx<nbCams; idx++)
     {
-        // Initialize windows
-        m_polWin0 = "Events by Polarity - Master"; //+ std::to_string(id);
-        m_ageWin0 = "Events by Age - Master";
-        m_frameWin0 = "Frame - Master";
-        cv::namedWindow(m_polWin0,0);
-        //cv::namedWindow(m_ageWin0,0);
-        cv::namedWindow(m_frameWin0,0);
+        // Initialize davis
+        if (m_davis[idx]!=nullptr)
+        {
+            // Initialize windows
+            m_polWin[idx] = "Events by Polarity - " + std::to_string(idx);
+            cv::namedWindow(m_polWin[idx],0);
 
-        // Age trackbars
-        cv::createTrackbar("Threshold",m_polWin0,&m_ageThresh,m_max_trackbar_val,nullptr);
+            m_frameWin[idx] = "Frame - " + std::to_string(idx);
+            cv::namedWindow(m_frameWin[idx],0);
 
-        // Listen to davis
-        m_davis0->init();
-        m_davis0->start();
-        m_davis0->registerEventListener(this);
-        m_davis0->registerFrameListener(this);
-        m_davis0->listen();
+            m_ageWin[idx] = "Events by Age - " + std::to_string(idx);
+            //cv::namedWindow(m_ageWin0,0);
+
+            // Davis trackbars
+            cv::createTrackbar("Threshold",m_polWin[idx],
+                               &m_ageThresh,
+                               m_max_trackbar_val,
+                               nullptr);
+
+            // Listen to davis
+            m_davis[idx]->init();
+            m_davis[idx]->start();
+            m_davis[idx]->registerEventListener(this);
+            m_davis[idx]->registerFrameListener(this);
+            m_davis[idx]->listen();
+        }
+
+        // Initialize filters
+        if (m_filter[idx]!=nullptr)
+        {
+            // Initialize window
+            m_filtWin[idx] = "Filtered Events - " + std::to_string(idx);
+            cv::namedWindow(m_filtWin[idx],0);
+
+            // Initialize filter tuning parameters
+            m_freq[idx] = m_filter[idx]->getFreq();
+            m_eps[idx] = m_filter[idx]->getEps();
+            m_neighborSize[idx] = m_filter[idx]->getNeighborSize();
+            m_threshA[idx] = m_filter[idx]->getThreshA();
+            m_threshB[idx] = m_filter[idx]->getThreshB();
+            m_threshAnti[idx] = m_filter[idx]->getThreshAnti();
+            m_etaInt[idx] = static_cast<int>(100*m_filter[idx]->getEta());
+
+            // Filter trackbars
+            cv::createTrackbar("Filter frequency",m_filtWin[idx],&m_freq[idx],1000,
+                               &callbackTrackbarFreq,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Epsilon",m_filtWin[idx],&m_eps[idx],20,
+                               &callbackTrackbarEps,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Neighbor Size",m_filtWin[idx],&m_neighborSize[idx],100,
+                               &callbackTrackbarNeighborSize,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("SupportsA",m_filtWin[idx],&m_threshA[idx],100,
+                               &callbackTrackbarThreshA,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("SupportsB",m_filtWin[idx],&m_threshB[idx],100,
+                               &callbackTrackbarThreshB,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Anti-Supports",m_filtWin[idx],&m_threshAnti[idx],100,
+                               &callbackTrackbarThreshAnti,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Eta",m_filtWin[idx],&m_etaInt[idx],100,
+                               &callbackTrackbarEta,static_cast<void*>(m_filter[idx]));
+
+            // Listen to filter
+            m_filter[idx]->registerFilterListener(this);
+        }
     }
 
-    if (m_davis1!=nullptr)
-    {
-        // Initialize windows
-        m_polWin1 = "Events by Polarity - Slave";
-        m_ageWin1 = "Events by Age - Slave";
-        m_frameWin1 = "Frame - Slave";
-        cv::namedWindow(m_polWin1,0);
-        //cv::namedWindow(m_ageWin1,0);
-        cv::namedWindow(m_frameWin1,0);
-
-        // Listen to davis
-        m_davis1->init();
-        m_davis1->start();
-        m_davis1->registerEventListener(this);
-        m_davis1->registerFrameListener(this);
-        m_davis1->listen();
-    }
-
-    // Listen to filter
-    if (m_filter0!=nullptr)
-    {
-        // Listen to filter
-        m_filter0->registerFilterListener(this);
-
-        // Initialize window
-        m_filtWin0 = "Filtered Events - Master";
-        cv::namedWindow(m_filtWin0,0);
-
-        // Initialize filter tuning parameters
-        m_freq0 = m_filter0->getFreq();
-        m_eps0 = m_filter0->getEps();
-        m_neighborSize0 = m_filter0->getNeighborSize();
-        m_threshA0 = m_filter0->getThreshA();
-        m_threshB0 = m_filter0->getThreshB();
-        m_threshAnti0 = m_filter0->getThreshAnti();
-        m_etaInt0 = static_cast<int>(100*m_filter0->getEta());
-
-        printf("\rFreq set to: %d. \n\r",m_freq0);
-        printf("Eps set to: %d. \n\r",m_eps0);
-        printf("Neighbor Size set to: %d. \n\r",m_neighborSize0);
-        printf("SupportsA set to: %d. \n\r",m_threshA0);
-        printf("SupportsB set to: %d. \n\r",m_threshB0);
-        printf("Anti-Supports set to: %d. \n\r",m_threshAnti0);
-        printf("Eta set to: %d. \n\r\n",m_etaInt0);
-
-        // Filter trackbars
-        cv::createTrackbar("Filter frequency",m_filtWin0,&m_freq0,1000,
-                           &callbackTrackbarFreq,static_cast<void*>(m_filter0));
-        cv::createTrackbar("Epsilon",m_filtWin0,&m_eps0,20,
-                           &callbackTrackbarEps,static_cast<void*>(m_filter0));
-        cv::createTrackbar("Neighbor Size",m_filtWin0,&m_neighborSize0,100,
-                           &callbackTrackbarNeighborSize,static_cast<void*>(m_filter0));
-        cv::createTrackbar("SupportsA",m_filtWin0,&m_threshA0,100,
-                           &callbackTrackbarThreshA,static_cast<void*>(m_filter0));
-        cv::createTrackbar("SupportsB",m_filtWin0,&m_threshB0,100,
-                           &callbackTrackbarThreshB,static_cast<void*>(m_filter0));
-        cv::createTrackbar("Anti-Supports",m_filtWin0,&m_threshAnti0,100,
-                           &callbackTrackbarThreshAnti,static_cast<void*>(m_filter0));
-        cv::createTrackbar("Eta",m_filtWin0,&m_etaInt0,100,
-                           &callbackTrackbarEta,static_cast<void*>(m_filter0));
-    }
-
-    if (m_filter1!=nullptr)
-    {
-        // Listen to filter
-        m_filter1->registerFilterListener(this);
-
-        // Initialize window
-        m_filtWin1 = "Filtered Events - Slave";
-        cv::namedWindow(m_filtWin1,0);
-
-        // Initialize filter tuning parameters
-        m_freq1 = m_filter1->getFreq();
-        m_eps1 = m_filter1->getEps();
-        m_neighborSize1 = m_filter1->getNeighborSize();
-        m_threshA1 = m_filter1->getThreshA();
-        m_threshB1 = m_filter1->getThreshB();
-        m_threshAnti1 = m_filter1->getThreshAnti();
-        m_etaInt1 = static_cast<int>(100*m_filter1->getEta());
-
-        printf("Freq set to: %d. \n\r",m_freq1);
-        printf("Eps set to: %d. \n\r",m_eps1);
-        printf("Neighbor Size set to: %d. \n\r",m_neighborSize1);
-        printf("SupportsA set to: %d. \n\r",m_threshA1);
-        printf("SupportsB set to: %d. \n\r",m_threshB1);
-        printf("Anti-Supports set to: %d. \n\r",m_threshAnti1);
-        printf("Eta set to: %d. \n\r\n",m_etaInt1);
-
-        // Filter trackbars
-        cv::createTrackbar("Frequency",m_filtWin1,&m_freq1,1000,
-                           &callbackTrackbarFreq,static_cast<void*>(m_filter1));
-        cv::createTrackbar("Epsilon",m_filtWin1,&m_eps1,20,
-                           &callbackTrackbarEps,static_cast<void*>(m_filter1));
-        cv::createTrackbar("Neighbor Size",m_filtWin1,&m_neighborSize1,100,
-                           &callbackTrackbarNeighborSize,static_cast<void*>(m_filter1));
-        cv::createTrackbar("SupportsA",m_filtWin1,&m_threshA1,100,
-                           &callbackTrackbarThreshA,static_cast<void*>(m_filter1));
-        cv::createTrackbar("SupportsB",m_filtWin1,&m_threshB1,100,
-                           &callbackTrackbarThreshB,static_cast<void*>(m_filter1));
-        cv::createTrackbar("Anti-Supports",m_filtWin1,&m_threshAnti1,100,
-                           &callbackTrackbarThreshAnti,static_cast<void*>(m_filter1));
-        cv::createTrackbar("Eta",m_filtWin1,&m_etaInt1,100,
-                           &callbackTrackbarEta,static_cast<void*>(m_filter1));
-    }
-
+    // Initialize triangulator
     if (m_triangulator!=nullptr)
     {
-        // Listen to triangulator
-        m_triangulator->registerTriangulatorListener(this);
-
         // Initialize window
         m_depthWin = "Depth Map";
         cv::namedWindow(m_depthWin,0);
@@ -277,8 +207,12 @@ Visualizer::Visualizer(const unsigned int rows,
         // Depth trackbars
         cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,100,nullptr);
         cv::createTrackbar("maxDepth",m_depthWin,&m_max_depth,100,nullptr);
+
+        // Listen to triangulator
+        m_triangulator->registerTriangulatorListener(this);
     }
 
+    // Initialize laser
     if (m_laser!=nullptr)
     {
         m_laser->start();
@@ -291,15 +225,15 @@ Visualizer::Visualizer(const unsigned int rows,
         m_laserFreq = m_laser->getFreq();
 
         // Laser trackbars
-        cv::createTrackbar("c_x",m_polWin0,&m_cx,4096,
+        cv::createTrackbar("c_x",m_polWin[0],&m_cx,4096,
                            &callbackTrackbarLaserCenterX,static_cast<void*>(m_laser));
-        cv::createTrackbar("c_y",m_polWin0,&m_cy,4096,
+        cv::createTrackbar("c_y",m_polWin[0],&m_cy,4096,
                            &callbackTrackbarLaserCenterY,static_cast<void*>(m_laser));
-        cv::createTrackbar("radius",m_polWin0,&m_r,2048,
+        cv::createTrackbar("radius",m_polWin[0],&m_r,2048,
                            &callbackTrackbarLaserRadius,static_cast<void*>(m_laser));
-        cv::createTrackbar("step",m_polWin0,&m_stepInt,1000,
+        cv::createTrackbar("step",m_polWin[0],&m_stepInt,1000,
                            &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
-        cv::createTrackbar("Laser frequency",m_polWin0,&m_laserFreq,1000,
+        cv::createTrackbar("Laser frequency",m_polWin[0],&m_laserFreq,1000,
                            &callbackTrackbarLaserFreq,static_cast<void*>(m_laser));
     }
 
@@ -310,33 +244,22 @@ Visualizer::Visualizer(const unsigned int rows,
     }
 }
 
-
 Visualizer::~Visualizer()
 {
-    if (m_davis0!=nullptr)
+    for (unsigned int idx=0; idx<m_nbCams; idx++)
     {
-        m_davis0->stopListening();
-        m_davis0->deregisterEventListener(this);
-        m_davis0->deregisterFrameListener(this);
-        m_davis0->stop();
-    }
+        if (m_davis[idx]!=nullptr)
+        {
+            m_davis[idx]->stopListening();
+            m_davis[idx]->deregisterEventListener(this);
+            m_davis[idx]->deregisterFrameListener(this);
+            m_davis[idx]->stop();
+        }
 
-    if (m_filter0!=nullptr)
-    {
-        m_filter0->deregisterFilterListener(this);
-    }
-
-    if (m_davis1!=nullptr)
-    {
-        m_davis1->stopListening();
-        m_davis1->deregisterEventListener(this);
-        m_davis1->deregisterFrameListener(this);
-        m_davis1->stop();
-    }
-
-    if (m_filter1!=nullptr)
-    {
-        m_filter1->deregisterFilterListener(this);
+        if (m_filter[idx]!=nullptr)
+        {
+            m_filter[idx]->deregisterFilterListener(this);
+        }
     }
 
     if (m_triangulator!=nullptr)
@@ -352,40 +275,41 @@ Visualizer::~Visualizer()
     if (recordEvents) { m_recorder.close(); }
 }
 
-// Runs in DAVIS240 thread
+// Runs in DAVIS240C thread
 void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                            const unsigned int id)
 {
-    const unsigned int x = e.m_x;
-    const unsigned int y = e.m_y;
-    const unsigned int p = e.m_pol; // p={0,1}
+    const int x = e.m_x;
+    const int y = e.m_y;
+    const bool p = e.m_pol; // p={0,1}
     const int t = e.m_timestamp;
     m_currenTime[id] = t;
-    m_polEvts[id][x*m_cols+y] = p; //2*p-1; // p={-1,1}
+    m_polEvts[id][x*m_cols+y] = p;
     m_ageEvts[id][x*m_cols+y] = t;
 }
 
-// Runs in DAVIS240 thread
+// Runs in DAVIS240C thread
 void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
                                            const unsigned int id)
 {
-    m_currenTime[id] = f.m_timestamp;
-    m_grayFrame[id] = f.m_frame;
+    auto m_grayFrameData = f.m_frame;
+    const int t = f.m_timestamp;
+    m_grayFrame[id] = cv::Mat(m_rows,m_cols,CV_16UC1,m_grayFrameData.data);
+    m_currenTime[id] = t;
 }
 
 void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
                                         const unsigned int id)
 {
-    const unsigned int x = e.m_x;
-    const unsigned int y = e.m_y;
+    const int x = e.m_x;
+    const int y = e.m_y;
     const int t = e.m_timestamp;
-    //printf("Camera %d - Timestamp %f. \n\r",id,1e-3*e.m_timestamp);
 
     m_filtEvts[id][x*m_cols+y] = t;
     if (recordEvents)
     {
         m_recorder << id << "\t" << x << "\t"
-                   << y << "\t" << e.m_timestamp << std::endl;
+                   << y << "\t" << t << std::endl;
     }
 }
 
@@ -395,7 +319,8 @@ void Visualizer::receivedNewDepth(const unsigned int &u,
                                   const double &Y,
                                   const double &Z)
 {
-    m_depthMap[u*m_cols+v] = Z;
+    double depth = Z;
+    m_depthMap[u*m_cols+v] = depth;
 }
 
 void Visualizer::run()
@@ -403,176 +328,109 @@ void Visualizer::run()
     char key = ' ';
 
     // Initialize display matrices
-    cv::Mat polMat0(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatHSV0(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatRGB0(m_rows,m_cols,CV_8UC3);
-    cv::Mat filtMat0(m_rows,m_cols,CV_8UC3);
-    cv::Mat polMat1(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatHSV1(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatRGB1(m_rows,m_cols,CV_8UC3);
-    cv::Mat filtMat1(m_rows,m_cols,CV_8UC3);
-    cv::Mat depthMatHSV(m_rows,m_cols,CV_8UC3);
-    cv::Mat depthMatRGB(m_rows,m_cols,CV_8UC3);
-    int pol,dt;
+    std::array<cv::Mat,2> polMat;
+    std::array<cv::Mat,2> filtMat;
+    std::array<cv::Mat,2> ageMatHSV;
+    std::array<cv::Mat,2> ageMatRGB;
+    cv::Mat depthMatHSV = cv::Mat(m_rows,m_cols,CV_8UC3);
+    cv::Mat depthMatRGB = cv::Mat(m_rows,m_cols,CV_8UC3);
+
+    for (auto& v : polMat) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
+    for (auto& v : filtMat) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
+    for (auto& v : ageMatHSV) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
+    for (auto& v : ageMatRGB) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
+
+    bool pol;
+    int dt;
     double z;
 
     while(key != 'q')
     {
-        for(unsigned int i=0; i<m_rows*m_cols; i++)
+        for(size_t i=0; i<m_rows*m_cols; i++)
         {
-            // Events by polarity - Master
-            // QUESTION: Where do we need mutex lock ?
-            //m_evtMutex0.lock();
-                pol = m_polEvts[0][i];
-                dt = m_currenTime[0] - m_ageEvts[0][i];
-            //m_evtMutex0.unlock();
-
-            if(dt<m_ageThresh)
+            for (unsigned int idx=0; idx<m_nbCams; idx++)
             {
-                polMat0.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
-                polMat0.data[3*i + 1] = static_cast<unsigned char>(pol>0?255:0);    // Green channel
-                polMat0.data[3*i + 2] = static_cast<unsigned char>(pol<0?255:0);    // Red Channel
-            }
-            // Events by age - Master
-            else { dt = m_ageThresh; }
-            ageMatHSV0.data[3*i + 0] = static_cast<unsigned char>(0.75*180*dt/float(m_ageThresh)); //H
-            ageMatHSV0.data[3*i + 1] = static_cast<unsigned char>(255); //S
-            ageMatHSV0.data[3*i + 2] = static_cast<unsigned char>(dt==m_ageThresh?0:255); //V
+                // Events by polarity
+                pol = m_polEvts[idx][i];
+                dt = m_currenTime[idx] - m_ageEvts[idx][i];
+                if(dt<m_ageThresh)
+                {
+                    polMat[idx].data[3*i + 0] = static_cast<uchar>(0);              // Blue channel
+                    polMat[idx].data[3*i + 1] = static_cast<uchar>(pol>0?255:0);    // Green channel for positive events
+                    polMat[idx].data[3*i + 2] = static_cast<uchar>(pol==0?255:0);    // Red Channel for negative events
+                }
 
-            // Events by polarity - Slave
-            //m_evtMutex1.lock();
-                pol = m_polEvts[1][i];
-                dt = m_currenTime[1] - m_ageEvts[1][i];
-            //m_evtMutex1.unlock();
+                // Events by age
+                else { dt = m_ageThresh; }
+                ageMatHSV[idx].data[3*i + 0] = static_cast<uchar>(0.75*180*dt/float(m_ageThresh)); //H
+                ageMatHSV[idx].data[3*i + 1] = static_cast<uchar>(255); //S
+                ageMatHSV[idx].data[3*i + 2] = static_cast<uchar>(dt==m_ageThresh?0:255); //V
 
-            if(dt<m_ageThresh)
-            {
-                polMat1.data[3*i + 0] = static_cast<unsigned char>(0);              // Blue channel
-                polMat1.data[3*i + 1] = static_cast<unsigned char>(pol>0?255:0);    // Green channel
-                polMat1.data[3*i + 2] = static_cast<unsigned char>(pol<0?255:0);    // Red Channel
-            }
-            // Events by age - Slave
-            else { dt = m_ageThresh; }
-            ageMatHSV1.data[3*i + 0] = static_cast<unsigned char>(0.75*180.*dt/float(m_ageThresh)); //H
-            ageMatHSV1.data[3*i + 1] = static_cast<unsigned char>(255); //S
-            ageMatHSV1.data[3*i + 2] = static_cast<unsigned char>(dt==m_ageThresh?0:255); //V
-
-            // Filtered events - Master
-            //m_filterEvtMutex0.lock();
-                dt = m_currenTime[0] - m_filtEvts[0][i];
-            //m_filterEvtMutex0.unlock();
-
-            if(dt < m_ageThresh)
-            {
-                filtMat0.data[3*i + 0] = static_cast<unsigned char>(0);
-                filtMat0.data[3*i + 1] = static_cast<unsigned char>(0);
-                filtMat0.data[3*i + 2] = static_cast<unsigned char>(255);  // why not change color given laser frequency?
-            }
-            else
-            {
-                filtMat0.data[3*i + 0] = static_cast<unsigned char>(0);
-                filtMat0.data[3*i + 1] = static_cast<unsigned char>(0);
-                filtMat0.data[3*i + 2] = static_cast<unsigned char>(0);
-            }
-
-            // Filtered events - Slave
-            //m_filterEvtMutex1.lock();
-                dt = m_currenTime[1] - m_filtEvts[1][i];
-            //m_filterEvtMutex1.unlock();
-
-            if(dt < m_ageThresh)
-            {
-                filtMat1.data[3*i + 0] = static_cast<unsigned char>(0);
-                filtMat1.data[3*i + 1] = static_cast<unsigned char>(0);
-                filtMat1.data[3*i + 2] = static_cast<unsigned char>(255);  // why not change color given laser frequency?
-            }
-            else
-            {
-                filtMat1.data[3*i + 0] = static_cast<unsigned char>(0);
-                filtMat1.data[3*i + 1] = static_cast<unsigned char>(0);
-                filtMat1.data[3*i + 2] = static_cast<unsigned char>(0);
+                // Filtered events
+                dt = m_currenTime[idx] - m_filtEvts[idx][i];
+                if(dt < m_ageThresh)
+                {
+                    filtMat[idx].data[3*i + 0] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 1] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 2] = static_cast<uchar>(255);  // why not change color given laser frequency?
+                }
+                else
+                {
+                    filtMat[idx].data[3*i + 0] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 1] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 2] = static_cast<uchar>(0);
+                }
             }
 
             // Depth map
-            //m_depthMutex.lock();
-                z = m_depthMap[i];
-            //m_depthMutex.unlock();
+            z = m_depthMap[i];
             if (z>0)
             {
                 if (z<m_min_depth){ z = m_min_depth; }
                 else if (z>m_max_depth){ z = m_max_depth; }
-                depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
-                depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(255);
-                depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(255);
+                depthMatHSV.data[3*i + 0] = static_cast<uchar>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+                depthMatHSV.data[3*i + 1] = static_cast<uchar>(255);
+                depthMatHSV.data[3*i + 2] = static_cast<uchar>(255);
             }
             else
             {
-                depthMatHSV.data[3*i + 0] = static_cast<unsigned char>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
-                depthMatHSV.data[3*i + 1] = static_cast<unsigned char>(255);
-                depthMatHSV.data[3*i + 2] = static_cast<unsigned char>(0);
+                depthMatHSV.data[3*i + 0] = static_cast<uchar>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+                depthMatHSV.data[3*i + 1] = static_cast<uchar>(255);
+                depthMatHSV.data[3*i + 2] = static_cast<uchar>(0);
             }
         }
 
-        if (m_davis0 != nullptr)
+        for (unsigned int idx=0; idx<m_nbCams; idx++)
         {
-            // Display events by polarity
-            cv::imshow(m_polWin0,polMat0);
-
-            // Display events by age (timestamp)
-            //cv::cvtColor(ageMatHSV0,ageMatRGB0,CV_HSV2BGR);
-            //cv::imshow(m_ageWin0,ageMatRGB0);
-
-            // Display frame
-            //m_frameMutex0.lock();
-            if (m_calibrator->m_calibrateCameras)
+            if (m_davis[idx] != nullptr)
             {
-                //cv::equalizeHist(m_grayFrame0,m_grayFrame0);
-                m_calibrator->calibrate(m_grayFrame[0],0);
+                // Display events by polarity
+                cv::imshow(m_polWin[idx],polMat[idx]);
+
+                // Display events by age (timestamp)
+                //cv::cvtColor(ageMatHSV0,ageMatRGB0,CV_HSV2BGR);
+                //cv::imshow(m_ageWin0,ageMatRGB0);
+
+                // Display frame
+                if (m_calibrator->m_calibrateCameras)
+                {
+                    //cv::equalizeHist(m_grayFrame0,m_grayFrame0); // TO DEBUG
+                    m_calibrator->calibrate(m_grayFrame[idx],0);
+                }
+                cv::imshow(m_frameWin[idx],m_grayFrame[idx]);
             }
-            cv::imshow(m_frameWin0,m_grayFrame[0]);
-            //m_frameMutex0.unlock();
-        }
 
-        if (m_davis1 != nullptr)
-        {
-            cv::imshow(m_polWin1,polMat1);
-            //cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
-            //cv::imshow(m_ageWin1,ageMatRGB1);
-
-            //m_frameMutex1.lock();
-            if (m_calibrator->m_calibrateCameras)
+            // Display trackers
+            if(m_filter[idx] != nullptr)
             {
-                //cv::equalizeHist(m_grayFrame1,m_grayFrame1);
-                m_calibrator->calibrate(m_grayFrame[1],1);
+                int x = static_cast<int>(m_filter[idx]->getX());
+                int y = static_cast<int>(m_filter[idx]->getY());
+                cv::circle(filtMat[idx],cv::Point2i(y,x),
+                           3,cv::Scalar(0,255,0));
+
+                // Display filtered events + trackers
+                cv::imshow(m_filtWin[idx],filtMat[idx]);
             }
-            cv::imshow(m_frameWin1,m_grayFrame[1]);
-            //m_frameMutex1.unlock();
-        }
-
-        // Display trackers
-        if(m_filter0 != nullptr)
-        {
-            //m_filterEvtMutex0.lock();
-                int x = static_cast<int>(m_filter0->getX());
-                int y = static_cast<int>(m_filter0->getY());
-            //m_filterEvtMutex0.unlock();
-            cv::circle(filtMat0,cv::Point2i(y,x),
-                       3,cv::Scalar(0,255,0));
-
-            // Display filtered events + trackers
-            cv::imshow(m_filtWin0,filtMat0);
-        }
-
-        if(m_filter1 != nullptr)
-        {
-            //m_filterEvtMutex1.lock();
-                int x = static_cast<int>(m_filter1->getX());
-                int y = static_cast<int>(m_filter1->getY());
-            //m_filterEvtMutex1.unlock();
-            cv::circle(filtMat1,cv::Point2i(y,x),
-                       3,cv::Scalar(0,255,0));
-
-            cv::imshow(m_filtWin1,filtMat1);
         }
 
         if (m_triangulator != nullptr)
@@ -583,12 +441,9 @@ void Visualizer::run()
         }
 
         // Reset the display matrices
-        ageMatHSV0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        polMat0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        filtMat0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        ageMatHSV1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        polMat1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        filtMat1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
+        for (auto& v : polMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
+        for (auto& v : filtMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
+        for (auto& v : ageMatHSV) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
 
         // Wait (in ms)
         key = cv::waitKey(1);
@@ -605,6 +460,5 @@ void Visualizer::run()
         {
             m_calibrator->m_calibrateCameras = true;
         }
-        // TODO: Record events/frames key + calibration
     }
 }

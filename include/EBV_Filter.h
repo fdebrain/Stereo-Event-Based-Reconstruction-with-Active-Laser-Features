@@ -21,9 +21,7 @@ public:
 class Filter : public DAVIS240CEventListener
 {
 public:
-    Filter(const unsigned int rows,
-           const unsigned int cols,
-           DAVIS240C* davis = nullptr);
+    Filter(int frequency, DAVIS240C* davis = nullptr);
     ~Filter();
 
     void runThread();
@@ -65,8 +63,8 @@ public:
 
 private:
     // Datastructure matrix of list of events
-    const unsigned int m_rows;
-    const unsigned int m_cols;
+    const int m_rows;
+    const int m_cols;
     std::vector<std::list<int>> m_events;
 
     // Who filter listens to

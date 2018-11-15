@@ -22,9 +22,7 @@ public:
 class Triangulator : public MatcherListener
 {
 public:
-    Triangulator(const unsigned int rows,
-                 const unsigned int cols,
-                 Matcher* matcher = nullptr,
+    Triangulator(Matcher* matcher = nullptr,
                  LaserController* laser = nullptr);
     ~Triangulator();
 
@@ -54,7 +52,7 @@ public:
 private:
     // Calibration matrices (camera0,camera1,laser)
     std::string m_pathCalib = "../calibration/calib.yaml";
-        std::string m_pathCalibLaser = "../calibration/laserCalib.yaml";
+    std::string m_pathCalibLaser = "../calibration/laserCalib.yaml";
     std::array<cv::Mat, 3> m_K;
     std::array<cv::Mat, 3> m_D;
     std::array<cv::Mat, 3> m_P;

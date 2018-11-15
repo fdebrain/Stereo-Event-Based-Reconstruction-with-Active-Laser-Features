@@ -63,7 +63,6 @@ DAVIS240C::~DAVIS240C()
     m_nbCams -= 1;
 }
 
-
 //=== INITIALIZING ===//
 void DAVIS240C::resetMasterClock()
 {
@@ -159,6 +158,7 @@ void DAVIS240C::readThread()
 
         for (auto &packet : *packetContainer)
         {
+            // Skip packet if nothing
             if (packet == nullptr) { continue; }
 
             if (packet->getEventType() == POLARITY_EVENT)
@@ -191,6 +191,7 @@ void DAVIS240C::readThread()
 
                 const libcaer::events::FrameEvent &frameEvent = (*frame)[0];
 
+                // QUESTION: f only lives in this scope. How is its data preserved afterwise ?
                 DAVIS240CFrame f;
                 f.m_timestamp = frameEvent.getTimestamp();
                 f.m_frame = frameEvent.getOpenCVMat();
@@ -208,8 +209,7 @@ int DAVIS240C::stopListening()
 
 void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
 {
-    std::list<DAVIS240CEventListener*>::iterator it;
-    for(it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
+    for(auto it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
     {
         for(unsigned int i=0; i<events.size(); i++)
             (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
@@ -230,8 +230,7 @@ void DAVIS240C::registerFrameListener(DAVIS240CFrameListener* listener)
 
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 {
-    std::list<DAVIS240CFrameListener*>::iterator it;
-    for(it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
+    for(auto it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
     {
         (*it)->receivedNewDAVIS240CFrame(frame,m_id);
     }

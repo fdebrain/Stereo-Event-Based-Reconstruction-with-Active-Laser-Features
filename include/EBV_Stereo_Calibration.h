@@ -18,7 +18,6 @@ public:
     IntrinsicsData();
 };
 
-
 class StereoCalibrator
 {
 public:
@@ -38,13 +37,14 @@ public:
     const float m_pattern_square_size = 3.0f;
     const size_t m_min_frames_to_capture{25};
     const std::chrono::milliseconds m_min_capture_delay{1000};
-    std::array<std::chrono::high_resolution_clock::time_point,2> m_last_frame_captured;
+    std::array<IntrinsicsData,2> m_camera_intrinsics;
+    std::array<std::chrono::high_resolution_clock::time_point, 2> m_last_frame_captured;
     std::vector<std::vector<cv::Point3d>> m_intrinsic_calib_world_points;
     std::array<std::vector<std::vector<cv::Point2f>>, 2> m_intrinsic_calib_image_points;
-    std::array<IntrinsicsData,2> m_camera_intrinsics;
 
     // Stereo extrinsics
     cv::Mat_<double> m_R, m_T, m_E, m_F;
+
     Triangulator* m_triangulator;
 };
 

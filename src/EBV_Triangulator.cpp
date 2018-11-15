@@ -64,12 +64,10 @@ void Triangulator::importCalibration()
                       m_Q[0], cv::CALIB_ZERO_DISPARITY);
 }
 
-Triangulator::Triangulator(const unsigned int rows,
-                           const unsigned int cols,
-                           Matcher* matcher,
+Triangulator::Triangulator(Matcher* matcher,
                            LaserController* laser)
-    : m_rows(rows),
-      m_cols(cols),
+    : m_rows(180),
+      m_cols(240),
       m_matcher(matcher),
       m_laser(laser)
 {

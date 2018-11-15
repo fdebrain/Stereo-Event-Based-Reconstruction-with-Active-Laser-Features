@@ -1,10 +1,8 @@
 #include <EBV_Matcher.h>
 
-Matcher::Matcher(const unsigned int rows,
-                 const unsigned int cols,
-                 Filter* filter0,
+Matcher::Matcher(Filter* filter0,
                  Filter* filter1)
-    : m_rows(rows), m_cols(cols),
+    : m_rows(180), m_cols(240),
       m_filter0(filter0), m_filter1(filter1)
 {
     // Matching parameters
@@ -36,11 +34,11 @@ void Matcher::runThread()
     while(true)
     {
         m_queueAccessMutex0.lock();
-            hasQueueEvent0  = !m_evtQueue0.empty();
+            hasQueueEvent0 = !m_evtQueue0.empty();
         m_queueAccessMutex0.unlock();
 
         m_queueAccessMutex1.lock();
-            hasQueueEvent1  = !m_evtQueue1.empty();
+            hasQueueEvent1 = !m_evtQueue1.empty();
         m_queueAccessMutex1.unlock();
 
         // Process only if incoming filtered events in both cameras

@@ -5,13 +5,11 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-Filter::Filter(const unsigned int rows,
-               const unsigned int cols,
-               DAVIS240C* davis)
-    : m_rows(rows),
-      m_cols(cols),
+Filter::Filter(int frequency, DAVIS240C* davis)
+    : m_rows(180),
+      m_cols(240),
       m_davis(davis),
-      m_frequency(530),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_frequency(frequency), //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
       m_targetPeriod(1e6/m_frequency),
       m_eps(10),            // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
@@ -19,13 +17,13 @@ Filter::Filter(const unsigned int rows,
       m_threshSupportsA(2), //5; //3;
       m_threshSupportsB(2), //10;  //3;
       m_threshAntiSupports(20),//5; //2;
-      m_maxTimeToKeep(2*m_targetPeriod), //When to flush old events = 10ms
+      m_maxTimeToKeep(2*m_targetPeriod),
       m_xc(0.0f),
       m_yc(0.0f),
       m_eta(0.01f)
 {
-    // Listen to Davis
     m_events.resize(m_rows*m_cols);
+    // Listen to Davis
     m_davis->registerEventListener(this);
 }
 
@@ -40,33 +38,37 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
 {
     // QUESTION: Since event is passed by reference and method is also called in visu,
     // should we care about thread-safety ? e is accessed by multiple thread
-    const unsigned int x = e.m_x;
-    const unsigned int y = e.m_y;
-    const unsigned int p = e.m_pol;
-    m_currTime = e.m_timestamp;
+    const int x = e.m_x;
+    const int y = e.m_y;
+    const bool p = e.m_pol;
+    m_currTime = e.m_timestamp; // Deep copy
 
     // Neighbor bounding box
-    const int xMin = std::max(0,int(x)-m_neighborSize);
-    const int yMin = std::max(0,int(y)-m_neighborSize);
-    const int xMax = std::min(int(m_rows-1),int(x)+m_neighborSize);
-    const int yMax = std::min(int(m_cols-1),int(y)+m_neighborSize);
+    const int xMin = std::max(0,x-m_neighborSize);
+    const int yMin = std::max(0,y-m_neighborSize);
+    const int xMax = std::min(m_rows-1,x+m_neighborSize);
+    const int yMax = std::min(m_cols-1,y+m_neighborSize);
+
+    int nbSupportsA;
+    int nbSupportsB;
+    int nbAntiSupports;
+    int dt;
 
     // QUESTION: When I try p>0 events, the master is always lagging behing the slave (about 1s), but many more events pass through the filter
     if (p<=0)
     {
-        int nbSupportsA = 0;
-        int nbSupportsB = 0;
-        int nbAntiSupports = 0;
-        for (int row=xMin; row<=xMax; row++)
+        nbSupportsA = 0;
+        nbSupportsB = 0;
+        nbAntiSupports = 0;
+        for (size_t row=xMin; row<=xMax; row++)
         {
-            for (int col=yMin; col<=yMax; col++)
+            for (size_t col=yMin; col<=yMax; col++)
             {
                 // QUESTION: Do we really need to lock a mutex here ? Seems expansive and already works well without
                 // Get list of events timestamps at neighbor pixel
                 std::list<int>* neighborList = &(m_events[row*m_cols+col]);
 
                 // Iterate through events in neighbor pixel (recent first -> end to begin)
-                std::list<DAVIS240CEvent>::reverse_iterator it;
                 for(auto it = neighborList->rbegin(); it!=neighborList->rend(); it++)
                 {
                     // Remove old events from the list
@@ -76,8 +78,10 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                         break;
                     }
 
-                    int dt = (m_currTime - *it);
+                    dt = (m_currTime - *it);
+                    // ==== DEBUG ====
                     //printf("Delta: %d. \n\r",dt);
+                    // ==== DEBUG ====
 
                     // Check if support event of type A: neighbor events with p=0 and t in [m_currTime-eps;m_currTime+eps]
                     if (dt < m_epsPeriod){ nbSupportsA++; }
@@ -112,16 +116,16 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
            )
         {
             // Center of mass tracker
-            //m_evtMutex.lock();
-                //m_xc = m_eta*m_xc + (1.f-m_eta)*x;
-                //m_yc = m_eta*m_yc + (1.f-m_eta)*y;
+            //m_xc = m_eta*m_xc + (1.f-m_eta)*x;
+            //m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
-                // We send CoG coordinates
-                //e.m_x = static_cast<unsigned int>(m_xc);
-                //e.m_y = static_cast<unsigned int>(m_yc);
-            //m_evtMutex.unlock();
+            // We send CoG coordinates
+            //e.m_x = static_cast<unsigned int>(m_xc);
+            //e.m_y = static_cast<unsigned int>(m_yc);
 
+            // ==== DEBUG ====
             //printf("Camera %d - Timestamp %d. \n\r",m_davis->m_id,e.m_timestamp);
+            // ==== DEBUG ====
             this->warnFilteredEvent(e);
         }
 
@@ -130,7 +134,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
         //       nbSupportsA, nbSupportsB, nbAntiSupports);
         // ==== END DEBUG ====
 
-        // Queue new event (only if negative)
+        // Queue new event
         m_events[x*m_cols+y].push_back(e.m_timestamp);
     }
 }

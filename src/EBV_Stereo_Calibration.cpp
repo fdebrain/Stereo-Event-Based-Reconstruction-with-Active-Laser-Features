@@ -52,12 +52,10 @@ void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
         && m_intrinsic_calib_image_points[1].size()>=m_min_frames_to_capture)
     {
         const std::vector<std::vector<cv::Point3f>> worldPoints0
-        {
-            m_intrinsic_calib_image_points[0].size(),
-            calculateWorldPoints()
-        };
+        { m_intrinsic_calib_image_points[0].size(), calculateWorldPoints() };
         cv::Mat rvecs0, tvecs0;
-        cv::calibrateCamera(worldPoints0,m_intrinsic_calib_image_points[0],
+        cv::calibrateCamera(worldPoints0,
+                            m_intrinsic_calib_image_points[0],
                             m_resolution,
                             m_camera_intrinsics[0].m_K,
                             m_camera_intrinsics[0].m_D,
@@ -67,12 +65,10 @@ void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
                                              60, DBL_EPSILON));
 
         const std::vector<std::vector<cv::Point3f>> worldPoints1
-        {
-            m_intrinsic_calib_image_points[1].size(),
-            calculateWorldPoints()
-        };
+        { m_intrinsic_calib_image_points[1].size(), calculateWorldPoints() };
         cv::Mat rvecs1, tvecs1;
-        cv::calibrateCamera(worldPoints0,m_intrinsic_calib_image_points[1],
+        cv::calibrateCamera(worldPoints1,
+                            m_intrinsic_calib_image_points[1],
                             m_resolution,
                             m_camera_intrinsics[1].m_K,
                             m_camera_intrinsics[1].m_D,
@@ -100,7 +96,6 @@ void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
         m_calibrateCameras = false;
         printf("Finished extracting the extrinsics with a rms per frame of %f \n\r",
                rms/m_min_frames_to_capture);
-
         return;
     }
 }
@@ -125,12 +120,13 @@ const std::vector<cv::Point3f> StereoCalibrator::calculateWorldPoints()
     std::vector<cv::Point3f> points;
     points.reserve(static_cast<uint64_t>(m_pattern_size.x * m_pattern_size.y));
 
-    for (int i = 0; i < m_pattern_size.y; i++) {
-        for (int j = 0; j < m_pattern_size.x; j++) {
+    for (int i = 0; i < m_pattern_size.y; i++)
+    {
+        for (int j = 0; j < m_pattern_size.x; j++)
+        {
             points.emplace_back(cv::Point3f(j * m_pattern_square_size,
                                             i * m_pattern_square_size, 0));
         }
     }
-
     return points;
 }
