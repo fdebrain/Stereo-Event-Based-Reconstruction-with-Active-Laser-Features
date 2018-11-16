@@ -45,11 +45,11 @@ public:
     const int m_rows;
     const int m_cols;
 
-private:
     // Who triangulator is listening to
     Matcher* m_matcher;
     LaserController* m_laser;
 
+private:
     // Calibration matrices (camera0,camera1,laser)
     std::string m_pathCalib = "../calibration/calib.yaml";
     std::string m_pathCalibLaser = "../calibration/laserCalib.yaml";
@@ -67,10 +67,12 @@ private:
     std::ofstream m_recorder;
 
     // List of incoming filtered events for each camera (FIFO)
-    std::array<std::list<DAVIS240CEvent>,2> m_evtQueue;
+    std::list<DAVIS240CEvent> m_evtQueue0;
+    std::list<DAVIS240CEvent> m_evtQueue1;
 
     // Mutex to access the queue
-    std::array<std::mutex,2> m_queueAccessMutex;
+    std::mutex m_queueAccessMutex0;
+    std::mutex m_queueAccessMutex1;
     std::mutex m_mutex;
 
     // Wait when no processing has to be done

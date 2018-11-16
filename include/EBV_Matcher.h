@@ -8,6 +8,9 @@
 #include <mutex>
 #include <condition_variable>
 
+
+//class Triangulator;
+
 class MatcherListener
 {
 public:
@@ -25,7 +28,7 @@ public:
     ~Matcher();
 
     void receivedNewFilterEvent(DAVIS240CEvent& event,
-                                const uint id) override;
+                                const unsigned int id) override;
     void runThread();
     void process(DAVIS240CEvent& e0, DAVIS240CEvent& e1);
 
@@ -50,24 +53,29 @@ private:
     int m_eps;
 
     // Flushing old events
-    std::array<int,2> m_lastEvent_t;
+    int m_currTime0;
+    int m_currTime1;
     int m_maxTimeToKeep;
 
     // List of incoming filtered events for each camera (FIFO)
-    std::array<std::list<DAVIS240CEvent>,2> m_evtQueue;
+    std::list<DAVIS240CEvent> m_evtQueue0;
+    std::list<DAVIS240CEvent> m_evtQueue1;
 
     // Mutex to access the queue
-    std::array<std::mutex,2> m_queueAccessMutex;
+    std::mutex m_queueAccessMutex0;
+    std::mutex m_queueAccessMutex1;
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
 
     // Who matcher listens to
-    std::array<Filter*,2> m_filter;
+    Filter* m_filter0;
+    Filter* m_filter1;
 
     // List of matcher listeners
     std::list<MatcherListener*> m_matcherListeners;
+
 };
 
 #endif // EBV_MATCHER_H

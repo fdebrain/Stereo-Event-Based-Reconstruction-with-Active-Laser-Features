@@ -1,6 +1,10 @@
 #ifndef EBV_VISUALIZER_H
 #define EBV_VISUALIZER_H
 
+#include <fstream>
+#include <string>
+#include <mutex>
+
 #include <EBV_DVS128USB.h>
 #include <EBV_DAVIS240C.h>
 #include <EBV_MagneticMirrorLaser.h>
@@ -10,15 +14,10 @@
 #include <EBV_Matcher.h>
 #include <EBV_Stereo_Calibration.h>
 
-#include <fstream>
-#include <string>
-#include <mutex>
-
 // Forward declaration
 namespace cv { class Mat;}
 
-class Visualizer : //public DVS128USBListener,
-                   public DAVIS240CEventListener,
+class Visualizer : public DAVIS240CEventListener,
                    public DAVIS240CFrameListener,
                    public FilterListener,
                    public TriangulatorListener
@@ -31,7 +30,6 @@ public:
                Filter* filter0 = nullptr,
                Filter* filter1 = nullptr,
                StereoCalibrator* calibrator = nullptr,
-               Matcher* matcher = nullptr,
                Triangulator* triangulator = nullptr,
                LaserController* laser = nullptr);
     ~Visualizer();
@@ -53,26 +51,26 @@ public:
 
 public:
     // Parameters for camera settings
-    const int                   m_rows;
-    const int                   m_cols;
-    const uint                  m_nbCams;
+    const int          m_rows;
+    const int          m_cols;
+    const uint         m_nbCams;
 
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime;
 
     // Structures for data storing
-    std::array<std::vector<bool>,2>        m_polEvts;
-    std::array<std::vector<int>,2>         m_ageEvts;
-    std::array<std::vector<int>,2>         m_filtEvts;
-    std::array<cv::Mat_<uchar>,2>          m_grayFrame;
-    std::vector<double>                    m_depthMap;
+    std::array<std::vector<bool>,2>    m_polEvts;
+    std::array<std::vector<int>,2>     m_ageEvts;
+    std::array<cv::Mat,2>              m_grayFrame;
+    std::array<std::vector<int>,2>     m_filtEvts;
+    std::vector<double>                m_depthMap;
 
     // Display window related variables
-    std::array<std::string,2>     m_polWin{};
-    std::array<std::string,2>     m_ageWin{};
-    std::array<std::string,2>     m_frameWin{};
-    std::array<std::string,2>     m_filtWin{};
-    std::string                   m_depthWin{};
+    std::array<std::string,2>   m_polWin;
+    std::array<std::string,2>   m_ageWin;
+    std::array<std::string,2>   m_frameWin;
+    std::array<std::string,2>   m_filtWin;
+    std::string                 m_depthWin;
 
     // Trackbar parameters (events age)
     int        m_ageThresh;
@@ -86,13 +84,13 @@ public:
     int m_laserFreq;
 
     // Trackbar parameters (filter)
-    std::array<int,2> m_freq{};
-    std::array<int,2> m_eps{};
-    std::array<int,2> m_neighborSize{};
-    std::array<int,2> m_threshA{};
-    std::array<int,2> m_threshB{};
-    std::array<int,2> m_threshAnti{};
-    std::array<int,2> m_etaInt{};
+    std::array<int,2> m_freq;
+    std::array<int,2> m_eps;
+    std::array<int,2> m_neighborSize;
+    std::array<int,2> m_threshA;
+    std::array<int,2> m_threshB;
+    std::array<int,2> m_threshAnti;
+    std::array<int,2> m_etaInt;
 
     // Trackbar parameters (depth in c,)
     int        m_min_depth;
@@ -101,21 +99,20 @@ public:
     int        m_matcherMaxBuffer;
 
     // Event recorder
-    std::ofstream       m_recorder;
+    std::ofstream m_recorder;
 
     // Davis object
-    std::array<DAVIS240C*,2>  m_davis;
-
-    // Filter object
-    std::array<Filter*,2>     m_filter;
+    std::array<DAVIS240C*,2>          m_davis;
 
     // Laser object
-    LaserController*    m_laser;
+    LaserController* m_laser;
+
+    // Filter object
+    std::array<Filter*,2>             m_filter;
 
     // Triangulator (depth estimator)
-    Matcher*            m_matcher;
-    Triangulator*       m_triangulator;
-    StereoCalibrator*   m_calibrator;
+    StereoCalibrator*    m_calibrator;
+    Triangulator*        m_triangulator;
 };
 
 #endif // EBV_VISUALIZER_H

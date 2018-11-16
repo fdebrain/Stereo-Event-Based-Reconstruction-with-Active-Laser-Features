@@ -6,14 +6,11 @@ IntrinsicsData::IntrinsicsData()
     m_D.resize(0);
 }
 
-StereoCalibrator::StereoCalibrator(Filter* filter0,
-                                   Filter* filter1,
-                                   Triangulator* triangulator)
+StereoCalibrator::StereoCalibrator(Triangulator* triangulator)
     : m_calibrateCameras(false),
       m_camera_intrinsics{IntrinsicsData{},IntrinsicsData{}},
       m_last_frame_captured{std::chrono::high_resolution_clock::time_point{},
                             std::chrono::high_resolution_clock::time_point{}},
-      m_filter{filter0,filter1},
       m_triangulator(triangulator)
 {
     m_R.resize(0);
@@ -24,11 +21,11 @@ StereoCalibrator::StereoCalibrator(Filter* filter0,
 
 StereoCalibrator::~StereoCalibrator(){}
 
-void StereoCalibrator::calibrateCameras(cv::Mat &frame, const unsigned int id)
+void StereoCalibrator::calibrateCameras(cv::Mat &frame, const uint id)
 {
     // Assess enough time between two frame captures
     const auto now = std::chrono::high_resolution_clock::now();
-    if (now-m_last_frame_captured[id]<m_min_capture_delay) { return; }
+    if (now-m_last_frame_captured[id]<m_min_capture_delay) {return;}
     m_last_frame_captured[id] = now;
 
     // Extract checkerboard corner points
@@ -55,10 +52,12 @@ void StereoCalibrator::calibrateCameras(cv::Mat &frame, const unsigned int id)
         && m_intrinsic_calib_image_points[1].size()>=m_min_frames_to_capture)
     {
         const std::vector<std::vector<cv::Point3f>> worldPoints0
-        { m_intrinsic_calib_image_points[0].size(), calculateWorldPoints() };
+        {
+            m_intrinsic_calib_image_points[0].size(),
+            calculateWorldPoints()
+        };
         cv::Mat rvecs0, tvecs0;
-        cv::calibrateCamera(worldPoints0,
-                            m_intrinsic_calib_image_points[0],
+        cv::calibrateCamera(worldPoints0,m_intrinsic_calib_image_points[0],
                             m_resolution,
                             m_camera_intrinsics[0].m_K,
                             m_camera_intrinsics[0].m_D,
@@ -68,10 +67,12 @@ void StereoCalibrator::calibrateCameras(cv::Mat &frame, const unsigned int id)
                                              60, DBL_EPSILON));
 
         const std::vector<std::vector<cv::Point3f>> worldPoints1
-        { m_intrinsic_calib_image_points[1].size(), calculateWorldPoints() };
+        {
+            m_intrinsic_calib_image_points[1].size(),
+            calculateWorldPoints()
+        };
         cv::Mat rvecs1, tvecs1;
-        cv::calibrateCamera(worldPoints1,
-                            m_intrinsic_calib_image_points[1],
+        cv::calibrateCamera(worldPoints0,m_intrinsic_calib_image_points[1],
                             m_resolution,
                             m_camera_intrinsics[1].m_K,
                             m_camera_intrinsics[1].m_D,
@@ -99,6 +100,7 @@ void StereoCalibrator::calibrateCameras(cv::Mat &frame, const unsigned int id)
         m_calibrateCameras = false;
         printf("Finished extracting the extrinsics with a rms per frame of %f \n\r",
                rms/m_min_frames_to_capture);
+
         return;
     }
 }
@@ -123,37 +125,12 @@ const std::vector<cv::Point3f> StereoCalibrator::calculateWorldPoints()
     std::vector<cv::Point3f> points;
     points.reserve(static_cast<uint64_t>(m_pattern_size.x * m_pattern_size.y));
 
-    for (int i = 0; i < m_pattern_size.y; i++)
-    {
-        for (int j = 0; j < m_pattern_size.x; j++)
-        {
+    for (int i = 0; i < m_pattern_size.y; i++) {
+        for (int j = 0; j < m_pattern_size.x; j++) {
             points.emplace_back(cv::Point3f(j * m_pattern_square_size,
                                             i * m_pattern_square_size, 0));
         }
     }
+
     return points;
-}
-
-
-void StereoCalibrator::pointLaserToPixel(const int u, const int v, const uint id)
-{
-    // Detect current laser position in camera
-    int u0 = m_filter[id]->getX();
-    int v0 = m_filter[id]->getY();
-
-    std::array<int,2> diff = {u-u0,v-v0};
-    int mse = diff[0]*diff[0] + diff[1]*diff[1];
-
-    while (mse>m_threshConverged)
-    {
-        u0 = m_filter[id]->getX();
-        v0 = m_filter[id]->getY();
-
-        diff = {u-u0,v-v0};
-        mse = diff[0]*diff[0] + diff[1]*diff[1];
-
-        int x = m_learningRate*diff[0];
-        int y = m_learningRate*diff[1];
-        m_laser->pos(x,y);
-    }
 }

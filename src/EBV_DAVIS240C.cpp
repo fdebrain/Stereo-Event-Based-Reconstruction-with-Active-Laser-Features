@@ -28,6 +28,7 @@ uint DAVIS240C::m_nbCams=0;
 libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
 
 DAVIS240C::DAVIS240C()
+    // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
     : m_id(m_nbCams),
       m_rows(180),
       m_cols(240),
@@ -61,6 +62,7 @@ DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
 }
+
 
 //=== INITIALIZING ===//
 void DAVIS240C::resetMasterClock()
@@ -157,7 +159,6 @@ void DAVIS240C::readThread()
 
         for (auto &packet : *packetContainer)
         {
-            // Skip packet if nothing
             if (packet == nullptr) { continue; }
 
             if (packet->getEventType() == POLARITY_EVENT)
@@ -190,10 +191,17 @@ void DAVIS240C::readThread()
 
                 const libcaer::events::FrameEvent &frameEvent = (*frame)[0];
 
-                // QUESTION: f only lives in this scope. How is its data preserved afterwise ?
                 DAVIS240CFrame f;
                 f.m_timestamp = frameEvent.getTimestamp();
-                f.m_frame = frameEvent.getOpenCVMat();
+
+                for (int row = 0; row < frameEvent.getLengthY(); row++)
+                {
+                    for (int col = 0; col < frameEvent.getLengthX(); col++)
+                    {
+                        f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*frameEvent.getPixel(col, row)/65535.);
+                    }
+                }
+
                 this->warnFrame(f);
             }
         }

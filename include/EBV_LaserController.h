@@ -8,6 +8,8 @@
 #include <thread>
 #include <mutex>
 
+static const char* modesList[] = {"circle", "swipe"};
+
 class MagneticMirrorLaser;
 
 class LaserController
@@ -19,7 +21,6 @@ public:
     void start();
     void draw();
     void stop();
-    void pos(int x, int y);
 
     // Getters and setters
     int getX() const { return m_x; }
@@ -57,17 +58,18 @@ public:
 
 private:
     MagneticMirrorLaser* m_laser;
-    int m_freq;
-    double m_step;
     int m_min_x;
     int m_min_y;
     int m_max_x;
     int m_max_y;
-    int m_vx;
-    int m_vy;
+    int m_freq;
+    double m_step;
     int m_cx;
     int m_cy;
     int m_r;
+    int m_vx;
+    int m_vy;
+
 };
 
 #endif // EBV_LASERCONTROLLER_H

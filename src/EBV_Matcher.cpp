@@ -3,15 +3,15 @@
 Matcher::Matcher(Filter* filter0,
                  Filter* filter1)
     : m_rows(180), m_cols(240),
-      m_filter{filter0,filter1}
+      m_filter0(filter0), m_filter1(filter1)
 {
     // Matching parameters
     m_eps = 1e4;
     m_maxTimeToKeep = 1e4; // Keep 10ms buffer in each filtered events queue
 
     // Initialize filters listeners
-    m_filter[0]->registerFilterListener(this);
-    m_filter[1]->registerFilterListener(this);
+    m_filter0->registerFilterListener(this);
+    m_filter1->registerFilterListener(this);
 
     // Initialize thread
     m_thread = std::thread(&Matcher::runThread,this);
@@ -19,44 +19,48 @@ Matcher::Matcher(Filter* filter0,
 
 Matcher::~Matcher()
 {
-    m_filter[0]->deregisterFilterListener(this);
-    m_filter[1]->deregisterFilterListener(this);
+    m_filter0->deregisterFilterListener(this);
+    m_filter1->deregisterFilterListener(this);
 }
 
 // The function the thread executes and waits on
 void Matcher::runThread()
 {
-    std::array<bool,2> hasQueueEvent;
+    bool hasQueueEvent0;
+    bool hasQueueEvent1;
     DAVIS240CEvent event0;
     DAVIS240CEvent event1;
 
     while(true)
     {
-        m_queueAccessMutex[0].lock();
-            hasQueueEvent[0] = !m_evtQueue[0].empty();
-        m_queueAccessMutex[0].unlock();
+        m_queueAccessMutex0.lock();
+            hasQueueEvent0  = !m_evtQueue0.empty();
+        m_queueAccessMutex0.unlock();
 
-        m_queueAccessMutex[1].lock();
-            hasQueueEvent[1] = !m_evtQueue[1].empty();
-        m_queueAccessMutex[1].unlock();
+        m_queueAccessMutex1.lock();
+            hasQueueEvent1  = !m_evtQueue1.empty();
+        m_queueAccessMutex1.unlock();
 
-        if(hasQueueEvent[0] && hasQueueEvent[1])
+        // Process only if incoming filtered events in both cameras
+        //CHANGE
+        if(hasQueueEvent0 && hasQueueEvent1)
         {
-            m_queueAccessMutex[0].lock();
-                int s0 = m_evtQueue[0].size();
-                event0 = m_evtQueue[0].front();
-                m_evtQueue[0].pop_front();
-            m_queueAccessMutex[0].unlock();
+            m_queueAccessMutex0.lock();
+                //int s0 = m_evtQueue0.size();
+                event0 = m_evtQueue0.front();
+                m_evtQueue0.pop_front();
+            m_queueAccessMutex0.unlock();
 
-            m_queueAccessMutex[1].lock();
-                int s1 = m_evtQueue[1].size();
-                event1 = m_evtQueue[1].front();
-                m_evtQueue[1].pop_front();
-            m_queueAccessMutex[1].unlock();
+            m_queueAccessMutex1.lock();
+                //int s1 = m_evtQueue1.size();
+                event1 = m_evtQueue1.front();
+                m_evtQueue1.pop_front();
+            m_queueAccessMutex1.unlock();
 
             // DEBUG - QUEUE SIZE SHOULD BE SIMILAR
-            //printf("Queue size: %d - %d.\n\r", s[0], s[1]);
+            //printf("Queue size: %d - %d.\n\r", s0, s1);
             // END DEBUG
+
 
             // DEBUG - DELTA TIME SHOULD BE SMALL
             //int t0 = event0.m_timestamp;
@@ -77,26 +81,51 @@ void Matcher::runThread()
 
 // Called by the thread of previous agent (here Filter)
 void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
-                                     const uint id)
+                                     const unsigned int id)
 {
     // DEBUG - CHECK IF EVENTS SYNCHRONIZED
     //printf("Camera %d - Timestamp %d. \n\r",id,event.m_timestamp);
     // END DEBUG
 
-    // Remove old events
-    m_queueAccessMutex[id].lock();
-        m_lastEvent_t[id] = event.m_timestamp;
-        std::list<DAVIS240CEvent>::iterator it = m_evtQueue[id].begin();
-        while(    ((m_lastEvent_t[id]-it->m_timestamp) > m_maxTimeToKeep)
-               && (it!=m_evtQueue[id].end())
-             )
+    switch (id)
+    {
+        case 0:
         {
-            m_evtQueue[id].erase(it++);
-        }
-        m_evtQueue[id].push_back(event);
-    m_queueAccessMutex[id].unlock();
+            m_queueAccessMutex0.lock();
+                m_evtQueue0.push_back(event);
 
-    // Notify thread
+                // Remove old events
+                m_currTime0 = event.m_timestamp;
+                std::list<DAVIS240CEvent>::iterator it = m_evtQueue0.begin(); // DANGER SHARED RESOURCE
+                while(    ((m_currTime0-it->m_timestamp) > m_maxTimeToKeep)
+                       && (it!=m_evtQueue0.end())
+                     )
+                {
+                    m_evtQueue0.erase(it++);
+                }
+            m_queueAccessMutex0.unlock();
+            break;
+        }
+
+        case 1:
+        {
+            m_queueAccessMutex1.lock();
+                m_evtQueue1.push_back(event);
+
+                // Remove old events
+                m_currTime1 = event.m_timestamp;
+                std::list<DAVIS240CEvent>::iterator it = m_evtQueue1.begin(); // DANGER SHARED RESOURCE
+                while(    ((m_currTime1-it->m_timestamp) > m_maxTimeToKeep)
+                       && (it!=m_evtQueue1.end())
+                     )
+                {
+                    m_evtQueue1.erase(it++);
+                }
+            m_queueAccessMutex1.unlock();
+            break;
+        }
+    }
+
     std::unique_lock<std::mutex> condLock(m_condWaitMutex);
     m_condWait.notify_one();
 }
@@ -105,8 +134,10 @@ void Matcher::process(DAVIS240CEvent& e0, DAVIS240CEvent& e1)
 {
     const int t0 = e0.m_timestamp;
     const int t1 = e1.m_timestamp;
+    //int dt = std::abs(t0 - t1);
+    //printf("%d. \n\r",dt);
 
-    // Match if similar timestamps
+    // Positive match if similar timestamps
     if (std::abs(t0 - t1)<m_eps)
     {
         warnMatch(e0,e1);
@@ -126,7 +157,8 @@ void Matcher::deregisterMatcherListener(MatcherListener* listener)
 void Matcher::warnMatch(const DAVIS240CEvent& event0,
                         const DAVIS240CEvent& event1)
 {
-    for(auto it = m_matcherListeners.begin(); it!=m_matcherListeners.end(); it++)
+    std::list<MatcherListener*>::iterator it;
+    for(it = m_matcherListeners.begin(); it!=m_matcherListeners.end(); it++)
     {
         (*it)->receivedNewMatch(event0,event1);
     }
