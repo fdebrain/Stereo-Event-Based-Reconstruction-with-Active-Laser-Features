@@ -97,10 +97,11 @@ static void callbackTrackbarMatcherMaxBuffer(int maxBuffer, void *data)
     matcher->setMaxBuffer(maxBuffer);
 }
 
-Visualizer::Visualizer(const unsigned int nbCams,
+Visualizer::Visualizer(const uint nbCams,
                        DAVIS240C* davis0, DAVIS240C* davis1,
                        Filter* filter0, Filter* filter1,
                        StereoCalibrator* calibrator,
+                       Matcher* matcher,
                        Triangulator* triangulator,
                        LaserController* laser)
     : m_rows(180), m_cols(240), m_nbCams(nbCams),
@@ -108,9 +109,10 @@ Visualizer::Visualizer(const unsigned int nbCams,
       m_max_trackbar_val(1e6),
       m_min_depth(20),
       m_max_depth(40),
-      m_laser(laser),
       m_davis{davis0,davis1},
       m_filter{filter0,filter1},
+      m_laser(laser),
+      m_matcher(matcher),
       m_triangulator(triangulator),
       m_calibrator(calibrator)
 {
@@ -121,7 +123,7 @@ Visualizer::Visualizer(const unsigned int nbCams,
     for (auto& v : m_grayFrame) { v = cv::Mat::zeros(m_rows,m_cols,CV_16UC1); }
     m_depthMap.resize(m_rows*m_cols);
 
-    for (unsigned int idx; idx<nbCams; idx++)
+    for (uint idx=0; idx<nbCams; idx++)
     {
         // Initialize davis
         if (m_davis[idx]!=nullptr)
@@ -144,6 +146,7 @@ Visualizer::Visualizer(const unsigned int nbCams,
 
             // Listen to davis
             m_davis[idx]->init();
+            printf("Hello %d",idx);
             m_davis[idx]->start();
             m_davis[idx]->registerEventListener(this);
             m_davis[idx]->registerFrameListener(this);
@@ -195,14 +198,14 @@ Visualizer::Visualizer(const unsigned int nbCams,
         cv::namedWindow(m_depthWin,0);
 
         // Initialize matcher parameters
-        m_matcherEps = m_triangulator->m_matcher->getEps();
-        m_matcherMaxBuffer = m_triangulator->m_matcher->getMaxBuffer();
+        m_matcherEps = m_matcher->getEps();
+        m_matcherMaxBuffer = m_matcher->getMaxBuffer();
 
         // Matcher trackbars
         cv::createTrackbar("Matcher eps",m_depthWin,&m_matcherEps,1e5,
-                           &callbackTrackbarMatcherEps,static_cast<void*>(m_triangulator->m_matcher));
+                           &callbackTrackbarMatcherEps,static_cast<void*>(m_matcher));
         cv::createTrackbar("Matcher max buffer",m_depthWin,&m_matcherMaxBuffer,1e5,
-                           &callbackTrackbarMatcherMaxBuffer,static_cast<void*>(m_triangulator->m_matcher));
+                           &callbackTrackbarMatcherMaxBuffer,static_cast<void*>(m_matcher));
 
         // Depth trackbars
         cv::createTrackbar("minDepth",m_depthWin,&m_min_depth,100,nullptr);
@@ -246,7 +249,7 @@ Visualizer::Visualizer(const unsigned int nbCams,
 
 Visualizer::~Visualizer()
 {
-    for (unsigned int idx=0; idx<m_nbCams; idx++)
+    for (uint idx=0; idx<m_nbCams; idx++)
     {
         if (m_davis[idx]!=nullptr)
         {
@@ -277,7 +280,7 @@ Visualizer::~Visualizer()
 
 // Runs in DAVIS240C thread
 void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                           const unsigned int id)
+                                           const uint id)
 {
     const int x = e.m_x;
     const int y = e.m_y;
@@ -290,7 +293,7 @@ void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
 
 // Runs in DAVIS240C thread
 void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
-                                           const unsigned int id)
+                                           const uint id)
 {
     auto m_grayFrameData = f.m_frame;
     const int t = f.m_timestamp;
@@ -299,7 +302,7 @@ void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
 }
 
 void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
-                                        const unsigned int id)
+                                        const uint id)
 {
     const int x = e.m_x;
     const int y = e.m_y;
@@ -313,8 +316,8 @@ void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
     }
 }
 
-void Visualizer::receivedNewDepth(const unsigned int &u,
-                                  const unsigned int &v,
+void Visualizer::receivedNewDepth(const int &u,
+                                  const int &v,
                                   const double &X,
                                   const double &Y,
                                   const double &Z)
@@ -340,19 +343,15 @@ void Visualizer::run()
     for (auto& v : ageMatHSV) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
     for (auto& v : ageMatRGB) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
 
-    bool pol;
-    int dt;
-    double z;
-
     while(key != 'q')
     {
         for(size_t i=0; i<m_rows*m_cols; i++)
         {
-            for (unsigned int idx=0; idx<m_nbCams; idx++)
+            for (uint idx=0; idx<m_nbCams; idx++)
             {
                 // Events by polarity
-                pol = m_polEvts[idx][i];
-                dt = m_currenTime[idx] - m_ageEvts[idx][i];
+                int pol = m_polEvts[idx][i];
+                int dt = m_currenTime[idx] - m_ageEvts[idx][i];
                 if(dt<m_ageThresh)
                 {
                     polMat[idx].data[3*i + 0] = static_cast<uchar>(0);              // Blue channel
@@ -383,7 +382,7 @@ void Visualizer::run()
             }
 
             // Depth map
-            z = m_depthMap[i];
+            double z = m_depthMap[i];
             if (z>0)
             {
                 if (z<m_min_depth){ z = m_min_depth; }
@@ -400,7 +399,7 @@ void Visualizer::run()
             }
         }
 
-        for (unsigned int idx=0; idx<m_nbCams; idx++)
+        for (uint idx=0; idx<m_nbCams; idx++)
         {
             if (m_davis[idx] != nullptr)
             {
@@ -415,20 +414,18 @@ void Visualizer::run()
                 if (m_calibrator->m_calibrateCameras)
                 {
                     //cv::equalizeHist(m_grayFrame0,m_grayFrame0); // TO DEBUG
-                    m_calibrator->calibrate(m_grayFrame[idx],0);
+                    m_calibrator->calibrateCameras(m_grayFrame[idx],idx);
                 }
                 cv::imshow(m_frameWin[idx],m_grayFrame[idx]);
             }
 
-            // Display trackers
+            // Display filtered events
             if(m_filter[idx] != nullptr)
             {
-                int x = static_cast<int>(m_filter[idx]->getX());
-                int y = static_cast<int>(m_filter[idx]->getY());
+                int x = m_filter[idx]->getX();
+                int y = m_filter[idx]->getY();
                 cv::circle(filtMat[idx],cv::Point2i(y,x),
                            3,cv::Scalar(0,255,0));
-
-                // Display filtered events + trackers
                 cv::imshow(m_filtWin[idx],filtMat[idx]);
             }
         }
@@ -456,6 +453,7 @@ void Visualizer::run()
             printf("Reset depth map.\n\r");
         }
 
+        // Calibrate cameras
         if (key=='c')
         {
             m_calibrator->m_calibrateCameras = true;

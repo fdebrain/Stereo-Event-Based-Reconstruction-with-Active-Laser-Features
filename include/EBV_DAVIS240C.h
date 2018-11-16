@@ -42,7 +42,7 @@ public:
         : m_frame(frame), m_timestamp(timestamp) {}
 
 public:
-     cv::Mat_<uint8_t> m_frame;
+     cv::Mat_<uchar> m_frame;
      int m_timestamp;
 };
 
@@ -50,18 +50,18 @@ class DAVIS240CEventListener
 {
 public:
     DAVIS240CEventListener(void) {}
-    virtual ~DAVIS240CEventListener() {}
+    ~DAVIS240CEventListener() {}
     virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
-                                           const unsigned int id) = 0;
+                                           const uint id) = 0;
 };
 
 class DAVIS240CFrameListener
 {
 public:
     DAVIS240CFrameListener(void) {}
-    virtual ~DAVIS240CFrameListener() {}
+    ~DAVIS240CFrameListener() {}
     virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
-                                           const unsigned int id) = 0;
+                                           const uint id) = 0;
 };
 
 class DAVIS240C
@@ -70,7 +70,7 @@ public:
     DAVIS240C();
     ~DAVIS240C();
 
-    static unsigned int m_nbCams;
+    static uint m_nbCams;
     static libcaer::devices::davis* m_davisMasterHandle;
 
     // Life cycle of a DAVIS240C
@@ -94,13 +94,13 @@ public:
 
 public:
     // Id of the camera
-    const unsigned int m_id;
+    const uint m_id;
 
+private:
     // Device resolution
     const int m_rows;
     const int m_cols;
 
-private:
     //Device handle
     libcaer::devices::davis m_davisHandle;
 

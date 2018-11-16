@@ -24,11 +24,10 @@ static void usbShutdownHandler(void *ptr)
     globalShutdown.store(true);
 }
 
-unsigned int DAVIS240C::m_nbCams=0;
+uint DAVIS240C::m_nbCams=0;
 libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
 
 DAVIS240C::DAVIS240C()
-    // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
     : m_id(m_nbCams),
       m_rows(180),
       m_cols(240),
@@ -211,7 +210,7 @@ void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
 {
     for(auto it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
     {
-        for(unsigned int i=0; i<events.size(); i++)
+        for(uint i=0; i<events.size(); i++)
             (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
     }
 }

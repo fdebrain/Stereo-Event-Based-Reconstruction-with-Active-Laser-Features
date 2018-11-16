@@ -15,7 +15,7 @@ class FilterListener
 public:
     FilterListener(void) {}
     virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,
-                                        const unsigned int id) = 0;
+                                        const uint id) = 0;
 };
 
 class Filter : public DAVIS240CEventListener
@@ -28,44 +28,44 @@ public:
     void process(DAVIS240CEvent& event);
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id) override;
+                                   const uint id) override;
 
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
     void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
-    inline float getX() const {return m_xc;}
-    inline float getY() const {return m_yc;}
+    int getX() const {return m_xc;}
+    int getY() const {return m_yc;}
 
     int getFreq() const {return m_frequency;}
-    void setFreq(int freq) {m_frequency=freq;
-                            m_targetPeriod = 1e6/m_frequency;}
+    void setFreq(const int freq) {m_frequency=freq;
+                                  m_targetPeriod = 1e6/m_frequency;}
 
     int getEps() const {return m_eps;}
-    void setEps(int eps) {m_eps=eps;
-                          m_epsPeriod = m_eps*m_targetPeriod/100.;}
+    void setEps(const int eps) {m_eps=eps;
+                                m_epsPeriod = m_eps*m_targetPeriod/100.;}
 
     int getNeighborSize() const {return m_neighborSize;}
-    void setNeighborSize(int size) {m_neighborSize=size;}
+    void setNeighborSize(const int size) {m_neighborSize=size;}
 
     int getThreshA() const {return m_threshSupportsA;}
-    void setThreshA(int nbSupports) {m_threshSupportsA=nbSupports;}
+    void setThreshA(const int nbSupports) {m_threshSupportsA=nbSupports;}
 
     int getThreshB() const {return m_threshSupportsB;}
-    void setThreshB(int nbSupports) {m_threshSupportsB=nbSupports;}
+    void setThreshB(const int nbSupports) {m_threshSupportsB=nbSupports;}
 
     int getThreshAnti() const {return m_threshAntiSupports;}
-    void setThreshAnti(int nbAntiSupports) {m_threshAntiSupports=nbAntiSupports;}
+    void setThreshAnti(const int nbAntiSupports) {m_threshAntiSupports=nbAntiSupports;}
 
     float getEta() const {return m_eta;}
-    void setEta(float eta) {m_eta=eta;}
+    void setEta(const float eta) {m_eta=eta;}
 
 private:
     // Datastructure matrix of list of events
     const int m_rows;
     const int m_cols;
-    std::vector<std::list<int>> m_events;
+    std::vector<std::list<int>> m_events_t; // Change to std::array ?
 
     // Who filter listens to
     DAVIS240C* m_davis;

@@ -25,25 +25,26 @@ class Visualizer : //public DVS128USBListener,
 {
 
 public:
-    Visualizer(const unsigned int nbCams,
+    Visualizer(const uint nbCams,
                DAVIS240C* davis0 = nullptr,
                DAVIS240C* davis1 = nullptr,
                Filter* filter0 = nullptr,
                Filter* filter1 = nullptr,
                StereoCalibrator* calibrator = nullptr,
+               Matcher* matcher = nullptr,
                Triangulator* triangulator = nullptr,
                LaserController* laser = nullptr);
     ~Visualizer();
 
     //void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id) override;
+                                   const uint id) override;
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
-                                   const unsigned int id) override;
+                                   const uint id) override;
     void receivedNewFilterEvent(DAVIS240CEvent& e,
-                                const unsigned int id) override;
-    void receivedNewDepth(const unsigned int &u,
-                          const unsigned int &v,
+                                const uint id) override;
+    void receivedNewDepth(const int &u,
+                          const int &v,
                           const double &X,
                           const double &Y,
                           const double &Z) override;
@@ -54,7 +55,7 @@ public:
     // Parameters for camera settings
     const int                   m_rows;
     const int                   m_cols;
-    const unsigned int          m_nbCams;
+    const uint                  m_nbCams;
 
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime;
@@ -66,21 +67,12 @@ public:
     std::array<cv::Mat_<uchar>,2>          m_grayFrame;
     std::vector<double>                    m_depthMap;
 
-    // Thread-safety
-    std::mutex                  m_evtMutex0;
-    std::mutex                  m_frameMutex0;
-    std::mutex                  m_filterEvtMutex0;
-    std::mutex                  m_evtMutex1;
-    std::mutex                  m_frameMutex1;
-    std::mutex                  m_filterEvtMutex1;
-    std::mutex                  m_depthMutex;
-
     // Display window related variables
-    std::array<std::string,2>     m_polWin;
-    std::array<std::string,2>     m_ageWin;
-    std::array<std::string,2>     m_frameWin;
-    std::array<std::string,2>     m_filtWin;
-    std::string                   m_depthWin;
+    std::array<std::string,2>     m_polWin{};
+    std::array<std::string,2>     m_ageWin{};
+    std::array<std::string,2>     m_frameWin{};
+    std::array<std::string,2>     m_filtWin{};
+    std::string                   m_depthWin{};
 
     // Trackbar parameters (events age)
     int        m_ageThresh;
@@ -94,13 +86,13 @@ public:
     int m_laserFreq;
 
     // Trackbar parameters (filter)
-    std::array<int,2> m_freq;
-    std::array<int,2> m_eps;
-    std::array<int,2> m_neighborSize;
-    std::array<int,2> m_threshA;
-    std::array<int,2> m_threshB;
-    std::array<int,2> m_threshAnti;
-    std::array<int,2> m_etaInt;
+    std::array<int,2> m_freq{};
+    std::array<int,2> m_eps{};
+    std::array<int,2> m_neighborSize{};
+    std::array<int,2> m_threshA{};
+    std::array<int,2> m_threshB{};
+    std::array<int,2> m_threshAnti{};
+    std::array<int,2> m_etaInt{};
 
     // Trackbar parameters (depth in c,)
     int        m_min_depth;
@@ -111,16 +103,17 @@ public:
     // Event recorder
     std::ofstream       m_recorder;
 
-    // Laser object
-    LaserController*    m_laser;
-
     // Davis object
     std::array<DAVIS240C*,2>  m_davis;
 
     // Filter object
     std::array<Filter*,2>     m_filter;
 
+    // Laser object
+    LaserController*    m_laser;
+
     // Triangulator (depth estimator)
+    Matcher*            m_matcher;
     Triangulator*       m_triangulator;
     StereoCalibrator*   m_calibrator;
 };

@@ -21,19 +21,23 @@ public:
 class StereoCalibrator
 {
 public:
-    StereoCalibrator(Triangulator* triangulator=nullptr);
+    StereoCalibrator(Filter* filter0 = nullptr,
+                     Filter* filter1 = nullptr,
+                     Triangulator* triangulator=nullptr);
     ~StereoCalibrator();
 
-    void calibrate(cv::Mat &frame, const int id);
+    void calibrateCameras(cv::Mat &frame, const uint id);
     void saveCalibration();
     const std::vector<cv::Point3f> calculateWorldPoints();
+
+    void pointLaserToPixel(const int u, const int v, const uint id);
 
     const cv::Size2i m_resolution{240,180};
     bool m_calibrateCameras{false};
     std::string m_pathCalib = "../calibration/calib2.yaml";
 
     // Intrinsics
-    const cv::Point2i m_pattern_size{8, 5};
+    const cv::Point2i m_pattern_size{8,5};
     const float m_pattern_square_size = 3.0f;
     const size_t m_min_frames_to_capture{25};
     const std::chrono::milliseconds m_min_capture_delay{1000};
@@ -45,7 +49,14 @@ public:
     // Stereo extrinsics
     cv::Mat_<double> m_R, m_T, m_E, m_F;
 
+    // Laser
+    int m_threshConverged{25};
+    float m_learningRate{0.1};
+
+    // Who listens to
+    std::array<Filter*,2> m_filter;
     Triangulator* m_triangulator;
+    LaserController* m_laser;
 };
 
 #endif // EBV_STEREO_CALIBRATION_H

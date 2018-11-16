@@ -25,7 +25,7 @@ public:
     ~Matcher();
 
     void receivedNewFilterEvent(DAVIS240CEvent& event,
-                                const unsigned int id) override;
+                                const uint id) override;
     void runThread();
     void process(DAVIS240CEvent& e0, DAVIS240CEvent& e1);
 
@@ -45,30 +45,26 @@ public:
     std::thread m_thread;
 
 private:
-    const unsigned int m_rows;
-    const unsigned int m_cols;
+    const int m_rows;
+    const int m_cols;
     int m_eps;
 
     // Flushing old events
-    int m_currTime0;
-    int m_currTime1;
+    std::array<int,2> m_lastEvent_t;
     int m_maxTimeToKeep;
 
     // List of incoming filtered events for each camera (FIFO)
-    std::list<DAVIS240CEvent> m_evtQueue0;
-    std::list<DAVIS240CEvent> m_evtQueue1;
+    std::array<std::list<DAVIS240CEvent>,2> m_evtQueue;
 
     // Mutex to access the queue
-    std::mutex m_queueAccessMutex0;
-    std::mutex m_queueAccessMutex1;
+    std::array<std::mutex,2> m_queueAccessMutex;
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
 
     // Who matcher listens to
-    Filter* m_filter0;
-    Filter* m_filter1;
+    std::array<Filter*,2> m_filter;
 
     // List of matcher listeners
     std::list<MatcherListener*> m_matcherListeners;

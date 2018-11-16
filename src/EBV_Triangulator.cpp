@@ -69,7 +69,8 @@ Triangulator::Triangulator(Matcher* matcher,
     : m_rows(180),
       m_cols(240),
       m_matcher(matcher),
-      m_laser(laser)
+      m_laser(laser),
+      m_queueAccessMutex{}
 {
     // Initialize datastructures
     for (auto &k : m_K) { k = cv::Mat(3,3,CV_32FC1); }
@@ -80,6 +81,8 @@ Triangulator::Triangulator(Matcher* matcher,
     for (auto &f : m_F) { f = cv::Mat(1,5,CV_32FC1); }
     for (auto &rect : m_Rect) { rect.resize(0); }
     for (auto &q : m_Q) { q.resize(0); }
+    for (auto &v : m_evtQueue) { v.resize(0); }
+
 
     // Listen to matcher
     m_matcher->registerMatcherListener(this);
@@ -100,33 +103,32 @@ Triangulator::~Triangulator()
 
 void Triangulator::run()
 {
-    bool hasQueueEvent0;
-    bool hasQueueEvent1;
+    std::array<bool,2> hasQueueEvent;
     DAVIS240CEvent event0;
     DAVIS240CEvent event1;
 
     while(true)
     {
-        m_queueAccessMutex0.lock();
-            hasQueueEvent0 =! m_evtQueue0.empty();
-        m_queueAccessMutex0.unlock();
+        m_queueAccessMutex[0].lock();
+            hasQueueEvent[0] =! m_evtQueue[0].empty();
+        m_queueAccessMutex[0].unlock();
 
-        m_queueAccessMutex1.lock();
-            hasQueueEvent1 =! m_evtQueue1.empty();
-        m_queueAccessMutex1.unlock();
+        m_queueAccessMutex[1].lock();
+            hasQueueEvent[1] =! m_evtQueue[1].empty();
+        m_queueAccessMutex[1].unlock();
 
         // Process only if incoming filtered events in both cameras
-        if(hasQueueEvent0 && hasQueueEvent1)
+        if(hasQueueEvent[0] && hasQueueEvent[1])
         {
-            m_queueAccessMutex0.lock();
-                event0 = m_evtQueue0.front();
-                m_evtQueue0.pop_front();
-            m_queueAccessMutex0.unlock();
+            m_queueAccessMutex[0].lock();
+                event0 = m_evtQueue[0].front();
+                m_evtQueue[0].pop_front();
+            m_queueAccessMutex[0].unlock();
 
-            m_queueAccessMutex1.lock();
-                event1 = m_evtQueue1.front();
-                m_evtQueue1.pop_front();
-            m_queueAccessMutex1.unlock();
+            m_queueAccessMutex[1].lock();
+                event1 = m_evtQueue[1].front();
+                m_evtQueue[1].pop_front();
+            m_queueAccessMutex[1].unlock();
 
             process(event0,event1);
         }
@@ -142,13 +144,13 @@ void Triangulator::run()
 void Triangulator::receivedNewMatch(const DAVIS240CEvent& event0,
                                     const DAVIS240CEvent& event1)
 {
-    m_queueAccessMutex0.lock();
-        m_evtQueue0.push_back(event0);
-    m_queueAccessMutex0.unlock();
+    m_queueAccessMutex[0].lock();
+        m_evtQueue[0].push_back(event0);
+    m_queueAccessMutex[0].unlock();
 
-    m_queueAccessMutex1.lock();
-        m_evtQueue1.push_back(event1);
-    m_queueAccessMutex1.unlock();
+    m_queueAccessMutex[1].lock();
+        m_evtQueue[1].push_back(event1);
+    m_queueAccessMutex[1].unlock();
 
     std::unique_lock<std::mutex> condLock(m_condWaitMutex);
     m_condWait.notify_one();
@@ -170,14 +172,14 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     std::vector<cv::Point2d> undistCoordsCorrected0, undistCoordsCorrected1;
     cv::Vec4d point3D;
 
-    m_queueAccessMutex0.lock();
-        const unsigned int x0 = event0.m_x;
-        const unsigned int y0 = event0.m_y;
-        const unsigned int x1 = event1.m_x;
-        const unsigned int y1 = event1.m_y;
-        int xLaser = m_laser->getX();
-        int yLaser = m_laser->getY();
-    m_queueAccessMutex0.unlock();
+    //m_queueAccessMutex[0].lock();
+    const int x0 = event0.m_x;
+    const int y0 = event0.m_y;
+    const int x1 = event1.m_x;
+    const int y1 = event1.m_y;
+    int xLaser = m_laser->getX();
+    int yLaser = m_laser->getY();
+    //m_queueAccessMutex[0].unlock();
 
     //printf("xLaser: %d - yLaser: %d - xEvent: %d - yEvent: %d. \n\r",
     //       xLaser,yLaser, x0, y0);
@@ -275,14 +277,13 @@ void Triangulator::deregisterTriangulatorListener(TriangulatorListener* listener
     m_triangulatorListeners.remove(listener);
 }
 
-void Triangulator::warnDepth(const unsigned int u,
-                             const unsigned int v,
+void Triangulator::warnDepth(const int u,
+                             const int v,
                              const double X,
                              const double Y,
                              const double Z)
 {
-    std::list<TriangulatorListener*>::iterator it;
-    for(it = m_triangulatorListeners.begin(); it!=m_triangulatorListeners.end(); it++)
+    for(auto it = m_triangulatorListeners.begin(); it!=m_triangulatorListeners.end(); it++)
     {
         (*it)->receivedNewDepth(u,v,X,Y,Z);
     }

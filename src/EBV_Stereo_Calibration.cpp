@@ -6,11 +6,14 @@ IntrinsicsData::IntrinsicsData()
     m_D.resize(0);
 }
 
-StereoCalibrator::StereoCalibrator(Triangulator* triangulator)
+StereoCalibrator::StereoCalibrator(Filter* filter0,
+                                   Filter* filter1,
+                                   Triangulator* triangulator)
     : m_calibrateCameras(false),
       m_camera_intrinsics{IntrinsicsData{},IntrinsicsData{}},
       m_last_frame_captured{std::chrono::high_resolution_clock::time_point{},
                             std::chrono::high_resolution_clock::time_point{}},
+      m_filter{filter0,filter1},
       m_triangulator(triangulator)
 {
     m_R.resize(0);
@@ -21,11 +24,11 @@ StereoCalibrator::StereoCalibrator(Triangulator* triangulator)
 
 StereoCalibrator::~StereoCalibrator(){}
 
-void StereoCalibrator::calibrate(cv::Mat &frame, const int id)
+void StereoCalibrator::calibrateCameras(cv::Mat &frame, const unsigned int id)
 {
     // Assess enough time between two frame captures
     const auto now = std::chrono::high_resolution_clock::now();
-    if (now-m_last_frame_captured[id]<m_min_capture_delay) {return;}
+    if (now-m_last_frame_captured[id]<m_min_capture_delay) { return; }
     m_last_frame_captured[id] = now;
 
     // Extract checkerboard corner points
@@ -129,4 +132,28 @@ const std::vector<cv::Point3f> StereoCalibrator::calculateWorldPoints()
         }
     }
     return points;
+}
+
+
+void StereoCalibrator::pointLaserToPixel(const int u, const int v, const uint id)
+{
+    // Detect current laser position in camera
+    int u0 = m_filter[id]->getX();
+    int v0 = m_filter[id]->getY();
+
+    std::array<int,2> diff = {u-u0,v-v0};
+    int mse = diff[0]*diff[0] + diff[1]*diff[1];
+
+    while (mse>m_threshConverged)
+    {
+        u0 = m_filter[id]->getX();
+        v0 = m_filter[id]->getY();
+
+        diff = {u-u0,v-v0};
+        mse = diff[0]*diff[0] + diff[1]*diff[1];
+
+        int x = m_learningRate*diff[0];
+        int y = m_learningRate*diff[1];
+        m_laser->pos(x,y);
+    }
 }

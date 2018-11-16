@@ -12,8 +12,8 @@ class TriangulatorListener
 {
 public:
     TriangulatorListener(void) {}
-    virtual void receivedNewDepth(const unsigned int &u,
-                                  const unsigned int &v,
+    virtual void receivedNewDepth(const int &u,
+                                  const int &v,
                                   const double &X,
                                   const double &Y,
                                   const double &Z) = 0;
@@ -36,20 +36,20 @@ public:
 
     void registerTriangulatorListener(TriangulatorListener* listener);
     void deregisterTriangulatorListener(TriangulatorListener* listener);
-    void warnDepth(const unsigned int u,
-                   const unsigned int v,
+    void warnDepth(const int u,
+                   const int v,
                    const double X,
                    const double Y,
                    const double Z);
 
-    const unsigned int m_rows;
-    const unsigned int m_cols;
+    const int m_rows;
+    const int m_cols;
 
+private:
     // Who triangulator is listening to
     Matcher* m_matcher;
     LaserController* m_laser;
 
-private:
     // Calibration matrices (camera0,camera1,laser)
     std::string m_pathCalib = "../calibration/calib.yaml";
     std::string m_pathCalibLaser = "../calibration/laserCalib.yaml";
@@ -67,12 +67,10 @@ private:
     std::ofstream m_recorder;
 
     // List of incoming filtered events for each camera (FIFO)
-    std::list<DAVIS240CEvent> m_evtQueue0;
-    std::list<DAVIS240CEvent> m_evtQueue1;
+    std::array<std::list<DAVIS240CEvent>,2> m_evtQueue;
 
     // Mutex to access the queue
-    std::mutex m_queueAccessMutex0;
-    std::mutex m_queueAccessMutex1;
+    std::array<std::mutex,2> m_queueAccessMutex;
     std::mutex m_mutex;
 
     // Wait when no processing has to be done
