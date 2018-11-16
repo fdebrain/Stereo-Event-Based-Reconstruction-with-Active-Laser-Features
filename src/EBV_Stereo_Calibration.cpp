@@ -134,3 +134,33 @@ const std::vector<cv::Point3f> StereoCalibrator::calculateWorldPoints()
 
     return points;
 }
+
+void StereoCalibrator::pointLaserToPixel(const int u, const int v, const uint id)
+{
+    // Detect current laser position in camera
+    //int u0 = m_filter[id]->getX();
+    //int v0 = m_filter[id]->getY();
+
+    //std::array<int,2> diff = {u-u0,v-v0};
+    //int mse = diff[0]*diff[0] + diff[1]*diff[1];
+
+    //printf("Current laser position (%d,%d). \n\r",u0,v0);
+    //printf("MSE: %d. \n\r",mse);
+
+//    while (mse>m_threshConverged)
+//    {
+//        u0 = m_filter[id]->getX();
+//        v0 = m_filter[id]->getY();
+
+//        diff[0] = u-u0;
+//        diff[1] = v-v0;
+//        mse = diff[0]*diff[0] + diff[1]*diff[1];
+
+//        int x = m_learningRate*diff[0];
+//        int y = m_learningRate*diff[1];
+//        m_laser->pos(x,y);
+
+//        printf("Laser commands: (%d,%d)",x,y);
+//    }
+    return;
+}

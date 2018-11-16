@@ -8,8 +8,6 @@
 #include <thread>
 #include <mutex>
 
-static const char* modesList[] = {"circle", "swipe"};
-
 class MagneticMirrorLaser;
 
 class LaserController
@@ -19,24 +17,16 @@ public:
     ~LaserController();
 
     void start();
+    void pos(int x, int y);
     void draw();
     void stop();
 
     // Getters and setters
     int getX() const { return m_x; }
-    void setX(const int x) { m_x= x; }
+    void setX(const int x) { m_x = x; this->pos(m_x,m_y);}
 
     int getY() const { return m_y; }
-    void setY(const int y) { m_y= y; }
-
-    int getCenterX() const { return m_cx; }
-    void setCenterX(const int cx) { m_cx= cx; }
-
-    int getCenterY() const { return m_cy; }
-    void setCenterY(const int cy) { m_cy = cy; }
-
-    int getRadius() const { return m_r; }
-    void setRadius(const int r) { m_r= r; }
+    void setY(const int y) { m_y = y; this->pos(m_x,m_y);}
 
     double getStep() const { return m_step; }
     void setStep(const double step) { m_step = step; }
@@ -46,6 +36,9 @@ public:
 
     bool getCalibrationMode() const { return m_calibrateLaser; }
     void setCalibrationMode(bool mode);
+
+    float getLearningRate() const { return m_learningRate; }
+    void setLearningRate(const float lr) { m_learningRate=lr; } ;
 
 public:
     std::thread m_thread;
@@ -64,12 +57,9 @@ private:
     int m_max_y;
     int m_freq;
     double m_step;
-    int m_cx;
-    int m_cy;
-    int m_r;
     int m_vx;
     int m_vy;
-
+    float m_learningRate;
 };
 
 #endif // EBV_LASERCONTROLLER_H

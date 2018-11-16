@@ -35,8 +35,8 @@ public:
     void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
-    inline float getX() const {return m_xc;}
-    inline float getY() const {return m_yc;}
+    int getX() const {return m_xc;}
+    int getY() const {return m_yc;}
 
     int getFreq() const {return m_frequency;}
     void setFreq(int freq) {m_frequency=freq;
@@ -85,7 +85,7 @@ private:
     int m_maxTimeToKeep;
 
     // Center of mass tracker
-    float m_xc, m_yc;
+    int m_xc, m_yc;
     float m_eta;
 
     // List of incoming raw events

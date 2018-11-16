@@ -110,14 +110,12 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
            )
         {
             // Center of mass tracker
-            //m_evtMutex.lock();
-                //m_xc = m_eta*m_xc + (1.f-m_eta)*x;
-                //m_yc = m_eta*m_yc + (1.f-m_eta)*y;
+            m_xc = m_eta*m_xc + (1.f-m_eta)*x;
+            m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
-                // We send CoG coordinates
-                //e.m_x = static_cast<unsigned int>(m_xc);
-                //e.m_y = static_cast<unsigned int>(m_yc);
-            //m_evtMutex.unlock();
+            // We send CoG coordinates
+            //e.m_x = static_cast<unsigned int>(m_xc);
+            //e.m_y = static_cast<unsigned int>(m_yc);
 
             //printf("Camera %d - Timestamp %d. \n\r",m_davis->m_id,e.m_timestamp);
             this->warnFilteredEvent(e);

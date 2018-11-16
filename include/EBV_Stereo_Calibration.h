@@ -28,6 +28,7 @@ public:
     void calibrateCameras(cv::Mat &frame, const uint id);
     void saveCalibration();
     const std::vector<cv::Point3f> calculateWorldPoints();
+    void pointLaserToPixel(const int u, const int v, const uint id);
 
     const cv::Size2i m_resolution{240,180};
     bool m_calibrateCameras{false};
@@ -45,7 +46,17 @@ public:
 
     // Stereo extrinsics
     cv::Mat_<double> m_R, m_T, m_E, m_F;
+
+    // Laser
+    int m_threshConverged{25};
+    float m_learningRate{0.1};
+
+    // Who listens to
+    std::array<Filter*,2> m_filter;
     Triangulator* m_triangulator;
+    LaserController* m_laser;
+
+    std::mutex          m_laserMutex;
 };
 
 #endif // EBV_STEREO_CALIBRATION_H

@@ -77,9 +77,9 @@ public:
     int        m_max_trackbar_val;
 
     // Trackbar parameters (laser)
-    int m_cx;
-    int m_cy;
-    int m_r;
+    int m_laserX;
+    int m_laserY;
+    int m_lrInt;
     int m_stepInt;
     int m_laserFreq;
 
@@ -109,6 +109,7 @@ public:
 
     // Filter object
     std::array<Filter*,2>             m_filter;
+    std::mutex                        m_laserMutex;
 
     // Triangulator (depth estimator)
     StereoCalibrator*    m_calibrator;

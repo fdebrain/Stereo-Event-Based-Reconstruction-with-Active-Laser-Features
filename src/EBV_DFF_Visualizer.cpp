@@ -51,22 +51,22 @@ static void callbackTrackbarEta(int newEta, void *data)
     filter->setEta(newEta/100.f);
 }
 
-static void callbackTrackbarLaserCenterX(int cx, void *data)
+static void callbackTrackbarLaserX(int x, void *data)
 {
     LaserController* laser = static_cast<LaserController*>(data);
-    laser->setCenterX(cx);
+    laser->setX(x);
 }
 
-static void callbackTrackbarLaserCenterY(int cy, void *data)
+static void callbackTrackbarLaserY(int y, void *data)
 {
     LaserController* laser = static_cast<LaserController*>(data);
-    laser->setCenterY(cy);
+    laser->setY(y);
 }
 
-static void callbackTrackbarLaserRadius(int r, void *data)
+static void callbackTrackbarLaserLearningRate(int lrInt, void *data)
 {
     LaserController* laser = static_cast<LaserController*>(data);
-    laser->setRadius(r);
+    laser->setLearningRate(lrInt/100.f);
 }
 
 static void callbackTrackbarLaserStep(int stepInt, void *data)
@@ -215,19 +215,19 @@ Visualizer::Visualizer(const uint nbCams,
         m_laser->start();
 
         // Initialize tuning parameters (laser)
-        m_cx = m_laser->getCenterX();
-        m_cy = m_laser->getCenterY();
-        m_r = m_laser->getRadius();
+        m_laserX = m_laser->getX();
+        m_laserY = m_laser->getY();
+        m_lrInt = static_cast<int>(100*m_laser->getLearningRate());
         m_stepInt = static_cast<int>(1./m_laser->getStep());
         m_laserFreq = m_laser->getFreq();
 
         // Laser trackbars
-        cv::createTrackbar("c_x",m_polWin[0],&m_cx,4096,
-                           &callbackTrackbarLaserCenterX,static_cast<void*>(m_laser));
-        cv::createTrackbar("c_y",m_polWin[0],&m_cy,4096,
-                           &callbackTrackbarLaserCenterY,static_cast<void*>(m_laser));
-        cv::createTrackbar("radius",m_polWin[0],&m_r,2048,
-                           &callbackTrackbarLaserRadius,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserX",m_polWin[0],&m_laserX,4000,
+                           &callbackTrackbarLaserX,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserY",m_polWin[0],&m_laserY,4000,
+                           &callbackTrackbarLaserY,static_cast<void*>(m_laser));
+        cv::createTrackbar("LearningRate",m_polWin[0],&m_lrInt,100,
+                           &callbackTrackbarLaserLearningRate,static_cast<void*>(m_laser));
         cv::createTrackbar("step",m_polWin[0],&m_stepInt,1000,
                            &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
         cv::createTrackbar("Laser frequency",m_polWin[0],&m_laserFreq,1000,
@@ -409,8 +409,8 @@ void Visualizer::run()
             // Display trackers
             if(m_filter[idx] != nullptr)
             {
-                int x = static_cast<int>(m_filter[idx]->getX());
-                int y = static_cast<int>(m_filter[idx]->getY());
+                int x = m_filter[idx]->getX();
+                int y = m_filter[idx]->getY();
                 cv::circle(filtMat[idx],cv::Point2i(y,x),
                            3,cv::Scalar(0,255,0));
 
@@ -432,7 +432,7 @@ void Visualizer::run()
         for (auto& v : ageMatHSV) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
 
         // Wait (in ms)
-        key = cv::waitKey(1);
+        key = cv::waitKey(10);
 
         // Reset depth map
         if (key=='r')
@@ -446,5 +446,45 @@ void Visualizer::run()
         {
             m_calibrator->m_calibrateCameras = true;
         }
+
+        if (key=='l')
+        {
+            // Detect current laser position in camera
+
+            int rgoal = 20;
+            int cgoal = 200;
+
+            int r = m_filter[0]->getX();
+            int c = m_filter[0]->getY();
+
+            std::array<int,2> diff = {rgoal-r,cgoal-c};
+            long mse = diff[0]*diff[0] + diff[1]*diff[1];
+
+            printf("Current laser position (%d,%d). \n\r",r,c);
+            printf("MSE: %ld. \n\r",mse);
+
+            for (int k=0; k<10;k++)
+            {
+                r = m_filter[0]->getX();
+                c = m_filter[0]->getY();
+
+                diff[0] = rgoal-r;
+                diff[1] = cgoal-c;
+                mse = diff[0]*diff[0] + diff[1]*diff[1];
+
+                int x = m_laser->getX() + m_laser->getLearningRate()*diff[0];
+                int y = m_laser->getY() + m_laser->getLearningRate()*diff[1];
+                m_laser->pos(x,y);
+                printf("Diff: (%d,%d). \n\r",diff[0],diff[1]);
+                printf("Laser commands: (%d,%d,%d). \n\r",x,y,mse);
+            }
+            //m_calibrator->pointLaserToPixel(300,300,0);
+
+            r = m_filter[0]->getX();
+            c = m_filter[0]->getY();
+            printf("Current laser position (%d,%d). \n\r",r,c);
+
+        }
+
     }
 }
