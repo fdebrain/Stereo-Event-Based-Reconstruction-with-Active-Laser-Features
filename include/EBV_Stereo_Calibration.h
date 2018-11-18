@@ -22,11 +22,15 @@ public:
 class StereoCalibrator
 {
 public:
-    StereoCalibrator(Triangulator* triangulator=nullptr);
+    StereoCalibrator(Filter* filter0=nullptr,
+                     Filter* filter1=nullptr,
+                     Triangulator* triangulator=nullptr);
     ~StereoCalibrator();
 
-    void calibrateCameras(cv::Mat &frame, const uint id);
-    void saveCalibration();
+    void calibrateCameras(cv::Mat& frame, const uint id);
+    void calibrateLaser(cv::Mat& frame, const uint id);
+    void saveCamerasCalibration();
+    void saveLaserCalibration();
     const std::vector<cv::Point3f> calculateWorldPoints();
     void pointLaserToPixel(const int u, const int v, const uint id);
 
@@ -42,6 +46,7 @@ public:
     std::array<std::chrono::high_resolution_clock::time_point,2> m_last_frame_captured;
     std::vector<std::vector<cv::Point3d>> m_intrinsic_calib_world_points;
     std::array<std::vector<std::vector<cv::Point2f>>, 2> m_intrinsic_calib_image_points;
+    std::array<std::vector<std::vector<cv::Point2f>>, 2> m_intrinsic_calib_laser_points;
     std::array<IntrinsicsData,2> m_camera_intrinsics;
 
     // Stereo extrinsics

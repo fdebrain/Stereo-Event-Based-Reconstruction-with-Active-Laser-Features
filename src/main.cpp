@@ -18,7 +18,9 @@ int main(int argc, char** argv)
     LaserController laser;
     Triangulator triangulator(&matcher,
                               &laser);
-    StereoCalibrator calibrator(&triangulator);
+    StereoCalibrator calibrator(&filter0,
+                                &filter1,
+                                &triangulator);
     Visualizer   visu(davis_master.m_nbCams,
                       &davis_master, &davis_slave,
                       &filter0, &filter1,

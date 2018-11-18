@@ -34,7 +34,7 @@ Filter::~Filter()
 
 // Associated to DAVIS event thread
 void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                       const unsigned int id)
+                                       const uint id)
 {
     // QUESTION: Since event is passed by reference and method is also called in visu,
     // should we care about thread-safety ? e is accessed by multiple thread
@@ -114,8 +114,8 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
             m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
             // We send CoG coordinates
-            //e.m_x = static_cast<unsigned int>(m_xc);
-            //e.m_y = static_cast<unsigned int>(m_yc);
+            //e.m_x = static_cast<uint>(m_xc);
+            //e.m_y = static_cast<uint>(m_yc);
 
             //printf("Camera %d - Timestamp %d. \n\r",m_davis->m_id,e.m_timestamp);
             this->warnFilteredEvent(e);

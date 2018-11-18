@@ -15,7 +15,7 @@ class FilterListener
 public:
     FilterListener(void) {}
     virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,
-                                        const unsigned int id) = 0;
+                                        const uint id) = 0;
 };
 
 class Filter : public DAVIS240CEventListener

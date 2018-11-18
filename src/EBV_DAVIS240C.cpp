@@ -198,7 +198,7 @@ void DAVIS240C::readThread()
                 {
                     for (int col = 0; col < frameEvent.getLengthX(); col++)
                     {
-                        f.m_frame[row*m_cols + col] = static_cast<unsigned char>(255.*frameEvent.getPixel(col, row)/65535.);
+                        f.m_frame[row*m_cols + col] = static_cast<uchar>(255.*frameEvent.getPixel(col, row)/65535.);
                     }
                 }
 

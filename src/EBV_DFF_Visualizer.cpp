@@ -449,41 +449,40 @@ void Visualizer::run()
 
         if (key=='l')
         {
+            m_calibrator->pointLaserToPixel(300,300,0);
             // Detect current laser position in camera
+//            int rgoal = 20;
+//            int cgoal = 200;
 
-            int rgoal = 20;
-            int cgoal = 200;
+//            int r = m_filter[0]->getX();
+//            int c = m_filter[0]->getY();
 
-            int r = m_filter[0]->getX();
-            int c = m_filter[0]->getY();
+//            std::array<int,2> diff = {rgoal-r,cgoal-c};
+//            long mse = diff[0]*diff[0] + diff[1]*diff[1];
 
-            std::array<int,2> diff = {rgoal-r,cgoal-c};
-            long mse = diff[0]*diff[0] + diff[1]*diff[1];
+//            printf("Current laser position (%d,%d). \n\r",r,c);
+//            printf("MSE: %ld. \n\r",mse);
 
-            printf("Current laser position (%d,%d). \n\r",r,c);
-            printf("MSE: %ld. \n\r",mse);
+//            for (int k=0; k<10;k++)
+//            {
+//                r = m_filter[0]->getX();
+//                c = m_filter[0]->getY();
 
-            for (int k=0; k<10;k++)
-            {
-                r = m_filter[0]->getX();
-                c = m_filter[0]->getY();
+//                diff[0] = rgoal-r;
+//                diff[1] = cgoal-c;
+//                mse = diff[0]*diff[0] + diff[1]*diff[1];
 
-                diff[0] = rgoal-r;
-                diff[1] = cgoal-c;
-                mse = diff[0]*diff[0] + diff[1]*diff[1];
+//                int x = m_laser->getX() + m_laser->getLearningRate()*diff[0];
+//                int y = m_laser->getY() + m_laser->getLearningRate()*diff[1];
+//                m_laser->pos(x,y);
+//                printf("Diff: (%d,%d). \n\r",diff[0],diff[1]);
+//                printf("Laser commands: (%d,%d,%d). \n\r",x,y,mse);
+//            }
+//            //m_calibrator->pointLaserToPixel(300,300,0);
 
-                int x = m_laser->getX() + m_laser->getLearningRate()*diff[0];
-                int y = m_laser->getY() + m_laser->getLearningRate()*diff[1];
-                m_laser->pos(x,y);
-                printf("Diff: (%d,%d). \n\r",diff[0],diff[1]);
-                printf("Laser commands: (%d,%d,%d). \n\r",x,y,mse);
-            }
-            //m_calibrator->pointLaserToPixel(300,300,0);
-
-            r = m_filter[0]->getX();
-            c = m_filter[0]->getY();
-            printf("Current laser position (%d,%d). \n\r",r,c);
-
+//            r = m_filter[0]->getX();
+//            c = m_filter[0]->getY();
+//            printf("Current laser position (%d,%d). \n\r",r,c);
         }
 
     }
