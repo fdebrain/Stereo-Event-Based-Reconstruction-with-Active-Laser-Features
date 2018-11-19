@@ -6,8 +6,8 @@ Matcher::Matcher(Filter* filter0,
       m_filter0(filter0), m_filter1(filter1)
 {
     // Matching parameters
-    m_eps = 1e4;
-    m_maxTimeToKeep = 1e4; // Keep 10ms buffer in each filtered events queue
+    m_eps = 10e3;
+    m_maxTimeToKeep = 10e3; // Keep 10ms buffer in each filtered events queue
 
     // Initialize filters listeners
     m_filter0->registerFilterListener(this);

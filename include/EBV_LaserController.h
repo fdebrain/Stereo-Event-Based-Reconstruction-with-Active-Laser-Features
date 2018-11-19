@@ -27,8 +27,11 @@ public:
     int getY() const { return m_y; }
     void setY(const int y) { m_y = y; this->setPos(m_x,m_y);}
 
-    double getStep() const { return m_step; }
-    void setStep(const double step) { m_step = step; }
+    int getVx() const { return m_vx; }
+    void setVx(const int vx) { m_vx = vx; this->setVel(m_vx,m_vy);}
+
+    int getVy() const { return m_vy; }
+    void setVy(const int vy) { m_vy = vy; this->setVel(m_vx,m_vy);}
 
     int getFreq() const { return m_freq; }
     void setFreq(const int freq);
@@ -36,10 +39,8 @@ public:
     bool getCalibrationMode() const { return m_calibrateLaser; }
     void setCalibrationMode(bool mode);
 
-    float getLearningRate() const { return m_learningRate; }
-    void setLearningRate(const float lr) { m_learningRate=lr; } ;
-
     void setPos(const int x, const int y);
+    void setVel(const int vx, const int vy);
 
 public:
     std::thread m_thread;
@@ -50,6 +51,7 @@ public:
     int m_y;
     bool m_calibrateLaser;
     bool m_laser_on;
+    bool m_laser_swipe;
 
 private:
     MagneticMirrorLaser* m_laser;
@@ -61,7 +63,6 @@ private:
     double m_step;
     int m_vx;
     int m_vy;
-    float m_learningRate;
 };
 
 #endif // EBV_LASERCONTROLLER_H

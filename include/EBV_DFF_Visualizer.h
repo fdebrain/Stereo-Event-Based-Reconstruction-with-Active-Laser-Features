@@ -56,7 +56,7 @@ public:
     const uint         m_nbCams;
 
     // Parameters related to filtering events above threshold age
-    std::array<int,2>           m_currenTime;
+    std::array<int,2>           m_currenTime{};
 
     // Structures for data storing
     std::array<std::vector<bool>,2>    m_polEvts;
@@ -66,37 +66,41 @@ public:
     std::vector<double>                m_depthMap;
 
     // Display window related variables
-    std::array<std::string,2>   m_polWin;
-    std::array<std::string,2>   m_ageWin;
-    std::array<std::string,2>   m_frameWin;
-    std::array<std::string,2>   m_filtWin;
-    std::string                 m_depthWin;
+    std::array<std::string,2>   m_polWin{};
+    std::array<std::string,2>   m_ageWin{};
+    std::array<std::string,2>   m_frameWin{};
+    std::array<std::string,2>   m_filtWin{};
+    std::string                 m_depthWin{};
 
     // Trackbar parameters (events age)
-    int        m_ageThresh;
-    int        m_max_trackbar_val;
+    int        m_ageThresh{};
+    int        m_max_trackbar_val{};
 
     // Trackbar parameters (laser)
-    int m_laserX;
-    int m_laserY;
-    int m_lrInt;
-    int m_stepInt;
-    int m_laserFreq;
+    int m_laserX{};
+    int m_laserY{};
+    int m_laserVx{};
+    int m_laserVy{};
+    int m_lrInt{};
+    int m_stepInt{};
+    int m_laserFreq{};
 
     // Trackbar parameters (filter)
-    std::array<int,2> m_freq;
-    std::array<int,2> m_eps;
-    std::array<int,2> m_neighborSize;
-    std::array<int,2> m_threshA;
-    std::array<int,2> m_threshB;
-    std::array<int,2> m_threshAnti;
-    std::array<int,2> m_etaInt;
+    std::array<int,2> m_filter_freq{};
+    std::array<int,2> m_filter_eps{};
+    std::array<int,2> m_filter_neighborSize{};
+    std::array<int,2> m_filter_threshA{};
+    std::array<int,2> m_filter_threshB{};
+    std::array<int,2> m_filter_threshAnti{};
+    std::array<int,2> m_filter_etaInt{};
+    std::array<int,2> m_filter_sigma{};
+    std::array<int,2> m_filter_max_t{};
 
     // Trackbar parameters (depth in c,)
-    int        m_min_depth;
-    int        m_max_depth;
-    int        m_matcherEps;
-    int        m_matcherMaxBuffer;
+    int        m_min_depth{};
+    int        m_max_depth{};
+    int        m_matcherEps{};
+    int        m_matcherMaxBuffer{};
 
     // Event recorder
     std::ofstream m_recorder;

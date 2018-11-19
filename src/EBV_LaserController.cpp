@@ -1,17 +1,16 @@
 #include <EBV_LaserController.h>
 #include <EBV_MagneticMirrorLaser.h>
 
-LaserController::LaserController()//Triangulator* triangulator)
+LaserController::LaserController()
     : m_laser{new MagneticMirrorLaser},
-      m_freq(500), // Fix the offset
-      m_step(50),
-      m_vx(1.5e4),
-      m_vy(4e5),
-      m_min_x(1000),
-      m_min_y(500),
-      m_max_x(3000),
-      m_max_y(3000),
-      m_learningRate(0.1),
+      m_freq(600), // Fix the offset
+      m_vx(1e4), //(1.5e4),
+      m_vy(3e5), //(4e5),
+      m_step(100),
+      m_min_x(500),
+      m_min_y(0),
+      m_max_x(3500),
+      m_max_y(4000),
       m_calibrateLaser(false),
       m_laser_on(false)
 { 
@@ -20,6 +19,13 @@ LaserController::LaserController()//Triangulator* triangulator)
     m_x = m_min_x;
     m_y = m_min_y;
     m_laser->pos(m_x,m_y);
+
+    //if (m_calibrateLaser==false) { this->draw(); }
+    if (m_calibrateLaser)
+    {
+        this->start();
+        m_thread = std::thread(&LaserController::draw,this);
+    }
 }
 
 LaserController::~LaserController()
@@ -39,9 +45,7 @@ void LaserController::start()
 {
     m_laser_on = true;
     m_laser->toggle(1);
-    m_laser->blink(static_cast<uint>(1e6/static_cast<double>(2*m_freq)));
-    this->draw();
-    //m_thread = std::thread(&LaserController::draw,this);
+    this->setFreq(m_freq);
 }
 
 void LaserController::stop()
@@ -55,8 +59,29 @@ void LaserController::setPos(const int x, const int y)
 {
     m_x = x;
     m_y = y;
-    m_laser->pos(x,y);
+
+    // Boundaries check
+    if (m_x<m_min_x) { m_x = m_min_x; }
+    if (m_x>m_max_x) { m_x = m_max_x; }
+    if (m_y<m_min_y) { m_y = m_min_y; }
+    if (m_y>m_max_y) { m_y = m_max_y; }
+
+    // Move to target
+    m_laser->pos(m_x,m_y);
+
+    // Wait for laser to reach target
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
+
+
+void LaserController::setVel(const int vx, const int vy)
+{
+    m_vx = vx;
+    m_vy = vy;
+
+    m_laser->vel(m_vx,m_vy);
+}
+
 
 void LaserController::draw()
 {
@@ -87,8 +112,16 @@ void LaserController::draw()
     }
     */
     /*
+
     while(true)
     {
+        m_y += m_step;
+        this->setPos(m_x,m_y);
+        if (m_y>=m_max_y) { m_y = m_min_y; m_x += 2*m_step; }
+        if (m_x>m_max_x) { m_x = m_min_x; }
+        std::this_thread::sleep_for (std::chrono::milliseconds(10));
+
+/*
         while(m_y<m_max_y)
         {
             m_y += m_step;
@@ -116,6 +149,7 @@ void LaserController::draw()
             m_laser->pos(m_x,m_y);
             std::this_thread::sleep_for (std::chrono::milliseconds(10));
         }
+    }
     }
     */
     m_laser->vel(m_vx,m_vy);

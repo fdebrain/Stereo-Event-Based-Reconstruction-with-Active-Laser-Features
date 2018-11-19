@@ -51,7 +51,7 @@ public:
 
 private:
     // Calibration matrices (camera0,camera1,laser)
-    std::string m_pathCalib = "../calibration/calib.yaml";
+    std::string m_pathCalib = "../calibration/calibCameras.yaml";
     std::string m_pathCalibLaser = "../calibration/laserCalib.yaml";
     std::array<cv::Mat, 3> m_K;
     std::array<cv::Mat, 3> m_D;

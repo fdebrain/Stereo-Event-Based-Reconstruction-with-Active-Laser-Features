@@ -12,13 +12,14 @@ int main(int argc, char** argv)
     DAVIS240C    davis_master;
     DAVIS240C    davis_slave;
 
-    Filter       filter0(&davis_master);
-    Filter       filter1(&davis_slave);
+    AdaptiveFilter       filter0(&davis_master);
+    AdaptiveFilter       filter1(&davis_slave);
     Matcher      matcher(&filter0,&filter1);
     LaserController laser;
     Triangulator triangulator(&matcher,
                               &laser);
-    StereoCalibrator calibrator(&filter0,
+    StereoCalibrator calibrator(&laser,
+                                &filter0,
                                 &filter1,
                                 &triangulator);
     Visualizer   visu(davis_master.m_nbCams,

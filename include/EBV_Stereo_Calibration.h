@@ -22,7 +22,8 @@ public:
 class StereoCalibrator
 {
 public:
-    StereoCalibrator(Filter* filter0=nullptr,
+    StereoCalibrator(LaserController* laser=nullptr,
+                     Filter* filter0=nullptr,
                      Filter* filter1=nullptr,
                      Triangulator* triangulator=nullptr);
     ~StereoCalibrator();
@@ -30,13 +31,18 @@ public:
     void calibrateCameras(cv::Mat& frame, const uint id);
     void calibrateLaser(cv::Mat& frame, const uint id);
     void saveCamerasCalibration();
-    void saveLaserCalibration();
+    void saveLaserCalibration(const int id);
     const std::vector<cv::Point3f> calculateWorldPoints();
     void pointLaserToPixel(const int u, const int v, const uint id);
 
+    float getLearningRate() const { return m_learningRate; }
+    void setLearningRate(const float lr) { m_learningRate=lr; }
+
     const cv::Size2i m_resolution{240,180};
-    bool m_calibrateCameras{false};
-    std::string m_pathCalib = "../calibration/calib2.yaml";
+    bool m_calibrate_cameras{false};
+    bool m_calibrate_laser{false};
+    std::string m_path_calib_cam = "../calibration/calibCameras.yaml";
+    std::string m_path_calib_laser = "../calibration/calibLaser.yaml";
 
     // Intrinsics
     const cv::Point2i m_pattern_size{8, 5};
@@ -47,14 +53,14 @@ public:
     std::vector<std::vector<cv::Point3d>> m_intrinsic_calib_world_points;
     std::array<std::vector<std::vector<cv::Point2f>>, 2> m_intrinsic_calib_image_points;
     std::array<std::vector<std::vector<cv::Point2f>>, 2> m_intrinsic_calib_laser_points;
-    std::array<IntrinsicsData,2> m_camera_intrinsics;
+    std::array<IntrinsicsData,3> m_camera_intrinsics;
 
     // Stereo extrinsics
     cv::Mat_<double> m_R, m_T, m_E, m_F;
 
     // Laser
-    int m_threshConverged{25};
-    float m_learningRate{0.1};
+    int m_threshConverged{2};
+    float m_learningRate;
 
     // Who listens to
     std::array<Filter*,2> m_filter;

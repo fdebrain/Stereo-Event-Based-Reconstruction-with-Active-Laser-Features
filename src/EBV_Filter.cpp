@@ -6,34 +6,66 @@
 #include <opencv2/opencv.hpp>
 
 Filter::Filter(DAVIS240C* davis)
-    : m_rows(180),
+    : m_davis(davis),
+      m_rows(180),
       m_cols(240),
-      m_davis(davis),
-      m_frequency(530),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_frequency(630),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
       m_targetPeriod(1e6/m_frequency),
-      m_eps(10),            // In percent of period T
+      m_eps(10), // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
-      m_neighborSize(3),    //3; //2;
-      m_threshSupportsA(2), //5; //3;
-      m_threshSupportsB(2), //10;  //3;
-      m_threshAntiSupports(20),//5; //2;
-      m_maxTimeToKeep(2*m_targetPeriod), //When to flush old events = 10ms
+      m_max_t(2*m_targetPeriod), //When to flush old events = 10ms
       m_xc(0.0f),
       m_yc(0.0f),
       m_eta(0.01f)
 {
-    // Listen to Davis
-    m_events.resize(m_rows*m_cols);
-    m_davis->registerEventListener(this);
 }
 
 Filter::~Filter()
 {
-    m_davis->deregisterEventListener(this);
+}
+
+void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                       const uint id)
+{
+    printf("Filter Event! \n\r");
+}
+
+void Filter::registerFilterListener(FilterListener* listener)
+{
+    m_filteredEventListeners.push_back(listener);
+}
+
+void Filter::deregisterFilterListener(FilterListener* listener)
+{
+    m_filteredEventListeners.remove(listener);
+}
+
+void Filter::warnFilteredEvent(DAVIS240CEvent& filtEvent)
+{
+    std::list<FilterListener*>::iterator it;
+    for(it = m_filteredEventListeners.begin(); it!=m_filteredEventListeners.end(); it++)
+    {
+        (*it)->receivedNewFilterEvent(filtEvent,m_davis->m_id);
+    }
+}
+
+// BASE FILTER
+BaseFilter::BaseFilter(DAVIS240C* davis)
+    : Filter(davis),
+      m_neighborSize(3),    //3; //2;
+      m_threshSupportsA(2), //5; //3;
+      m_threshSupportsB(2), //10;  //3;
+      m_threshAntiSupports(20)//5; //2;
+{
+    // Initialize datastructures
+    m_events.resize(m_rows*m_cols);
+
+    // Listen to Davis
+    m_davis->registerEventListener(this);
 }
 
 // Associated to DAVIS event thread
-void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                        const uint id)
 {
     // QUESTION: Since event is passed by reference and method is also called in visu,
@@ -41,7 +73,7 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const bool p = e.m_pol;
-    m_currTime = e.m_timestamp;
+    m_current_t= e.m_timestamp;
 
     // Neighbor bounding box
     const int xMin = std::max(0,x-m_neighborSize);
@@ -68,13 +100,13 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                 for(auto it = neighborList->rbegin(); it!=neighborList->rend(); it++)
                 {
                     // Remove old events from the list
-                    if ((m_currTime-*it) > m_maxTimeToKeep )
+                    if ((m_current_t-*it) > m_max_t )
                     {
                         neighborList->erase(neighborList->begin(),it.base());
                         break;
                     }
 
-                    int dt = (m_currTime - *it);
+                    int dt = (m_current_t- *it);
                     //printf("Delta: %d. \n\r",dt);
 
                     // Check if support event of type A: neighbor events with p=0 and t in [m_currTime-eps;m_currTime+eps]
@@ -131,48 +163,19 @@ void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     }
 }
 
-void Filter::registerFilterListener(FilterListener* listener)
-{
-    m_filteredEventListeners.push_back(listener);
-}
-
-void Filter::deregisterFilterListener(FilterListener* listener)
-{
-    m_filteredEventListeners.remove(listener);
-}
-
-void Filter::warnFilteredEvent(DAVIS240CEvent& filtEvent)
-{
-    std::list<FilterListener*>::iterator it;
-    for(it = m_filteredEventListeners.begin(); it!=m_filteredEventListeners.end(); it++)
-    {
-        (*it)->receivedNewFilterEvent(filtEvent,m_davis->m_id);
-    }
-}
-
 
 // ADAPTIVE FILTER
-
 AdaptiveFilter::AdaptiveFilter(DAVIS240C* davis)
-    : m_davis(davis),
-      m_rows(180),
-      m_cols(240),
-      m_frequency(530),
-      m_eps(0.1*m_frequency),
-      m_sigma(30),
-      m_max_t(10e3) // 10ms
+      : Filter(davis),
+        m_sigma(60)
 {
+    // Initialize datastructures
     m_last_event.resize(m_rows*m_cols);
     m_last_transitions.resize(m_rows*m_cols);
-    m_last_filtered_events.resize(0);
+    m_last_filtered_events.resize(0); // Optimization: estimate max size
 
     // Listen to Davis
     m_davis->registerEventListener(this);
-}
-
-AdaptiveFilter::~AdaptiveFilter()
-{
-    m_davis->deregisterEventListener(this);
 }
 
 // Associated to DAVIS event thread
@@ -197,11 +200,11 @@ void AdaptiveFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
         if (last_p!=p)
         {
             type = (p>last_p?1:0);
-        }
 
-        // Send transition (QUESTION: MAKE A COPY OR BY REF)
-        DAVIS240CEvent e(x,y,p,t);
-        receivedNewTransition(e,type);
+            // Send event if transition (QUESTION: MAKE A COPY OR BY REF)
+            DAVIS240CEvent e(x,y,p,t);
+            receivedNewTransition(e,type);
+        }
     }
 
     // Update last events matrix
@@ -245,21 +248,27 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
 
     // Compare with reference frequency
     const int freq = int(1e6f/float(dt));
-    if (std::abs(m_frequency-freq)<m_eps)
+
+    if (std::abs(m_frequency-freq)<m_sigma)
     {
         // Compute probability (gaussian)
-        const float prob = std::exp( (freq-m_frequency)*(freq-m_frequency)
-                                     /(2*m_sigma*m_sigma))
-                                     /(m_sigma*std::sqrt(2*m_pi));
+        const double prob = std::exp( -(freq-m_frequency)*(freq-m_frequency)
+                                     /(2.*m_sigma*m_sigma));
+        //printf("Freq: %d - Prob: %f. \n\r", freq, prob);
 
-        if (prob>0.5f)
+        if (prob>0.1f)
         {
             // Send filtered event
             DAVIS240CEvent e(x,y,p,t);
             warnFilteredEvent(e);
 
+            // Center of mass tracker
+            m_xc = m_eta*m_xc + (1.f-m_eta)*x;
+            m_yc = m_eta*m_yc + (1.f-m_eta)*y;
+
             // Save last filtered event in list
-            m_last_filtered_events.push_back(e);
+            //m_last_filtered_events.push_back(e);
+            m_last_filtered_events.emplace_back(x,y,p,t);
 
             // Remove old filtered events
             auto it = m_last_filtered_events.begin();
@@ -269,26 +278,6 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
             {
                 m_last_filtered_events.erase(it++);
             }
-
         }
-    }
-}
-
-void AdaptiveFilter::registerFilterListener(FilterListener* listener)
-{
-    m_filter_listeners.push_back(listener);
-}
-
-void AdaptiveFilter::deregisterFilterListener(FilterListener* listener)
-{
-    m_filter_listeners.remove(listener);
-}
-
-void AdaptiveFilter::warnFilteredEvent(DAVIS240CEvent& filtEvent)
-{
-    std::list<FilterListener*>::iterator it;
-    for(it = m_filter_listeners.begin(); it!=m_filter_listeners.end(); it++)
-    {
-        (*it)->receivedNewFilterEvent(filtEvent,m_davis->m_id);
     }
 }
