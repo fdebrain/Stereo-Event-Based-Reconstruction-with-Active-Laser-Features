@@ -103,4 +103,41 @@ private:
     std::mutex m_condWaitMutex;
 };
 
+class AdaptiveFilter : public DAVIS240CEventListener
+{
+public:
+    AdaptiveFilter(DAVIS240C* davis = nullptr);
+    ~AdaptiveFilter();
+
+    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                   const unsigned int id) override;
+    void receivedNewTransition(DAVIS240CEvent& e, const bool transition);
+    void receivedNewHyperTransition(DAVIS240CEvent& e, const int dt);
+
+    void registerFilterListener(FilterListener* listener);
+    void deregisterFilterListener(FilterListener* listener);
+    void warnFilteredEvent(DAVIS240CEvent& event);
+
+private:
+    // Who filter listens to
+    DAVIS240C* m_davis;
+
+    const int m_rows;
+    const int m_cols;
+    int m_frequency;
+    int m_eps;
+    int m_sigma;
+    const float m_pi{3.14159f};
+    int m_current_t;
+    int m_max_t;
+
+    // Data structure matrix of list of events
+    std::vector<std::pair<bool,int>> m_last_event;
+    std::vector<std::array<int,2>> m_last_transitions;
+    std::vector<DAVIS240CEvent> m_last_filtered_events;
+
+    // List of filter listeners
+    std::list<FilterListener*> m_filter_listeners;
+};
+
 #endif // EBV_FILTER_H
