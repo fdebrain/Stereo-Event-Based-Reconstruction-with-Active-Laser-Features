@@ -248,7 +248,7 @@ void StereoCalibrator::pointLaserToPixel(const int rGoal, const int cGoal, const
 
         int x = m_laser->getX() + m_laser->getLearningRate()*diff[0];
         int y = m_laser->getY() + m_laser->getLearningRate()*diff[1];
-        m_laser->pos(x,y);
+        m_laser->setPos(x,y);
         printf("Diff: (%d,%d). \n\r",diff[0],diff[1]);
         printf("Laser commands: (%d,%d,%d). \n\r",x,y,mse);
     }

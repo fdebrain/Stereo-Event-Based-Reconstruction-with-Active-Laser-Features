@@ -212,7 +212,7 @@ Visualizer::Visualizer(const uint nbCams,
     // Initialize laser
     if (m_laser!=nullptr)
     {
-        m_laser->start();
+        //m_laser->start();
 
         // Initialize tuning parameters (laser)
         m_laserX = m_laser->getX();
@@ -483,6 +483,21 @@ void Visualizer::run()
 //            r = m_filter[0]->getX();
 //            c = m_filter[0]->getY();
 //            printf("Current laser position (%d,%d). \n\r",r,c);
+        }
+
+        // Laser on
+        if (key=='o')
+        {
+            if (m_laser->m_laser_on==false)
+            {
+                printf("Laser on. \n\r");
+                m_laser->start();
+            }
+            else
+            {
+                printf("Laser off. \n\r");
+                m_laser->stop();
+            }
         }
 
     }

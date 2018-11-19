@@ -12,16 +12,14 @@ LaserController::LaserController()//Triangulator* triangulator)
       m_max_x(3000),
       m_max_y(3000),
       m_learningRate(0.1),
-      m_calibrateLaser(false)
+      m_calibrateLaser(false),
+      m_laser_on(false)
 { 
     // Initialize laser
     m_laser->init("/dev/ttyUSB0");
-    m_laser->toggle(1);
     m_x = m_min_x;
     m_y = m_min_y;
     m_laser->pos(m_x,m_y);
-    m_laser->blink(static_cast<uint>(1e6/static_cast<double>(2*m_freq)));
-
 }
 
 LaserController::~LaserController()
@@ -39,16 +37,21 @@ void LaserController::setFreq(const int freq)
 
 void LaserController::start()
 {
-    m_thread = std::thread(&LaserController::draw,this);
+    m_laser_on = true;
+    m_laser->toggle(1);
+    m_laser->blink(static_cast<uint>(1e6/static_cast<double>(2*m_freq)));
+    this->draw();
+    //m_thread = std::thread(&LaserController::draw,this);
 }
 
 void LaserController::stop()
 {
+    m_laser_on = false;
     m_laser->toggle(0);
     m_laser->vel(0,0);
 }
 
-void LaserController::pos(int x, int y)
+void LaserController::setPos(const int x, const int y)
 {
     m_x = x;
     m_y = y;

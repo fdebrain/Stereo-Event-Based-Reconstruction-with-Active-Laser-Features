@@ -17,16 +17,15 @@ public:
     ~LaserController();
 
     void start();
-    void pos(int x, int y);
     void draw();
     void stop();
 
     // Getters and setters
     int getX() const { return m_x; }
-    void setX(const int x) { m_x = x; this->pos(m_x,m_y);}
+    void setX(const int x) { m_x = x; this->setPos(m_x,m_y);}
 
     int getY() const { return m_y; }
-    void setY(const int y) { m_y = y; this->pos(m_x,m_y);}
+    void setY(const int y) { m_y = y; this->setPos(m_x,m_y);}
 
     double getStep() const { return m_step; }
     void setStep(const double step) { m_step = step; }
@@ -40,6 +39,8 @@ public:
     float getLearningRate() const { return m_learningRate; }
     void setLearningRate(const float lr) { m_learningRate=lr; } ;
 
+    void setPos(const int x, const int y);
+
 public:
     std::thread m_thread;
     std::string m_mode;
@@ -48,6 +49,7 @@ public:
     int m_x;
     int m_y;
     bool m_calibrateLaser;
+    bool m_laser_on;
 
 private:
     MagneticMirrorLaser* m_laser;
