@@ -26,10 +26,10 @@ public:
           m_timestamp(0)
     {}
 
-    DAVIS240CEvent(const int x,
-                   const int y,
-                   const bool pol,
-                   const int timestamp)
+    DAVIS240CEvent(int x,
+                   int y,
+                   bool pol,
+                   int timestamp)
         : m_x(x),
           m_y(y),
           m_pol(pol),
@@ -45,16 +45,15 @@ public:
 struct DAVIS240CFrame
 {
 public:
-    DAVIS240CFrame(): m_frame(0), m_timestamp(0)
+    DAVIS240CFrame(): m_frame(240*180), m_timestamp(0)
     {
-        m_frame.resize(240*180);
     }
 
-    DAVIS240CFrame(const cv::Mat frame,
+    DAVIS240CFrame(const std::vector<uchar> frame,
                    const int timestamp)
         : m_frame(frame), m_timestamp(timestamp)
     {
-        m_frame.resize(240*180);
+        //m_frame.resize(240*180);
     }
 
      std::vector<uchar> m_frame;

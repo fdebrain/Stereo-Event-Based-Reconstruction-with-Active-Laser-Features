@@ -21,11 +21,11 @@ LaserController::LaserController()
     m_laser->pos(m_x,m_y);
 
     //if (m_calibrateLaser==false) { this->draw(); }
-    if (m_calibrateLaser)
-    {
-        this->start();
-        m_thread = std::thread(&LaserController::draw,this);
-    }
+//    if (m_calibrateLaser)
+//    {
+//        this->start();
+//        m_thread = std::thread(&LaserController::draw,this);
+//    }
 }
 
 LaserController::~LaserController()
@@ -46,6 +46,13 @@ void LaserController::start()
     m_laser_on = true;
     m_laser->toggle(1);
     this->setFreq(m_freq);
+}
+
+void LaserController::startSwipe()
+{
+    this->start();
+    this->draw();
+    m_thread = std::thread(&LaserController::draw,this);
 }
 
 void LaserController::stop()
@@ -85,72 +92,73 @@ void LaserController::setVel(const int vx, const int vy)
 
 void LaserController::draw()
 {
-    /*
-    double t = 0.0;
-    uint x=0, y=0;
 
-    while(true)
-    {
-        if (m_mode=="circle")
-        {
-            t += m_step;
-            x = static_cast<uint>(m_cx + m_r*cos(2.*3.14*t));
-            y = static_cast<uint>(m_cy + m_r*sin(2.*3.14*t));
-            m_laser->pos(x,y);
-            if (t>1.0) { t = 0.0; }
+//    double t = 0.0;
+//    uint x=0, y=0;
 
-            std::this_thread::sleep_for (std::chrono::milliseconds(1));
-        }
-        else
-        {
-            y += 10;
-            m_laser->pos(x,y);
-            if (y>=m_max_y) { y = 0; x += 100; }
-            if (x>m_max_x) { x = 0; }
-            std::this_thread::sleep_for (std::chrono::microseconds(500));
-        }
-    }
-    */
-    /*
+//    while(true)
+//    {
+//        if (m_mode=="circle")
+//        {
+//            t += m_step;
+//            x = static_cast<uint>(m_cx + m_r*cos(2.*3.14*t));
+//            y = static_cast<uint>(m_cy + m_r*sin(2.*3.14*t));
+//            m_laser->pos(x,y);
+//            if (t>1.0) { t = 0.0; }
 
-    while(true)
-    {
-        m_y += m_step;
-        this->setPos(m_x,m_y);
-        if (m_y>=m_max_y) { m_y = m_min_y; m_x += 2*m_step; }
-        if (m_x>m_max_x) { m_x = m_min_x; }
-        std::this_thread::sleep_for (std::chrono::milliseconds(10));
+//            std::this_thread::sleep_for (std::chrono::milliseconds(1));
+//        }
+//        else
+//        {
+//            y += 10;
+//            m_laser->pos(x,y);
+//            if (y>=m_max_y) { y = 0; x += 100; }
+//            if (x>m_max_x) { x = 0; }
+//            std::this_thread::sleep_for (std::chrono::microseconds(500));
+//        }
+//    }
 
-/*
-        while(m_y<m_max_y)
-        {
-            m_y += m_step;
-            m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-        }
+    // Normal swipe
+//    while(true)
+//    {
+//        m_y += m_step;
+//        this->setPos(m_x,m_y);
+//        if (m_y>=m_max_y) { m_y = m_min_y; m_x += 2*m_step; }
+//        if (m_x>m_max_x) { m_x = m_min_x; }
+//        std::this_thread::sleep_for (std::chrono::milliseconds(10));
+//    }
 
-        while(m_x<m_max_x)
-        {
-            m_x += m_step;
-            m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-        }
+    // Draw rectangle
+//    while(true)
+//    {
+//        while(m_y<m_max_y)
+//        {
+//            m_y += m_step;
+//            m_laser->pos(m_x,m_y);
+//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+//        }
 
-        while(m_y>m_min_y)
-        {
-            m_y -= m_step;
-            m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-        }
+//        while(m_x<m_max_x)
+//        {
+//            m_x += m_step;
+//            m_laser->pos(m_x,m_y);
+//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+//        }
 
-        while(m_x>m_min_x)
-        {
-            m_x -= m_step;
-            m_laser->pos(m_x,m_y);
-            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-        }
-    }
-    }
-    */
+//        while(m_y>m_min_y)
+//        {
+//            m_y -= m_step;
+//            m_laser->pos(m_x,m_y);
+//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+//        }
+
+//        while(m_x>m_min_x)
+//        {
+//            m_x -= m_step;
+//            m_laser->pos(m_x,m_y);
+//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
+//        }
+//    }
+
     m_laser->vel(m_vx,m_vy);
 }

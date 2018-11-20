@@ -9,11 +9,11 @@ Filter::Filter(DAVIS240C* davis)
     : m_davis(davis),
       m_rows(180),
       m_cols(240),
-      m_frequency(630),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
-      m_targetPeriod(1e6/m_frequency),
+      m_frequency(600),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_targetPeriod(1e6f/(float)m_frequency),
       m_eps(10), // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
-      m_max_t(2*m_targetPeriod), //When to flush old events = 10ms
+      m_max_t(10*m_targetPeriod), //When to flush old events = 10ms
       m_xc(0.0f),
       m_yc(0.0f),
       m_eta(0.01f)
@@ -27,7 +27,6 @@ Filter::~Filter()
 void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                        const uint id)
 {
-    printf("Filter Event! \n\r");
 }
 
 void Filter::registerFilterListener(FilterListener* listener)
@@ -167,7 +166,8 @@ void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
 // ADAPTIVE FILTER
 AdaptiveFilter::AdaptiveFilter(DAVIS240C* davis)
       : Filter(davis),
-        m_sigma(60)
+        m_sigma(30),
+        m_neighbor_radius(1)
 {
     // Initialize datastructures
     m_last_event.resize(m_rows*m_cols);
@@ -194,12 +194,11 @@ void AdaptiveFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     {
         // Make a copy of last event's polarity, if one
         const bool last_p = m_last_event[x*m_cols+y].first;
-        bool type{};
 
         // Encode transition type (0=falling, 1=rising)
         if (last_p!=p)
         {
-            type = (p>last_p?1:0);
+            bool type = (p>last_p?1:0);
 
             // Send event if transition (QUESTION: MAKE A COPY OR BY REF)
             DAVIS240CEvent e(x,y,p,t);
@@ -252,32 +251,35 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
     if (std::abs(m_frequency-freq)<m_sigma)
     {
         // Compute probability (gaussian)
-        const double prob = std::exp( -(freq-m_frequency)*(freq-m_frequency)
-                                     /(2.*m_sigma*m_sigma));
+        //const double prob = std::exp( -(freq-m_frequency)*(freq-m_frequency)
+        //                             /(2.*m_sigma*m_sigma));
         //printf("Freq: %d - Prob: %f. \n\r", freq, prob);
 
-        if (prob>0.1f)
+        //=== DEBUG ===//
+//        if (freq>200)
+//        {
+//            printf("Freq: %d. \n\r", freq);
+//        }
+        //=== END DEBUG ===//
+
+        // Send filtered event
+        DAVIS240CEvent e(x,y,p,t);
+        warnFilteredEvent(e);
+
+        // Center of mass tracker
+        m_xc = m_eta*m_xc + (1.f-m_eta)*x;
+        m_yc = m_eta*m_yc + (1.f-m_eta)*y;
+
+        // Save last filtered event in list
+        m_last_filtered_events.emplace_back(x,y,p,t);
+
+        // Remove old filtered events
+        auto it = m_last_filtered_events.begin();
+        while(    ((m_current_t-it->m_timestamp) > m_max_t)
+                   && (it!=m_last_filtered_events.end())
+        )
         {
-            // Send filtered event
-            DAVIS240CEvent e(x,y,p,t);
-            warnFilteredEvent(e);
-
-            // Center of mass tracker
-            m_xc = m_eta*m_xc + (1.f-m_eta)*x;
-            m_yc = m_eta*m_yc + (1.f-m_eta)*y;
-
-            // Save last filtered event in list
-            //m_last_filtered_events.push_back(e);
-            m_last_filtered_events.emplace_back(x,y,p,t);
-
-            // Remove old filtered events
-            auto it = m_last_filtered_events.begin();
-            while(    ((m_current_t-it->m_timestamp) > m_max_t)
-                       && (it!=m_last_filtered_events.end())
-            )
-            {
-                m_last_filtered_events.erase(it++);
-            }
+            m_last_filtered_events.erase(it++);
         }
     }
 }

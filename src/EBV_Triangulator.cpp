@@ -182,7 +182,7 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     //printf("xLaser: %d - yLaser: %d - xEvent: %d - yEvent: %d. \n\r",
     //       xLaser,yLaser, x0, y0);
 
-    /*
+    ///*
     // Camera0-Camera1 stereo
     coords0.push_back(cv::Point2d(y0,x0)); // Warning: x = column, y = row
     coords1.push_back(cv::Point2d(y1,x1));
@@ -207,21 +207,21 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                           undistCoordsCorrected0,
                           undistCoordsCorrected1,
                           point3D);
-    */
+    //*/
 
     // Camera0-Laser stereo
     //coords0.push_back(cv::Point2d(y0,x0)); // Warning: Point2d(column,row)
     //coords1.push_back(cv::Point2d(yLaser,xLaser));
-    coords0.emplace_back(y0,x0);
-    coords1.emplace_back(yLaser,xLaser);
+//    coords0.emplace_back(y0,x0);
+//    coords1.emplace_back(yLaser,xLaser);
 
-    // Undistort 2D points
-    cv::undistortPoints(coords0, undistCoords0,
-                        m_K[0], m_D[0],
-                        m_Rect[0],
-                        m_P[0]);
+//    // Undistort 2D points
+//    cv::undistortPoints(coords0, undistCoords0,
+//                        m_K[0], m_D[0],
+//                        m_Rect[0],
+//                        m_P[0]);
 
-    undistCoords1 = coords1;
+//    undistCoords1 = coords1;
 //    cv::undistortPoints(coords1, undistCoords1,
 //                        m_K[2], m_D[2],
 //                        m_Rect[2],
@@ -233,19 +233,19 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     //                  undistCoordsCorrected1);
 
     // Triangulate
-    cv::triangulatePoints(m_P[0], m_P[2],
-                          undistCoords0,
-                          undistCoords1,
-                          //undistCoordsCorrected0,
-                          //undistCoordsCorrected1,
-                          point3D);
+//    cv::triangulatePoints(m_P[0], m_P[2],
+//                          undistCoords0,
+//                          undistCoords1,
+//                          //undistCoordsCorrected0,
+//                          //undistCoordsCorrected1,
+//                          point3D);
 
     double X = point3D[0]/point3D[3];
     double Y = point3D[1]/point3D[3];
     double Z = point3D[2]/point3D[3];
 
     // DEBUG - CHECK 3D POINT POSITION
-    printf("Point at: (%2.1f,%2.1f,%2.1f).\n\r",X,Y,Z);
+    //printf("Point at: (%2.1f,%2.1f,%2.1f).\n\r",X,Y,Z);
     // END DEBUG
 
     // Save laser calibration file

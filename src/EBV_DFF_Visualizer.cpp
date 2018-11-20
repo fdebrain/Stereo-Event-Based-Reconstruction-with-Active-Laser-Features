@@ -121,11 +121,11 @@ Visualizer::Visualizer(const uint nbCams,
       m_triangulator(triangulator)
 {
     // Initialize data structure
-    for (auto& v : m_polEvts) { v.resize(m_rows*m_cols); }
-    for (auto& v : m_ageEvts) { v.resize(m_rows*m_cols); }
-    for (auto& v : m_filtEvts) { v.resize(m_rows*m_cols); }
+    for (auto& v : m_polEvts) { v.resize(m_rows*m_cols,0); }
+    for (auto& v : m_ageEvts) { v.resize(m_rows*m_cols,0); }
+    for (auto& v : m_filtEvts) { v.resize(m_rows*m_cols,0); }
     for (auto& v : m_grayFrame) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC1); }
-    m_depthMap.resize(m_rows*m_cols);
+    m_depthMap.resize(m_rows*m_cols,0);
 
     for (uint idx=0; idx<2; idx++)
     {
@@ -175,7 +175,7 @@ Visualizer::Visualizer(const uint nbCams,
 
 
             // Filter trackbars
-            cv::createTrackbar("Filter frequency",m_filtWin[idx],&m_filter_freq[idx],1000,
+            cv::createTrackbar("Filter frequency",m_filtWin[idx],&m_filter_freq[idx],1500,
                                &callbackTrackbarFilterFreq,static_cast<void*>(m_filter[idx]));
             cv::createTrackbar("Epsilon",m_filtWin[idx],&m_filter_eps[idx],20,
                                &callbackTrackbarFilterEps,static_cast<void*>(m_filter[idx]));
@@ -205,7 +205,7 @@ Visualizer::Visualizer(const uint nbCams,
         m_laserFreq = m_laser->getFreq();
 
         // Laser trackbars
-        cv::createTrackbar("Laser frequency",m_polWin[0],&m_laserFreq,1000,
+        cv::createTrackbar("Laser frequency",m_polWin[0],&m_laserFreq,1500,
                            &callbackTrackbarLaserFreq,static_cast<void*>(m_laser));
         cv::createTrackbar("laserX",m_polWin[0],&m_laserX,4000,
                            &callbackTrackbarLaserX,static_cast<void*>(m_laser));
@@ -321,7 +321,9 @@ void Visualizer::receivedNewDepth(const int &u,
                                   const double &Z)
 {
     const double depth = Z;
-    m_depthMap[u*m_cols+v] = depth;
+    const double last_depth = m_depthMap[u*m_cols+v];
+    if (last_depth>0) { m_depthMap[u*m_cols+v] = 0.5*(last_depth + depth); }
+    else { m_depthMap[u*m_cols+v] = depth; }
 }
 
 void Visualizer::run()
@@ -463,7 +465,7 @@ void Visualizer::run()
         if (key=='r')
         {
             m_depthMap.clear();
-            m_depthMap.resize(m_rows*m_cols);
+            m_depthMap.resize(m_rows*m_cols,0);
             printf("Reset depth map.\n\r");
         }
 
@@ -516,13 +518,13 @@ void Visualizer::run()
                 {
                     m_laser->m_laser_swipe = true;
                     printf("Laser swipe on. \n\r");
-                    m_laser->start();
-                    m_laser->draw();
+                    m_laser->startSwipe();
+                    //m_laser->draw();
                 }
                 else
                 {
                     m_laser->m_laser_swipe = false;
-                    printf("Laser swipe on. \n\r");
+                    printf("Laser swipe off. \n\r");
                     m_laser->stop();
                 }
             }

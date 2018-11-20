@@ -36,15 +36,15 @@ public:
     int getY() const {return m_yc;}
 
     int getFreq() const {return m_frequency;}
-    void setFreq(int freq) {m_frequency=freq;
-                            m_targetPeriod = 1e6/m_frequency;}
+    void setFreq(const int freq) {m_frequency=freq;
+                                  m_targetPeriod = 1e6f/(float)m_frequency;}
 
     int getEps() const {return m_eps;}
-    void setEps(int eps) {m_eps=eps;
-                          m_epsPeriod = m_eps*m_targetPeriod/100.;}
+    void setEps(const int eps) {m_eps=eps;
+                                m_epsPeriod = m_eps*m_targetPeriod/100.f;}
 
     float getEta() const {return m_eta;}
-    void setEta(float eta) {m_eta=eta;}
+    void setEta(const float eta) {m_eta=eta;}
 
     // Who filter listens to
     DAVIS240C* m_davis;
@@ -119,6 +119,7 @@ public:
     void setMaxT(int max_t) {m_max_t=max_t;}
 
     int m_sigma;
+    int m_neighbor_radius;
     const float m_pi{3.14159f};
 
     // Data structure matrix of list of events

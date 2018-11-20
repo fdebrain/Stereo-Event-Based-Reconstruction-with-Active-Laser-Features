@@ -17,6 +17,7 @@ public:
     ~LaserController();
 
     void start();
+    void startSwipe();
     void draw();
     void stop();
 

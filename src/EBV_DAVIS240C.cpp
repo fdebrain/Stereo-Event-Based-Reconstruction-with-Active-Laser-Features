@@ -172,16 +172,18 @@ void DAVIS240C::readThread()
                 {
                     const libcaer::events::PolarityEvent &polarityEvent = (*polarity)[n];
 
-                    //DAVIS240CEvent e;
-                    //e.m_y           = polarityEvent.getX();
-                    //e.m_x           = polarityEvent.getY();
-                    //e.m_timestamp   = polarityEvent.getTimestamp();
-                    //e.m_pol         = polarityEvent.getPolarity(); // {0,1}
-                    //events.push_back(e);
-                    events.emplace_back(polarityEvent.getX(),
-                                        polarityEvent.getY(),
-                                        polarityEvent.getPolarity(),
-                                        polarityEvent.getTimestamp());
+                      //DAVIS240CEvent e;
+//                    e.m_y           = polarityEvent.getX();
+//                    e.m_x           = polarityEvent.getY();
+//                    e.m_timestamp   = polarityEvent.getTimestamp();
+//                    e.m_pol         = polarityEvent.getPolarity(); // {0,1}
+//                    events.push_back(e);
+
+                    int y = polarityEvent.getX();
+                    int x = polarityEvent.getY();
+                    int t = polarityEvent.getTimestamp();
+                    bool p = polarityEvent.getPolarity(); // {0,1}
+                    events.emplace_back(x,y,p,t);
                 }
                 this->warnEvent(events);
             }
