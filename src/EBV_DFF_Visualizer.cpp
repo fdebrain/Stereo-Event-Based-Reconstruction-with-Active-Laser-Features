@@ -126,6 +126,7 @@ Visualizer::Visualizer(const uint nbCams,
     for (auto& v : m_filtEvts) { v.resize(m_rows*m_cols,0); }
     for (auto& v : m_grayFrame) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC1); }
     m_depthMap.resize(m_rows*m_cols,0);
+    m_mask = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
 
     for (uint idx=0; idx<2; idx++)
     {
@@ -172,7 +173,6 @@ Visualizer::Visualizer(const uint nbCams,
 //            m_threshA[idx] = m_filter[idx]->getThreshA();
 //            m_threshB[idx] = m_filter[idx]->getThreshB();
 //            m_threshAnti[idx] = m_filter[idx]->getThreshAnti();
-
 
             // Filter trackbars
             cv::createTrackbar("Filter frequency",m_filtWin[idx],&m_filter_freq[idx],1500,
@@ -226,6 +226,9 @@ Visualizer::Visualizer(const uint nbCams,
         // Initialize window
         m_depthWin = "Depth Map";
         cv::namedWindow(m_depthWin,0);
+
+        m_depthInpaintedWin = "Depth Map Inpainted";
+        cv::namedWindow(m_depthInpaintedWin,0);
 
         // Initialize matcher parameters
         m_matcherEps = m_triangulator->m_matcher->getEps();
@@ -320,14 +323,22 @@ void Visualizer::receivedNewDepth(const int &u,
                                   const double &Y,
                                   const double &Z)
 {
-    const double depth = Z;
-    const double last_depth = m_depthMap[u*m_cols+v];
-    if (last_depth>0) { m_depthMap[u*m_cols+v] = 0.5*(last_depth + depth); }
-    else { m_depthMap[u*m_cols+v] = depth; }
+    // Update depth value
+    const float depth = Z;
+    const float last_depth = m_depthMap[u*m_cols+v];
+    if (last_depth>0)
+    {
+        m_depthMap[u*m_cols+v] = 0.5*(last_depth + depth);
+    }
+    else
+    {
+        m_depthMap[u*m_cols+v] = depth;
+    }
 }
 
 void Visualizer::run()
 {   
+    // Wait (in ms)
     char key = ' ';
 
     // Initialize display matrices
@@ -337,10 +348,15 @@ void Visualizer::run()
     std::array<cv::Mat,2> ageMatRGB;
     cv::Mat depthMatHSV = cv::Mat(m_rows,m_cols,CV_8UC3);
     cv::Mat depthMatRGB = cv::Mat(m_rows,m_cols,CV_8UC3);
+    cv::Mat depthMatRGBInpainted = cv::Mat(m_rows,m_cols,CV_8UC3);
     for (auto& v : polMat) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
     for (auto& v : filtMat) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
     for (auto& v : ageMatHSV) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
     for (auto& v : ageMatRGB) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
+
+    cv::StereoBM sbm(g1, g2, disp);
+    normalize(disp, disp8, 0, 255, CV_MINMAX, CV_8U);
+
 
     while(key != 'q')
     {
@@ -387,7 +403,7 @@ void Visualizer::run()
             }
 
             // Depth map
-            double z = m_depthMap[i];
+            float z = m_depthMap[i];
             if (z>0)
             {
                 if (z<m_min_depth){ z = m_min_depth; }
@@ -395,12 +411,14 @@ void Visualizer::run()
                 depthMatHSV.data[3*i + 0] = static_cast<uchar>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
                 depthMatHSV.data[3*i + 1] = static_cast<uchar>(255);
                 depthMatHSV.data[3*i + 2] = static_cast<uchar>(255);
+                m_mask.data[i] = static_cast<uint8_t>(0);
             }
             else
             {
                 depthMatHSV.data[3*i + 0] = static_cast<uchar>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
                 depthMatHSV.data[3*i + 1] = static_cast<uchar>(255);
                 depthMatHSV.data[3*i + 2] = static_cast<uchar>(0);
+                m_mask.data[i] = static_cast<uint8_t>(255);
             }
         }
 
@@ -453,33 +471,26 @@ void Visualizer::run()
             cv::imshow(m_depthWin,depthMatRGB);
         }
 
-        // Reset the display matrices
-        for (auto& v : polMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
-        for (auto& v : filtMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
-        for (auto& v : ageMatHSV) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
-
-        // Wait (in ms)
         key = cv::waitKey(10);
-
-        // Reset depth map
-        if (key=='r')
+        switch (key)
         {
+        case 'r':
+            printf("Reset depth map.\n\r");
             m_depthMap.clear();
             m_depthMap.resize(m_rows*m_cols,0);
-            printf("Reset depth map.\n\r");
-        }
+            break;
 
-        if (key=='c')
-        {
+        // Calibrate cameras
+        case 'c':
             if (m_calibrator)
             {
                 printf("Starting camera calibration. \n\r");
                 m_calibrator->m_calibrate_cameras = true;
             }
-        }
+            break;
 
-        if (key=='l')
-        {   
+        // Calibrate laser
+        case 'l':
             if (m_calibrator)
             {
                 printf("Starting laser calibration. \n\r");
@@ -489,45 +500,29 @@ void Visualizer::run()
                 m_calibrator->calibrateLaser(m_grayFrame[1],1);
                 //m_calibrator->pointLaserToPixel(30,200,0);
             }
+            break;
+
+        // Toogle laser state (on/off)
+        case 'o':
+            if (m_laser) { m_laser->toogleState(); }
+            break;
+
+        // Toogle laser swipe mode (on/off)
+        case 's':
+            if (m_laser) { m_laser->toogleSwipe(); }
+            break;
+
+        case 'i':
+            // Inpainting
+            printf("Inpainting. \n\r");
+            cv::inpaint(depthMatRGB,m_mask,depthMatRGBInpainted,2,cv::INPAINT_TELEA);
+            cv::imshow(m_depthInpaintedWin,depthMatRGBInpainted);
+            break;
         }
 
-        // Laser on
-        if (key=='o')
-        {
-            if (m_laser)
-            {
-                if (m_laser->m_laser_on==false)
-                {
-                    printf("Laser on. \n\r");
-                    m_laser->start();
-                }
-                else
-                {
-                    printf("Laser off. \n\r");
-                    m_laser->stop();
-                }
-            }
-        }
-
-        // Laser swipe
-        if (key=='s')
-        {
-            if (m_laser)
-            {
-                if (m_laser->m_laser_swipe==false)
-                {
-                    m_laser->m_laser_swipe = true;
-                    printf("Laser swipe on. \n\r");
-                    m_laser->startSwipe();
-                    //m_laser->draw();
-                }
-                else
-                {
-                    m_laser->m_laser_swipe = false;
-                    printf("Laser swipe off. \n\r");
-                    m_laser->stop();
-                }
-            }
-        }
+        // Reset the display matrices
+        for (auto& v : polMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
+        for (auto& v : filtMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
+        for (auto& v : ageMatHSV) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
     }
 }

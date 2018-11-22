@@ -63,7 +63,8 @@ public:
     std::array<std::vector<int>,2>     m_ageEvts;
     std::array<cv::Mat,2>              m_grayFrame;
     std::array<std::vector<int>,2>     m_filtEvts;
-    std::vector<double>                m_depthMap;
+    std::vector<float>                 m_depthMap;
+    cv::Mat                            m_mask;
 
     // Display window related variables
     std::array<std::string,2>   m_polWin{};
@@ -71,6 +72,7 @@ public:
     std::array<std::string,2>   m_frameWin{};
     std::array<std::string,2>   m_filtWin{};
     std::string                 m_depthWin{};
+    std::string                 m_depthInpaintedWin{};
 
     // Trackbar parameters (events age)
     int        m_ageThresh{};
