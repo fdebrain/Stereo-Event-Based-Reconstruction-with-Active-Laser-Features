@@ -5,11 +5,11 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-Filter::Filter(DAVIS240C* davis)
+Filter::Filter(int freq, DAVIS240C* davis)
     : m_davis(davis),
       m_rows(180),
       m_cols(240),
-      m_frequency(600),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_frequency(freq),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
       m_targetPeriod(1e6f/(float)m_frequency),
       m_eps(10), // In percent of period T
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
@@ -49,8 +49,8 @@ void Filter::warnFilteredEvent(DAVIS240CEvent& filtEvent)
 }
 
 // BASE FILTER
-BaseFilter::BaseFilter(DAVIS240C* davis)
-    : Filter(davis),
+BaseFilter::BaseFilter(int freq, DAVIS240C* davis)
+    : Filter(freq,davis),
       m_neighborSize(3),    //3; //2;
       m_threshSupportsA(2), //5; //3;
       m_threshSupportsB(2), //10;  //3;
@@ -164,8 +164,8 @@ void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
 
 
 // ADAPTIVE FILTER
-AdaptiveFilter::AdaptiveFilter(DAVIS240C* davis)
-      : Filter(davis),
+AdaptiveFilter::AdaptiveFilter(int freq,DAVIS240C* davis)
+      : Filter(freq,davis),
         m_sigma(30),
         m_neighbor_radius(1)
 {

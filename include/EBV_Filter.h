@@ -21,7 +21,7 @@ public:
 class Filter : public DAVIS240CEventListener
 {
 public:
-    explicit Filter(DAVIS240C* davis = nullptr);
+    explicit Filter(int freq, DAVIS240C* davis = nullptr);
     ~Filter();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
@@ -74,7 +74,7 @@ public:
 class BaseFilter : public Filter
 {
 public:
-    explicit BaseFilter(DAVIS240C* davis);
+    explicit BaseFilter(int freq, DAVIS240C* davis);
     ~BaseFilter(){}
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
@@ -104,7 +104,7 @@ public:
 class AdaptiveFilter : public Filter
 {
 public:
-    AdaptiveFilter(DAVIS240C* davis);
+    AdaptiveFilter(int freq, DAVIS240C* davis);
     ~AdaptiveFilter(){}
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,

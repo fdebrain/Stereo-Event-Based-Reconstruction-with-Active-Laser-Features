@@ -1,24 +1,31 @@
 #include <EBV_LaserController.h>
 #include <EBV_MagneticMirrorLaser.h>
 
-LaserController::LaserController()
+LaserController::LaserController(int freq)
     : m_laser{new MagneticMirrorLaser},
-      m_freq(600), // Fix the offset
-      m_vx(1e4), //(1.5e4),
-      m_vy(3e5), //(4e5),
+      m_freq(freq), // Fix the offset
       m_step(100),
       m_min_x(500),
       m_min_y(0),
       m_max_x(3500),
       m_max_y(4000),
       m_calibrateLaser(false),
-      m_laser_on(false)
+      m_laser_on(false),
+      m_swipe_on(false),
+      m_received_new_state(false),
+      m_vx(0),
+      m_vy(0),
+      m_swipe_vx(15e3), //(15e3),
+      m_swipe_vy(200e3) //(400ee),
 { 
     // Initialize laser
     m_laser->init("/dev/ttyUSB0");
     m_x = m_min_x;
     m_y = m_min_y;
     m_laser->pos(m_x,m_y);
+
+    // Initialize thread
+    m_thread = std::thread(&LaserController::runThread,this);
 
     //if (m_calibrateLaser==false) { this->draw(); }
 //    if (m_calibrateLaser)
@@ -41,27 +48,6 @@ void LaserController::setFreq(const int freq)
     m_laser->blink(static_cast<uint>(1e6/static_cast<double>(2*m_freq)));
 }
 
-void LaserController::start()
-{
-    m_laser_on = true;
-    m_laser->toggle(1);
-    this->setFreq(m_freq);
-}
-
-void LaserController::startSwipe()
-{
-    this->start();
-    this->draw();
-    m_thread = std::thread(&LaserController::draw,this);
-}
-
-void LaserController::stop()
-{
-    m_laser_on = false;
-    m_laser->toggle(0);
-    m_laser->vel(0,0);
-}
-
 void LaserController::setPos(const int x, const int y)
 {
     m_x = x;
@@ -80,18 +66,80 @@ void LaserController::setPos(const int x, const int y)
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
-
 void LaserController::setVel(const int vx, const int vy)
 {
     m_vx = vx;
     m_vy = vy;
-
     m_laser->vel(m_vx,m_vy);
 }
 
-
-void LaserController::draw()
+void LaserController::start()
 {
+    printf("Start laser. \n\r");
+    m_laser_on = true;
+    m_laser->toggle(1);
+    this->setFreq(m_freq);
+}
+
+void LaserController::stop()
+{
+    printf("Stop laser. \n\r");
+    m_laser_on = false;
+    m_swipe_on = false;
+    m_laser->toggle(0);
+    m_laser->vel(0,0);
+}
+
+void LaserController::toogleState()
+{
+    m_received_new_state = true;
+    m_laser_on = !m_laser_on;
+
+    if (m_laser_on) { this->start(); }
+    else { this->stop(); }
+
+    // Notify new command to the thread
+    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+    m_condWait.notify_one();
+}
+
+void LaserController::toogleSwipe()
+{
+    m_received_new_state = true;
+    m_swipe_on = !m_swipe_on;
+
+    if (m_swipe_on) { this->swipe(); }
+    else { this->stop(); }
+
+    // Notify new command to the thread
+    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+    m_condWait.notify_one();
+}
+
+void LaserController::runThread()
+{
+    while(true)
+    {
+//        if (m_received_new_state)
+//        {
+//            m_received_new_state = false;
+//            if (m_laser_on) { this->start(); }
+//            else if (m_swipe_on) { this->swipe(); }
+//            else { this->stop(); }
+//        }
+//        else
+        // IDLE if not received new command
+        std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+        m_condWait.wait(condLock);
+        condLock.unlock();
+    }
+}
+
+void LaserController::swipe()
+{
+    printf("Swipe mode laser. \n\r");
+    this->start();
+    this->setVel(m_swipe_vx,m_swipe_vy);
 
 //    double t = 0.0;
 //    uint x=0, y=0;
@@ -159,6 +207,4 @@ void LaserController::draw()
 //            std::this_thread::sleep_for (std::chrono::milliseconds(10));
 //        }
 //    }
-
-    m_laser->vel(m_vx,m_vy);
 }

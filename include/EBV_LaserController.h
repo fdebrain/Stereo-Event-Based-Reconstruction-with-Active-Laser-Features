@@ -7,19 +7,22 @@
 #include <string>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 
 class MagneticMirrorLaser;
 
 class LaserController
 {
 public:
-    LaserController();
+    LaserController(int freq);
     ~LaserController();
 
     void start();
-    void startSwipe();
-    void draw();
     void stop();
+    void toogleState();
+    void toogleSwipe();
+    void runThread();
+    void swipe();
 
     // Getters and setters
     int getX() const { return m_x; }
@@ -48,11 +51,13 @@ public:
     std::string m_mode;
     std::mutex m_mutex;
 
+    // Laser state
     int m_x;
     int m_y;
     bool m_calibrateLaser;
     bool m_laser_on;
-    bool m_laser_swipe;
+    bool m_swipe_on;
+    bool m_received_new_state;
 
 private:
     MagneticMirrorLaser* m_laser;
@@ -64,6 +69,13 @@ private:
     double m_step;
     int m_vx;
     int m_vy;
+    int m_swipe_vx;
+    int m_swipe_vy;
+
+    // Wait when no processing has to be done
+    std::condition_variable m_condWait;
+    std::mutex m_condWaitMutex;
+
 };
 
 #endif // EBV_LASERCONTROLLER_H

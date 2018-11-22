@@ -68,10 +68,11 @@ void Matcher::runThread()
             //printf("Delta-time: (%d).\n\r",t0-t1);
             // END DEBUG
 
-            process(event0,event1);
+            this->process(event0,event1);
         }
         else
         {
+            // IDLE if no new received events
             std::unique_lock<std::mutex> condLock(m_condWaitMutex);
             m_condWait.wait(condLock);
             condLock.unlock();
