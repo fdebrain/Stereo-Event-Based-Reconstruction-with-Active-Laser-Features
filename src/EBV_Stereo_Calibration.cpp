@@ -10,20 +10,20 @@ StereoCalibrator::StereoCalibrator(LaserController* laser,
                                    Filter* filter0,
                                    Filter* filter1,
                                    Triangulator* triangulator)
-    : m_calibrate_cameras(false),
-      m_calibrate_laser(false),
-      m_camera_intrinsics{IntrinsicsData{},IntrinsicsData{}},
-      m_last_frame_captured{std::chrono::high_resolution_clock::time_point{},
-                            std::chrono::high_resolution_clock::time_point{}},
-      m_laser(laser),
+    : m_laser(laser),
       m_filter{filter0,filter1},
       m_triangulator(triangulator),
+      m_path_calib_cam(m_triangulator->m_path_calib_cam),
+      m_path_calib_laser(m_triangulator->m_path_calib_laser),
+      m_last_frame_captured{std::chrono::high_resolution_clock::time_point{},
+                            std::chrono::high_resolution_clock::time_point{}},
+      m_camera_intrinsics{IntrinsicsData{},IntrinsicsData{}},
       m_learningRate(0.3f)
 {
-    m_R.resize(0);
-    m_T.resize(0);
-    m_E.resize(0);
-    m_F.resize(0);
+    for (auto& m: m_R) { m.resize(0); }
+    for (auto& m: m_T) { m.resize(0); }
+    for (auto& m: m_E) { m.resize(0); }
+    for (auto& m: m_F) { m.resize(0); }
 }
 
 StereoCalibrator::~StereoCalibrator(){}
@@ -103,6 +103,7 @@ void StereoCalibrator::calibrateCameras(cv::Mat &frame, const uint id)
                              + cv::TermCriteria::EPS, 60,
                              DBL_EPSILON));
 
+        // Save parameters
         saveCamerasCalibration();
         m_triangulator->importCalibration();
         m_calibrate_cameras = false;
@@ -112,98 +113,123 @@ void StereoCalibrator::calibrateCameras(cv::Mat &frame, const uint id)
     }
 }
 
-void StereoCalibrator::calibrateLaser(cv::Mat& frame, const uint id)
-{
-    // Extract checkerboard corner points
-    if (m_intrinsic_calib_image_points[id].size()<m_min_frames_to_capture)
+void StereoCalibrator::calibrateLaser(cv::Mat& frame0,
+                                      cv::Mat& frame1,
+                                      const uint id)
+{   
+    // Extract checkerboard corner points and corresponding laser commands
+    if (   m_intrinsic_calib_image_points[0].size()<m_min_frames_to_capture
+        && m_intrinsic_calib_image_points[1].size()<m_min_frames_to_capture)
     {
-        std::vector<cv::Point2f> points;
-        bool ret = cv::findChessboardCorners(frame,
+        std::vector<cv::Point2f> points0;
+        std::vector<cv::Point2f> points1;
+        bool ret0 = cv::findChessboardCorners(frame0,
                                              m_pattern_size,
-                                             points);
-        if (ret)
+                                             points0);
+        bool ret1 = cv::findChessboardCorners(frame1,
+                                             m_pattern_size,
+                                             points1);
+
+        if (ret0 && ret1)
         {
-            cv::cornerSubPix(frame,points,cv::Size(5,5),cv::Size(-1,-1),
+            // Corner detection - Camera 0
+            cv::cornerSubPix(frame0,points0,cv::Size(5,5),cv::Size(-1,-1),
                              cv::TermCriteria(cv::TermCriteria::COUNT
                              + cv::TermCriteria::EPS,30, DBL_EPSILON));
-            m_intrinsic_calib_image_points[id].push_back(points);
-            cv::drawChessboardCorners(frame,m_pattern_size,points,ret);
-            printf("Calibrating laser-camera %d: %d frames retrieved. \n\r",id,
-                   m_intrinsic_calib_image_points[id].size());
+            m_intrinsic_calib_image_points[0].push_back(points0);
+            cv::drawChessboardCorners(frame0,m_pattern_size,points0,ret0);
+
+            // Corner detection - Camera 1
+            cv::cornerSubPix(frame1,points1,cv::Size(5,5),cv::Size(-1,-1),
+                             cv::TermCriteria(cv::TermCriteria::COUNT
+                             + cv::TermCriteria::EPS,30, DBL_EPSILON));
+            m_intrinsic_calib_image_points[1].push_back(points1);
+            cv::drawChessboardCorners(frame1,m_pattern_size,points1,ret1);
+
+            printf("Calibrating laser-camera: %d frames retrieved. \n\r",
+                   m_intrinsic_calib_image_points[0].size());
 
             // Finding laser command correspondance to each corner point
             std::vector<cv::Point2f> laserPoints;
-
-            for (auto &point : points)
+            for (auto &point : points0)
             {
-                printf("Pointing to (%d,%d). \n\r",int(point.x),int(point.y));
-                pointLaserToPixel(int(point.y),int(point.x),id);
-                //auto laserPtn = cv::Point2f(m_laser->getY(), m_laser->getX());
-                //laserPoints.push_back(laserPtn);
-                laserPoints.emplace_back(m_laser->getY(), m_laser->getX());
+                pointLaserToPixel(int(point.y),int(point.x),0);
+                int xLaser = 180*(m_laser->getX()-m_laser->m_min_x)/(m_laser->m_max_x - m_laser->m_min_x);
+                int yLaser = 240*(m_laser->getY()-m_laser->m_min_y)/(m_laser->m_max_y - m_laser->m_min_y);
+                laserPoints.emplace_back(yLaser, xLaser);
+                printf("Pointing to (%d,%d) with commands (%d,%d)->(%d,%d). \n\r",
+                       int(point.x),int(point.y),m_laser->getX(),m_laser->getY(),
+                       xLaser,yLaser);
             }
-            m_intrinsic_calib_laser_points[id].push_back(laserPoints);
+            m_intrinsic_calib_laser_points.push_back(laserPoints);
         }
     }
 
-    // Extract intrinsics once enough points
-    if (   m_intrinsic_calib_image_points[id].size()>=m_min_frames_to_capture
-        && m_intrinsic_calib_laser_points[id].size()>=m_min_frames_to_capture)
+    // Extract intrinsics & extrinsics once enough data
+    if (   m_intrinsic_calib_image_points[0].size()>=m_min_frames_to_capture
+        && m_intrinsic_calib_image_points[1].size()>=m_min_frames_to_capture
+        && m_intrinsic_calib_laser_points.size()>=m_min_frames_to_capture)
     {
-        // Extract camera intrinsics
-        const std::vector<std::vector<cv::Point3f>> worldPoints0
-        {
-            m_intrinsic_calib_image_points[id].size(),
-            calculateWorldPoints()
-        };
-        cv::Mat rvecs0, tvecs0;
-        cv::calibrateCamera(worldPoints0,m_intrinsic_calib_image_points[id],
-                            m_resolution,
-                            m_camera_intrinsics[id].m_K,
-                            m_camera_intrinsics[id].m_D,
-                            rvecs0, tvecs0,0,
-                            cv::TermCriteria(cv::TermCriteria::COUNT
-                                             + cv::TermCriteria::EPS,
-                                             60, DBL_EPSILON));
+        m_camera_intrinsics[0].m_K = m_triangulator->m_K[0];
+        m_camera_intrinsics[0].m_D = m_triangulator->m_D[0];
+
+        m_camera_intrinsics[1].m_K = m_triangulator->m_K[1];
+        m_camera_intrinsics[1].m_D = m_triangulator->m_D[1];
 
         // Extract laser intrinsics
-        const std::vector<std::vector<cv::Point3f>> worldPoints1
+        const std::vector<std::vector<cv::Point3f>> worldPoints
         {
-            m_intrinsic_calib_laser_points[id].size(),
+            m_intrinsic_calib_laser_points.size(),
             calculateWorldPoints()
         };
-        cv::Mat rvecs1, tvecs1;
-        cv::calibrateCamera(worldPoints0,m_intrinsic_calib_laser_points[id],
+        cv::Mat rvecs, tvecs;
+        cv::calibrateCamera(worldPoints,m_intrinsic_calib_laser_points,
                             m_resolution,
                             m_camera_intrinsics[2].m_K,
                             m_camera_intrinsics[2].m_D,
-                            rvecs1, tvecs1,0,
+                            rvecs, tvecs,0,
                             cv::TermCriteria(cv::TermCriteria::COUNT
                                              + cv::TermCriteria::EPS,
                                              60, DBL_EPSILON));
 
-        // Extract extrinsics
-        double rms = cv::stereoCalibrate(
-            worldPoints1, m_intrinsic_calib_image_points[id],
-            m_intrinsic_calib_laser_points[id],
-            m_camera_intrinsics[id].m_K,
-            m_camera_intrinsics[id].m_D,
+        // Extract extrinsics (Camera0-Laser)
+        double rms0 = cv::stereoCalibrate(
+            worldPoints,
+            m_intrinsic_calib_image_points[0],
+            m_intrinsic_calib_laser_points,
+            m_camera_intrinsics[0].m_K,
+            m_camera_intrinsics[0].m_D,
             m_camera_intrinsics[2].m_K,
             m_camera_intrinsics[2].m_D,
-            m_resolution, m_R, m_T, m_E, m_F,
+            m_resolution, m_R[1], m_T[1], m_E[1], m_F[1],
             cv::CALIB_FIX_INTRINSIC,
             cv::TermCriteria(cv::TermCriteria::COUNT
                              + cv::TermCriteria::EPS, 60,
                              DBL_EPSILON));
 
-        saveLaserCalibration(id);
+        // Extract extrinsics (Laser-Camera1)
+        double rms1 = cv::stereoCalibrate(
+            worldPoints,
+            m_intrinsic_calib_image_points[1],
+            m_intrinsic_calib_laser_points,
+            m_camera_intrinsics[1].m_K,
+            m_camera_intrinsics[1].m_D,
+            m_camera_intrinsics[2].m_K,
+            m_camera_intrinsics[2].m_D,
+            m_resolution, m_R[2], m_T[2], m_E[2], m_F[2],
+            cv::CALIB_FIX_INTRINSIC,
+            cv::TermCriteria(cv::TermCriteria::COUNT
+                             + cv::TermCriteria::EPS, 60,
+                             DBL_EPSILON));
+
+        printf("Finished extracting the extrinsics with rms %.3f - %.3f. \n\r",
+               rms0/m_min_frames_to_capture,rms1/m_min_frames_to_capture);
+
+        saveLaserCalibration();
         m_triangulator->importCalibration();
         m_calibrate_laser = false;
-        printf("Finished extracting the extrinsics with a rms per frame of %f \n\r",
-               rms/m_min_frames_to_capture);
-
-        return;
     }
+    return;
 }
 
 void StereoCalibrator::saveCamerasCalibration()
@@ -213,26 +239,36 @@ void StereoCalibrator::saveCamerasCalibration()
     fs << "dist_coeffs0" << m_camera_intrinsics[0].m_D;
     fs << "camera_matrix1" << m_camera_intrinsics[1].m_K;
     fs << "dist_coeffs1" << m_camera_intrinsics[1].m_D;
-    fs << "R" << m_R;
-    fs << "T" << m_T;
-    fs << "F" << m_F;
+    fs << "R" << m_R[0];
+    fs << "T" << m_T[0];
+    fs << "F" << m_F[0];
     fs.release();
     printf("Camera calibration saved ! \n\r");
     return;
 }
 
-void StereoCalibrator::saveLaserCalibration(const int id)
+void StereoCalibrator::saveLaserCalibration()
 {
     cv::FileStorage fs(m_path_calib_laser, cv::FileStorage::WRITE);
-    fs << "camera_matrix " + std::to_string(id) << m_camera_intrinsics[id].m_K;
-    fs << "dist_coeffs " + std::to_string(id) << m_camera_intrinsics[id].m_D;
+    fs << "camera_matrix0" << m_camera_intrinsics[0].m_K;
+    fs << "dist_coeffs0" << m_camera_intrinsics[0].m_D;
+    fs << "camera_matrix1" << m_camera_intrinsics[1].m_K;
+    fs << "dist_coeffs1" << m_camera_intrinsics[1].m_D;
     fs << "camera_matrix_laser" << m_camera_intrinsics[2].m_K;
     fs << "dist_coeffs_laser" << m_camera_intrinsics[2].m_D;
-    fs << "R" << m_R;
-    fs << "T" << m_T;
-    fs << "F" << m_F;
+    fs << "R1" << m_R[1];
+    fs << "T1" << m_T[1];
+    fs << "F1" << m_F[1];
+    fs << "R2" << m_R[2];
+    fs << "T2" << m_T[2];
+    fs << "F2" << m_F[2];
     fs.release();
     printf("Laser calibration saved ! \n\r");
+
+    m_intrinsic_calib_image_points[0].clear();
+    m_intrinsic_calib_image_points[1].clear();
+    m_intrinsic_calib_laser_points.clear();
+
     return;
 }
 
@@ -252,7 +288,6 @@ const std::vector<cv::Point3f> StereoCalibrator::calculateWorldPoints()
 
 void StereoCalibrator::pointLaserToPixel(const int rGoal, const int cGoal, const uint id)
 {
-    m_laser->start();
     int r = m_filter[id]->getX();
     int c = m_filter[id]->getY();
 
@@ -270,8 +305,6 @@ void StereoCalibrator::pointLaserToPixel(const int rGoal, const int cGoal, const
         diff = {rGoal-r,cGoal-c};
         mse = std::sqrt(diff[0]*diff[0] + diff[1]*diff[1]);
         if (mse<m_threshConverged) { return; }
-
-        int m_step = 4;
 
         // Update laser command
         int dx;
