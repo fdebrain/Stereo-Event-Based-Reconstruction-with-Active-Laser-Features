@@ -1,6 +1,7 @@
 #ifndef EBV_LASERCONTROLLER_H
 #define EBV_LASERCONTROLLER_H
 
+#include <list>
 #include <cmath>
 #include <chrono>
 #include <fstream>
@@ -11,18 +12,37 @@
 
 class MagneticMirrorLaser;
 
+struct LaserEvent
+{
+  LaserEvent()
+      : m_x(0),
+        m_y(0),
+        m_timestamp(0)
+  {}
+
+  LaserEvent(int x, int y, int t)
+      : m_x(x),
+        m_y(y),
+        m_timestamp(t)
+  {}
+
+  int m_x;
+  int m_y;
+  int m_timestamp;
+};
+
+class LaserListener
+{
+public:
+    LaserListener(void) {}
+    virtual void receivedNewCommand(const int x, const int y);
+};
+
 class LaserController
 {
 public:
     LaserController(int freq);
     ~LaserController();
-
-    void start();
-    void stop();
-    void toogleState();
-    void toogleSwipe();
-    void runThread();
-    void swipe();
 
     // Getters and setters
     int getX() const { return m_x; }
@@ -46,10 +66,24 @@ public:
     void setPos(const int x, const int y);
     void setVel(const int vx, const int vy);
 
+    // Life cycle
+    void start();
+    void stop();
+    void toogleState();
+    void toogleSwipe();
+    void runThread();
+    void swipe();
+
+    // Laser event listening
+    void registerLaserListener(LaserListener* listener);
+    void deregisterLaserListener(LaserListener* listener);
+    void warnCommand(const int x, const int y);
+
 public:
     std::thread m_thread;
     std::string m_mode;
     std::mutex m_mutex;
+    std::chrono::high_resolution_clock::time_point m_chrono{};
 
     // Laser state
     int m_x;
@@ -59,12 +93,13 @@ public:
     bool m_swipe_on;
     bool m_received_new_state;
 
-private:
-    MagneticMirrorLaser* m_laser;
     int m_min_x;
     int m_min_y;
     int m_max_x;
     int m_max_y;
+
+private:
+    MagneticMirrorLaser* m_laser;
     int m_freq;
     double m_step;
     int m_vx;
@@ -76,6 +111,7 @@ private:
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
 
+    std::list<LaserListener*> m_laserListeners;
 };
 
 #endif // EBV_LASERCONTROLLER_H

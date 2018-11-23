@@ -20,19 +20,12 @@ LaserController::LaserController(int freq)
 { 
     // Initialize laser
     m_laser->init("/dev/ttyUSB0");
-    m_x = m_min_x;
-    m_y = m_min_y;
+    m_x = m_max_x/2;
+    m_y = m_max_y/2;
     m_laser->pos(m_x,m_y);
 
     // Initialize thread
     m_thread = std::thread(&LaserController::runThread,this);
-
-    //if (m_calibrateLaser==false) { this->draw(); }
-//    if (m_calibrateLaser)
-//    {
-//        this->start();
-//        m_thread = std::thread(&LaserController::draw,this);
-//    }
 }
 
 LaserController::~LaserController()
@@ -108,7 +101,11 @@ void LaserController::toogleSwipe()
     m_received_new_state = true;
     m_swipe_on = !m_swipe_on;
 
-    if (m_swipe_on) { this->swipe(); }
+    if (m_swipe_on)
+    {
+        printf("Swipe mode laser. \n\r");
+        this->start();
+    }
     else { this->stop(); }
 
     // Notify new command to the thread
@@ -120,26 +117,29 @@ void LaserController::runThread()
 {
     while(true)
     {
-//        if (m_received_new_state)
-//        {
-//            m_received_new_state = false;
-//            if (m_laser_on) { this->start(); }
-//            else if (m_swipe_on) { this->swipe(); }
-//            else { this->stop(); }
-//        }
-//        else
-        // IDLE if not received new command
-        std::unique_lock<std::mutex> condLock(m_condWaitMutex);
-        m_condWait.wait(condLock);
-        condLock.unlock();
+        if (m_swipe_on) { this->swipe(); }
+        else
+        {
+            // IDLE if not received new command
+            std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+            m_condWait.wait(condLock);
+            condLock.unlock();
+        }
     }
 }
 
 void LaserController::swipe()
 {
-    printf("Swipe mode laser. \n\r");
-    this->start();
-    this->setVel(m_swipe_vx,m_swipe_vy);
+    const auto now = std::chrono::high_resolution_clock::now();
+    m_chrono = now;
+
+    //this->setVel(m_swipe_vx,m_swipe_vy);
+
+    m_y += m_step;
+    if (m_y>=m_max_y) { m_y = m_min_y; m_x += 2*m_step; }
+    if (m_x>m_max_x) { m_x = m_min_x; }
+    this->setPos(m_x,m_y);
+    std::this_thread::sleep_for (std::chrono::milliseconds(3));
 
 //    double t = 0.0;
 //    uint x=0, y=0;
@@ -207,4 +207,23 @@ void LaserController::swipe()
 //            std::this_thread::sleep_for (std::chrono::milliseconds(10));
 //        }
 //    }
+}
+
+//=== LASER LISTENING ===//
+void LaserController::registerLaserListener(LaserListener* listener)
+{
+    m_laserListeners.push_back(listener);
+}
+
+void LaserController::warnCommand(const int x, const int y)
+{
+    for(auto it = m_laserListeners.begin(); it!=m_laserListeners.end(); it++)
+    {
+        (*it)->receivedNewCommand(x,y);
+    }
+}
+
+void LaserController::deregisterLaserListener(LaserListener* listener)
+{
+    m_laserListeners.remove(listener);
 }
