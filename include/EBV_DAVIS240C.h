@@ -26,10 +26,7 @@ public:
           m_timestamp(0)
     {}
 
-    DAVIS240CEvent(int x,
-                   int y,
-                   bool pol,
-                   int timestamp)
+    DAVIS240CEvent(int x, int y, bool pol, int timestamp)
         : m_x(x),
           m_y(y),
           m_pol(pol),

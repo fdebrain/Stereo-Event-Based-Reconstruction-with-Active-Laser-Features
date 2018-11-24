@@ -42,17 +42,19 @@ public:
                    const double Y,
                    const double Z);
 
-    const int m_rows;
-    const int m_cols;
+    const int m_rows{180};
+    const int m_cols{240};
+    bool m_enable{false};
 
     // Who triangulator is listening to
     Matcher* m_matcher;
     LaserController* m_laser;
 
-private:
+    // Calibration paths
+    std::string m_path_calib_cam = "../calibration/calibCameras.yaml";
+    std::string m_path_calib_laser = "../calibration/calibLaser.yaml";
+
     // Calibration matrices (camera0,camera1,laser)
-    std::string m_pathCalib = "../calibration/calibCameras.yaml";
-    std::string m_pathCalibLaser = "../calibration/laserCalib.yaml";
     std::array<cv::Mat, 3> m_K;
     std::array<cv::Mat, 3> m_D;
     std::array<cv::Mat, 3> m_P;
@@ -62,6 +64,7 @@ private:
     std::array<cv::Mat, 3> m_Rect;
     std::array<cv::Mat, 3> m_Q;
 
+private:
     // Event recordings
     const std::string m_eventRecordFile = "../calibration/laserCalibPoints.txt";
     std::ofstream m_recorder;

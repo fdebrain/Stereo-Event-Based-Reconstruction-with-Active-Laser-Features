@@ -354,10 +354,6 @@ void Visualizer::run()
     for (auto& v : ageMatHSV) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
     for (auto& v : ageMatRGB) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
 
-    cv::StereoBM sbm(g1, g2, disp);
-    normalize(disp, disp8, 0, 255, CV_MINMAX, CV_8U);
-
-
     while(key != 'q')
     {
         for(uint i=0; i<m_rows*m_cols; i++)
@@ -441,10 +437,6 @@ void Visualizer::run()
                         //cv::equalizeHist(m_grayFrame[idx],m_grayFrame[idx]);
                         m_calibrator->calibrateCameras(m_grayFrame[idx],idx);
                     }
-                    if (m_calibrator->m_calibrate_laser)
-                    {
-                        //m_calibrator->calibrateLaser(m_grayFrame[idx],1);
-                    }
                 }
 
                 // Display frame
@@ -491,14 +483,16 @@ void Visualizer::run()
 
         // Calibrate laser
         case 'l':
-            if (m_calibrator)
+            if (m_calibrator && m_laser)
             {
+                if(!m_laser->m_laser_on) { m_laser->start(); }
+                m_laser->setPos(m_laser->m_max_x/2,m_laser->m_max_y/2);
                 printf("Starting laser calibration. \n\r");
                 m_calibrator->m_calibrate_laser = true;
                 m_laser->m_calibrateLaser = true;
 
-                m_calibrator->calibrateLaser(m_grayFrame[1],1);
-                //m_calibrator->pointLaserToPixel(30,200,0);
+                m_calibrator->calibrateLaser(m_grayFrame[0],
+                                             m_grayFrame[1],0);
             }
             break;
 

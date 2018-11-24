@@ -27,6 +27,14 @@ public:
             Filter* filter1 = nullptr);
     ~Matcher();
 
+    // Getters and setters
+    int getEps() const { return m_eps; }
+    void setEps(const int eps) { m_eps = eps; }
+
+    int getMaxBuffer() const { return m_maxTimeToKeep; }
+    void setMaxBuffer(const int maxBuffer) { m_maxTimeToKeep = maxBuffer; }
+
+
     void receivedNewFilterEvent(DAVIS240CEvent& event,
                                 const unsigned int id) override;
     void runThread();
@@ -36,12 +44,6 @@ public:
     void deregisterMatcherListener(MatcherListener* listener);
     void warnMatch(const DAVIS240CEvent& event0,
                    const DAVIS240CEvent& event1);
-
-    int getEps() const { return m_eps; }
-    void setEps(const int eps) { m_eps = eps; }
-
-    int getMaxBuffer() const { return m_maxTimeToKeep; }
-    void setMaxBuffer(const int maxBuffer) { m_maxTimeToKeep = maxBuffer; }
 
 public:
     // Thread this object runs in

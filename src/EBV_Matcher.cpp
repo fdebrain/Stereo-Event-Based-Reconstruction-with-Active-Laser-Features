@@ -46,13 +46,11 @@ void Matcher::runThread()
         if(hasQueueEvent0 && hasQueueEvent1)
         {
             m_queueAccessMutex0.lock();
-                //int s0 = m_evtQueue0.size();
                 event0 = m_evtQueue0.front();
                 m_evtQueue0.pop_front();
             m_queueAccessMutex0.unlock();
 
             m_queueAccessMutex1.lock();
-                //int s1 = m_evtQueue1.size();
                 event1 = m_evtQueue1.front();
                 m_evtQueue1.pop_front();
             m_queueAccessMutex1.unlock();

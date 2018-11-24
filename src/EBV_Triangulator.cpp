@@ -9,7 +9,7 @@ void Triangulator::importCalibration()
 {
     // Import camera calibration
     cv::FileStorage fs;
-    fs.open(m_pathCalib, cv::FileStorage::READ);
+    fs.open(m_path_calib_cam, cv::FileStorage::READ);
     fs["camera_matrix0"] >> m_K[0];
     fs["dist_coeffs0"] >> m_D[0];
     fs["camera_matrix1"] >> m_K[1];
@@ -17,58 +17,82 @@ void Triangulator::importCalibration()
     fs["R"] >> m_R[0];
     fs["T"] >> m_T[0];
     fs["F"] >> m_F[0];
-    std::cout << "K0: " << m_K[0] << "\n\r";
-    std::cout << "D0: " << m_D[0] << "\n\r";
-    std::cout << "K1: " << m_K[1] << "\n\r";
-    std::cout << "D1: " << m_D[1] << "\n\r";
-    std::cout << "R: " << m_R[0] << "\n\r";
-    std::cout << "T: " << m_T[0] << "\n\r";
-    std::cout << "F: " << m_F[0] << "\n\r";
+//    std::cout << "K0: " << m_K[0] << "\n\r";
+//    std::cout << "D0: " << m_D[0] << "\n\r";
+//    std::cout << "K1: " << m_K[1] << "\n\r";
+//    std::cout << "D1: " << m_D[1] << "\n\r";
+//    std::cout << "R: " << m_R[0] << "\n\r";
+//    std::cout << "T: " << m_T[0] << "\n\r";
+//    std::cout << "F: " << m_F[0] << "\n\r";
     fs.release();
 
     // Import laser calibration
-    fs.open(m_pathCalibLaser, cv::FileStorage::READ);
+    fs.open(m_path_calib_laser, cv::FileStorage::READ);
+    fs["camera_matrix0"] >> m_K[0];
+    fs["dist_coeffs0"] >> m_D[0];
+    fs["camera_matrix1"] >> m_K[1];
+    fs["dist_coeffs1"] >> m_D[1];
     fs["camera_matrix_laser"] >> m_K[2];
     fs["dist_coeffs_laser"] >> m_D[2];
-    fs["R0"] >> m_R[1];
-    fs["T0"] >> m_T[1];
-    fs["F0"] >> m_F[1];
-    fs["R1"] >> m_R[2];
-    fs["T1"] >> m_T[2];
-    fs["F1"] >> m_F[2];
-    std::cout << "KLaser: " << m_K[2] << "\n\r";
-    std::cout << "DLaser: " << m_D[2] << "\n\r";
-    std::cout << "R0: " << m_R[1] << "\n\r";
-    std::cout << "T0: " << m_T[1] << "\n\r";
-    std::cout << "F0: " << m_F[1] << "\n\r";
-    std::cout << "R1: " << m_R[2] << "\n\r";
-    std::cout << "T1: " << m_T[2] << "\n\r";
-    std::cout << "F1: " << m_F[2] << "\n\r";
+    fs["R1"] >> m_R[1];
+    fs["T1"] >> m_T[1];
+    fs["F1"] >> m_F[1];
+    fs["R2"] >> m_R[2];
+    fs["T2"] >> m_T[2];
+    fs["F2"] >> m_F[2];
+//    std::cout << "KLaser: " << m_K[2] << "\n\r";
+//    std::cout << "DLaser: " << m_D[2] << "\n\r";
+//    std::cout << "R1: " << m_R[1] << "\n\r";
+//    std::cout << "T1: " << m_T[1] << "\n\r";
+//    std::cout << "F1: " << m_F[1] << "\n\r";
+//    std::cout << "R2: " << m_R[2] << "\n\r";
+//    std::cout << "T2: " << m_T[2] << "\n\r";
+//    std::cout << "F2: " << m_F[2] << "\n\r";
     fs.release();
 
     // Compute projection matrices + stereo-rectification rotations
-    cv::stereoRectify(m_K[0],m_D[0],
-                      m_K[2],m_D[2],
-                      cv::Size(m_cols,m_rows),
-                      m_R[1],m_T[1],
-                      m_Rect[0], m_Rect[2],
-                      m_P[0], m_P[2],
-                      m_Q[1]);
+    if (m_K[2].cols>0 && m_K[0].size==m_K[2].size)
+    {
+        m_enable = true;
+        cv::stereoRectify(m_K[0],m_D[0],
+                          m_K[2],m_D[2],
+                          cv::Size(m_cols,m_rows),
+                          m_R[1],m_T[1],
+                          m_Rect[0], m_Rect[2],
+                          m_P[0], m_P[2],
+                          m_Q[1], cv::CALIB_ZERO_DISPARITY);
 
-    cv::stereoRectify(m_K[0],m_D[0],
-                      m_K[1],m_D[1],
-                      cv::Size(m_cols,m_rows),
-                      m_R[0],m_T[0],
-                      m_Rect[0], m_Rect[1],
-                      m_P[0], m_P[1],
-                      m_Q[0], cv::CALIB_ZERO_DISPARITY);
+//        cv::stereoRectify(m_K[1],m_D[1],
+//                          m_K[2],m_D[2],
+//                          cv::Size(m_cols,m_rows),
+//                          m_R[2],m_T[2],
+//                          m_Rect[1], m_Rect[2],
+//                          m_P[1], m_P[2],
+//                          m_Q[2], cv::CALIB_ZERO_DISPARITY);
+
+//        cv::stereoRectify(m_K[0],m_D[0],
+//                          m_K[1],m_D[1],
+//                          cv::Size(m_cols,m_rows),
+//                          m_R[0],m_T[0],
+//                          m_Rect[0], m_Rect[1],
+//                          m_P[0], m_P[1],
+//                          m_Q[0], cv::CALIB_ZERO_DISPARITY);
+
+
+        std::cout << "P0: " << m_P[0] << "\n\r";
+        std::cout << "P1: " << m_P[1] << "\n\r";
+        std::cout << "P2: " << m_P[2] << "\n\r";
+    }
+    else
+    {
+        m_enable = false;
+        printf("Please press L to calibrate the laser.\n\r");
+    }
 }
 
 Triangulator::Triangulator(Matcher* matcher,
                            LaserController* laser)
-    : m_rows(180),
-      m_cols(240),
-      m_matcher(matcher),
+    : m_matcher(matcher),
       m_laser(laser)
 {
     // Initialize datastructures
@@ -78,8 +102,8 @@ Triangulator::Triangulator(Matcher* matcher,
     for (auto &r : m_R) { r = cv::Mat(3,3,CV_32FC1); }
     for (auto &t : m_T) { t = cv::Mat(3,1,CV_32FC1); }
     for (auto &f : m_F) { f = cv::Mat(1,5,CV_32FC1); }
-    for (auto &rect : m_Rect) { rect.resize(0); }
-    for (auto &q : m_Q) { q.resize(0); }
+    for (auto &rect : m_Rect) { rect = cv::Mat(3,3,CV_32FC1); }
+    for (auto &q : m_Q) { q = cv::Mat(4,4,CV_32FC1); }
 
     // Listen to matcher
     m_matcher->registerMatcherListener(this);
@@ -89,7 +113,8 @@ Triangulator::Triangulator(Matcher* matcher,
 
     // Calibration
     this->importCalibration();
-    m_thread = std::thread(&Triangulator::run,this);
+
+    if (m_enable) { m_thread = std::thread(&Triangulator::run,this); }
 }
 
 Triangulator::~Triangulator()
@@ -171,21 +196,21 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     cv::Vec4d point3D;
 
     m_queueAccessMutex0.lock();
-        const unsigned int x0 = event0.m_x;
-        const unsigned int y0 = event0.m_y;
-        const unsigned int x1 = event1.m_x;
-        const unsigned int y1 = event1.m_y;
-        int xLaser = m_laser->getX();
-        int yLaser = m_laser->getY();
+        const int x0 = event0.m_x;
+        const int y0 = event0.m_y;
+        const int x1 = event1.m_x;
+        const int y1 = event1.m_y;
+        int xLaser = 180*(m_laser->getX()-m_laser->m_min_x)/(m_laser->m_max_x - m_laser->m_min_x);
+        int yLaser = 240*(m_laser->getY()-m_laser->m_min_y)/(m_laser->m_max_y - m_laser->m_min_y);
     m_queueAccessMutex0.unlock();
 
     //printf("xLaser: %d - yLaser: %d - xEvent: %d - yEvent: %d. \n\r",
     //       xLaser,yLaser, x0, y0);
 
-    ///*
+    /*
     // Camera0-Camera1 stereo
-    coords0.push_back(cv::Point2d(y0,x0)); // Warning: x = column, y = row
-    coords1.push_back(cv::Point2d(y1,x1));
+    coords0.emplace_back(y0,x0);
+    coords1.emplace_back(y1,x1);
 
     // Undistort 2D points
     cv::undistortPoints(coords0, undistCoords0,
@@ -207,45 +232,43 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                           undistCoordsCorrected0,
                           undistCoordsCorrected1,
                           point3D);
-    //*/
+    */
 
     // Camera0-Laser stereo
-    //coords0.push_back(cv::Point2d(y0,x0)); // Warning: Point2d(column,row)
-    //coords1.push_back(cv::Point2d(yLaser,xLaser));
-//    coords0.emplace_back(y0,x0);
-//    coords1.emplace_back(yLaser,xLaser);
+    coords0.emplace_back(y0,x0);
+    coords1.emplace_back(yLaser,xLaser);
 
-//    // Undistort 2D points
-//    cv::undistortPoints(coords0, undistCoords0,
-//                        m_K[0], m_D[0],
-//                        m_Rect[0],
-//                        m_P[0]);
+    // Undistort 2D points
+    cv::undistortPoints(coords0, undistCoords0,
+                        m_K[0], m_D[0],
+                        m_Rect[0],
+                        m_P[0]);
 
-//    undistCoords1 = coords1;
-//    cv::undistortPoints(coords1, undistCoords1,
-//                        m_K[2], m_D[2],
-//                        m_Rect[2],
-//                        m_P[2]);
+    //undistCoords1 = coords1;
+    cv::undistortPoints(coords1, undistCoords1,
+                        m_K[2], m_D[2],
+                        m_Rect[2],
+                        m_P[2]);
 
     // Correct matches
-    //cv::correctMatches(m_F0,undistCoords0,undistCoords1,
-    //                  undistCoordsCorrected0,
-    //                  undistCoordsCorrected1);
+    cv::correctMatches(m_F[1],undistCoords0,undistCoords1,
+                      undistCoordsCorrected0,
+                      undistCoordsCorrected1);
 
     // Triangulate
-//    cv::triangulatePoints(m_P[0], m_P[2],
-//                          undistCoords0,
-//                          undistCoords1,
-//                          //undistCoordsCorrected0,
-//                          //undistCoordsCorrected1,
-//                          point3D);
+    cv::triangulatePoints(m_P[0], m_P[2],
+                          undistCoords0,
+                          undistCoords1,
+                          //undistCoordsCorrected0,
+                          //undistCoordsCorrected1,
+                          point3D);
 
     double X = point3D[0]/point3D[3];
     double Y = point3D[1]/point3D[3];
     double Z = point3D[2]/point3D[3];
 
     // DEBUG - CHECK 3D POINT POSITION
-    //printf("Point at: (%2.1f,%2.1f,%2.1f).\n\r",X,Y,Z);
+    printf("Point at: (%2.1f,%2.1f,%2.1f).\n\r",X,Y,Z);
     // END DEBUG
 
     // Save laser calibration file
