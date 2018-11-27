@@ -1,9 +1,11 @@
 #include <EBV_Matcher.h>
 
 Matcher::Matcher(Filter* filter0,
-                 Filter* filter1)
+                 Filter* filter1,
+                 LaserController* laser)
     : m_rows(180), m_cols(240),
-      m_filter0(filter0), m_filter1(filter1)
+      m_filter0(filter0), m_filter1(filter1),
+      m_laser(laser)
 {
     // Matching parameters
     m_eps = 10e3;
@@ -12,6 +14,7 @@ Matcher::Matcher(Filter* filter0,
     // Initialize filters listeners
     m_filter0->registerFilterListener(this);
     m_filter1->registerFilterListener(this);
+    //m_laser->registerLaserListener(this);
 
     // Initialize thread
     m_thread = std::thread(&Matcher::runThread,this);
@@ -21,6 +24,7 @@ Matcher::~Matcher()
 {
     m_filter0->deregisterFilterListener(this);
     m_filter1->deregisterFilterListener(this);
+    //m_laser->deregisterLaserListener(this);
 }
 
 // The function the thread executes and waits on
@@ -28,8 +32,10 @@ void Matcher::runThread()
 {
     bool hasQueueEvent0;
     bool hasQueueEvent1;
+    //bool hasQueueEvent2;
     DAVIS240CEvent event0;
     DAVIS240CEvent event1;
+    //LaserEvent event2;
 
     while(true)
     {
@@ -40,6 +46,10 @@ void Matcher::runThread()
         m_queueAccessMutex1.lock();
             hasQueueEvent1  = !m_evtQueue1.empty();
         m_queueAccessMutex1.unlock();
+
+//        m_queueAccessMutex2.lock();
+//            hasQueueEvent2  = !m_evtQueue2.empty();
+//        m_queueAccessMutex2.unlock();
 
         // Process only if incoming filtered events in both cameras
         //CHANGE
@@ -67,6 +77,27 @@ void Matcher::runThread()
             // END DEBUG
 
             this->process(event0,event1);
+
+//            // Laser events
+//            if (hasQueueEvent2)
+//            {
+//                m_queueAccessMutex2.lock();
+//                    event2 = m_evtQueue2.front();
+//                    m_evtQueue2.pop_front();
+//                m_queueAccessMutex2.unlock();
+
+//                // DEBUG - QUEUE SIZE SHOULD BE SIMILAR
+//                //printf("Queue size: %d - %d.\n\r", m_evtQueue0.size(), m_evtQueue2.size());
+//                // END DEBUG
+
+//                // DEBUG - DELTA TIME SHOULD BE SMALL
+//                //int t0 = event0.m_timestamp;
+//                //int t1 = event1.m_timestamp;
+//                //printf("Delta-time: (%d).\n\r",t0-t1);
+//                // END DEBUG
+
+//                //this->process(event0, event2);
+//            }
         }
         else
         {
@@ -129,6 +160,27 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
     m_condWait.notify_one();
 }
 
+//void Matcher::receivedNewLaserEvent(const LaserEvent& event)
+//{
+//    int t = event.m_timestamp;
+//    m_queueAccessMutex2.lock();
+//        m_evtQueue2.push_back(event);
+
+//        // Remove old events
+//        m_currTime2 = event.m_timestamp;
+//        std::list<LaserEvent>::iterator it = m_evtQueue2.begin(); // DANGER SHARED RESOURCE
+//        while(    ((m_currTime2-it->m_timestamp) > m_maxTimeToKeep)
+//               && (it!=m_evtQueue2.end())
+//             )
+//        {
+//            m_evtQueue2.erase(it++);
+//        }
+//    m_queueAccessMutex2.unlock();
+
+//    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+//    m_condWait.notify_one();
+//}
+
 void Matcher::process(DAVIS240CEvent& e0, DAVIS240CEvent& e1)
 {
     const int t0 = e0.m_timestamp;
@@ -142,6 +194,11 @@ void Matcher::process(DAVIS240CEvent& e0, DAVIS240CEvent& e1)
         warnMatch(e0,e1);
     }
 }
+
+//void Matcher::process(DAVIS240CEvent& e0, LaserEvent& e1)
+//{
+//    warnMatch(e0,e1);
+//}
 
 void Matcher::registerMatcherListener(MatcherListener* listener)
 {
@@ -162,3 +219,13 @@ void Matcher::warnMatch(const DAVIS240CEvent& event0,
         (*it)->receivedNewMatch(event0,event1);
     }
 }
+
+//void Matcher::warnMatch(const DAVIS240CEvent& event0,
+//                        const LaserEvent& event1)
+//{
+//    std::list<MatcherListener*>::iterator it;
+//    for(it = m_matcherListeners.begin(); it!=m_matcherListeners.end(); it++)
+//    {
+//        (*it)->receivedNewMatch(event0,event1);
+//    }
+//}

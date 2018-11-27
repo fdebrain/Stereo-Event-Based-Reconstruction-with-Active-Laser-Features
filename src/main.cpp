@@ -17,7 +17,7 @@ int main(int argc, char** argv)
     LaserController laser(freq);
     AdaptiveFilter       filter0(freq,&davis_master);
     AdaptiveFilter       filter1(freq,&davis_slave);
-    Matcher      matcher(&filter0,&filter1);
+    Matcher      matcher(&filter0,&filter1,&laser);
     Triangulator triangulator(&matcher,
                               &laser);
     StereoCalibrator calibrator(&laser,

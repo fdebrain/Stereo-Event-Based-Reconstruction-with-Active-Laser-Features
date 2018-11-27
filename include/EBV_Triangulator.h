@@ -28,6 +28,7 @@ public:
 
     void calibrateLaser();
     void importCalibration();
+    bool isValid(const int id) const;
     void run();
     void receivedNewMatch(const DAVIS240CEvent& event1,
                           const DAVIS240CEvent& event2) override;
@@ -45,6 +46,9 @@ public:
     const int m_rows{180};
     const int m_cols{240};
     bool m_enable{false};
+    bool m_camera_stereo{true};
+    bool m_debug{false};
+    bool m_record{false};
 
     // Who triangulator is listening to
     Matcher* m_matcher;

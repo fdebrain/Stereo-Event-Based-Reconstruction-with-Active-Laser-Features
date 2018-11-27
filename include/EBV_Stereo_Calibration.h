@@ -52,8 +52,8 @@ public:
 
     // Intrinsics
     const cv::Point2i m_pattern_size{8, 5};
-    const float m_pattern_square_size = 3.0f;
-    const size_t m_min_frames_to_capture{5};
+    const float m_pattern_square_size = 0.03f;
+    const size_t m_min_frames_to_capture{20};
     const int m_step{3};
     const std::chrono::milliseconds m_min_capture_delay{1000};
     std::array<std::chrono::high_resolution_clock::time_point,2> m_last_frame_captured;

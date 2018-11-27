@@ -119,7 +119,6 @@ public:
     void setMaxT(int max_t) {m_max_t=max_t;}
 
     int m_sigma;
-    int m_neighbor_radius;
     const float m_pi{3.14159f};
 
     // Data structure matrix of list of events

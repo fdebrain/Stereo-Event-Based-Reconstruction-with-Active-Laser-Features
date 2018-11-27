@@ -486,11 +486,9 @@ void Visualizer::run()
             if (m_calibrator && m_laser)
             {
                 if(!m_laser->m_laser_on) { m_laser->start(); }
-                m_laser->setPos(m_laser->m_max_x/2,m_laser->m_max_y/2);
+                //m_laser->setPos(m_laser->m_max_x/2,m_laser->m_max_y/2);
                 printf("Starting laser calibration. \n\r");
                 m_calibrator->m_calibrate_laser = true;
-                m_laser->m_calibrateLaser = true;
-
                 m_calibrator->calibrateLaser(m_grayFrame[0],
                                              m_grayFrame[1],0);
             }
@@ -511,6 +509,18 @@ void Visualizer::run()
             printf("Inpainting. \n\r");
             cv::inpaint(depthMatRGB,m_mask,depthMatRGBInpainted,2,cv::INPAINT_TELEA);
             cv::imshow(m_depthInpaintedWin,depthMatRGBInpainted);
+            break;
+
+        case 't':
+            // Change triangulation mode
+            m_triangulator->m_camera_stereo = !m_triangulator->m_camera_stereo;
+            m_triangulator->importCalibration();
+            printf("Switch triangulation mode. \n\r");
+            break;
+
+         case 'd':
+            printf("Switch debug mode. \n\r");
+            m_triangulator->m_debug = !m_triangulator->m_debug;
             break;
         }
 

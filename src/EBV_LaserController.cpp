@@ -9,7 +9,6 @@ LaserController::LaserController(int freq)
       m_min_y(0),
       m_max_x(3500),
       m_max_y(4000),
-      m_calibrateLaser(false),
       m_laser_on(false),
       m_swipe_on(false),
       m_received_new_state(false),
@@ -57,6 +56,13 @@ void LaserController::setPos(const int x, const int y)
 
     // Wait for laser to reach target
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+    // Warn new laser event
+//    const auto now = std::chrono::high_resolution_clock::now();
+//    auto t = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+
+    //LaserEvent event(x,y,t);
+    //this->warnCommand(event);
 }
 
 void LaserController::setVel(const int vx, const int vy)
@@ -117,7 +123,7 @@ void LaserController::runThread()
 {
     while(true)
     {
-        if (m_swipe_on) { this->swipe(); }
+        if (m_swipe_on) { this->sweep(); }
         else
         {
             // IDLE if not received new command
@@ -128,7 +134,7 @@ void LaserController::runThread()
     }
 }
 
-void LaserController::swipe()
+void LaserController::sweep()
 {
     const auto now = std::chrono::high_resolution_clock::now();
     m_chrono = now;
@@ -215,11 +221,11 @@ void LaserController::registerLaserListener(LaserListener* listener)
     m_laserListeners.push_back(listener);
 }
 
-void LaserController::warnCommand(const int x, const int y)
+void LaserController::warnCommand(const LaserEvent& event)
 {
     for(auto it = m_laserListeners.begin(); it!=m_laserListeners.end(); it++)
     {
-        (*it)->receivedNewCommand(x,y);
+        (*it)->receivedNewLaserEvent(event);
     }
 }
 

@@ -1,6 +1,8 @@
 #ifndef EBV_LASERCONTROLLER_H
 #define EBV_LASERCONTROLLER_H
 
+#include <EBV_DAVIS240C.h>
+
 #include <list>
 #include <cmath>
 #include <chrono>
@@ -12,30 +14,22 @@
 
 class MagneticMirrorLaser;
 
-struct LaserEvent
+struct LaserEvent : public DAVIS240CEvent
 {
   LaserEvent()
-      : m_x(0),
-        m_y(0),
-        m_timestamp(0)
+      : DAVIS240CEvent (0,0,false,0)
   {}
 
   LaserEvent(int x, int y, int t)
-      : m_x(x),
-        m_y(y),
-        m_timestamp(t)
+      : DAVIS240CEvent (x,y,false,t)
   {}
-
-  int m_x;
-  int m_y;
-  int m_timestamp;
 };
 
 class LaserListener
 {
 public:
     LaserListener(void) {}
-    virtual void receivedNewCommand(const int x, const int y);
+    virtual void receivedNewLaserEvent(const LaserEvent& event) = 0;
 };
 
 class LaserController
@@ -60,8 +54,8 @@ public:
     int getFreq() const { return m_freq; }
     void setFreq(const int freq);
 
-    bool getCalibrationMode() const { return m_calibrateLaser; }
-    void setCalibrationMode(bool mode);
+    //bool getCalibrationMode() const { return m_calibrateLaser; }
+    //void setCalibrationMode(bool mode);
 
     void setPos(const int x, const int y);
     void setVel(const int vx, const int vy);
@@ -72,12 +66,12 @@ public:
     void toogleState();
     void toogleSwipe();
     void runThread();
-    void swipe();
+    void sweep();
 
     // Laser event listening
     void registerLaserListener(LaserListener* listener);
     void deregisterLaserListener(LaserListener* listener);
-    void warnCommand(const int x, const int y);
+    void warnCommand(const LaserEvent& event);
 
 public:
     std::thread m_thread;
@@ -88,7 +82,6 @@ public:
     // Laser state
     int m_x;
     int m_y;
-    bool m_calibrateLaser;
     bool m_laser_on;
     bool m_swipe_on;
     bool m_received_new_state;

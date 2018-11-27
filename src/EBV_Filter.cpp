@@ -166,8 +166,7 @@ void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
 // ADAPTIVE FILTER
 AdaptiveFilter::AdaptiveFilter(int freq,DAVIS240C* davis)
       : Filter(freq,davis),
-        m_sigma(30),
-        m_neighbor_radius(1)
+        m_sigma(30)
 {
     // Initialize datastructures
     m_last_event.resize(m_rows*m_cols);
@@ -250,10 +249,6 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
 
     if (std::abs(m_frequency-freq)<m_sigma)
     {
-        // Compute probability (gaussian)
-        //const double prob = std::exp( -(freq-m_frequency)*(freq-m_frequency)
-        //                             /(2.*m_sigma*m_sigma));
-        //printf("Freq: %d - Prob: %f. \n\r", freq, prob);
 
         //=== DEBUG ===//
 //        if (freq>200)
