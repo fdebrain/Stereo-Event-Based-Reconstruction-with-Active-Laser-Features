@@ -79,14 +79,16 @@ public:
     int        m_max_trackbar_val{};
 
     // Trackbar parameters (laser)
-    int m_laserX{};
-    int m_laserY{};
-    int m_laserVx{};
-    int m_laserVy{};
+    std::array<int,2> m_laser_pos{};
+    //int m_laser_y{};
+    std::array<int,2> m_laser_vel{};
+    //int m_laser_vx{};
+    //int m_laser_vy{};
     int m_lrInt{};
-    int m_stepInt{};
-    int m_laserFreq{};
-
+    int m_laser_freq{};
+    int m_laser_step{};
+    int m_laser_ratio_int{};
+    std::array<int,4> m_laser_boundaries{};
     // Trackbar parameters (filter)
     std::array<int,2> m_filter_freq{};
     std::array<int,2> m_filter_eps{};

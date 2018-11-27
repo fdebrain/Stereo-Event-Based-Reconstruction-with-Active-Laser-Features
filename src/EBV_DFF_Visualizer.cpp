@@ -9,6 +9,7 @@
 #include <opencv2/opencv.hpp>
 
 //=== TRACKBAR CALLBACKS ===//
+//=== Filters ===//
 static void callbackTrackbarFilterFreq(int new_freq, void *data)
 {
     Filter* filter = static_cast<Filter*>(data);
@@ -57,6 +58,31 @@ static void callbackTrackbarEta(int newEta, void *data)
     filter->setEta(newEta/100.f);
 }
 
+//=== Laser ===//
+static void callbackTrackbarLaserMinX(int min_x, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMinX(min_x);
+}
+
+static void callbackTrackbarLaserMaxX(int max_x, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMaxX(max_x);
+}
+
+static void callbackTrackbarLaserMinY(int min_y, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMinY(min_y);
+}
+
+static void callbackTrackbarLaserMaxY(int max_y, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMaxY(max_y);
+}
+
 static void callbackTrackbarLaserX(int x, void *data)
 {
     LaserController* laser = static_cast<LaserController*>(data);
@@ -93,6 +119,19 @@ static void callbackTrackbarLaserFreq(int freq, void *data)
     laser->setFreq(freq);
 }
 
+static void callbackTrackbarLaserStep(int step, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setStep(step);
+}
+
+static void callbackTrackbarLaserRatio(int ratio, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setRatio(ratio/10.f);
+}
+
+//=== Matcher ===//
 static void callbackTrackbarMatcherEps(int eps, void *data)
 {
     Matcher* matcher = static_cast<Matcher*>(data);
@@ -198,23 +237,43 @@ Visualizer::Visualizer(const uint nbCams,
     if (m_laser!=nullptr)
     {
         // Initialize tuning parameters (laser)
-        m_laserX = m_laser->getX();
-        m_laserY = m_laser->getY();
-        m_laserVx = m_laser->getVx();
-        m_laserVy = m_laser->getVy();
-        m_laserFreq = m_laser->getFreq();
+        m_laser_pos[0] = m_laser->getX();
+        m_laser_pos[1] = m_laser->getY();
+        m_laser_vel[0] = m_laser->getVx();
+        m_laser_vel[1] = m_laser->getVy();
+        m_laser_freq = m_laser->getFreq();
+        m_laser_step = m_laser->getStep();
+        m_laser_ratio_int = static_cast<int>(10*m_laser->getRatio());
+        m_laser_boundaries[0] = m_laser->getMinX();
+        m_laser_boundaries[1] = m_laser->getMaxX();
+        m_laser_boundaries[2] = m_laser->getMinY();
+        m_laser_boundaries[3] = m_laser->getMaxY();
 
         // Laser trackbars
-        cv::createTrackbar("Laser frequency",m_polWin[0],&m_laserFreq,1500,
+        cv::createTrackbar("Laser frequency",m_polWin[0],&m_laser_freq,1500,
                            &callbackTrackbarLaserFreq,static_cast<void*>(m_laser));
-        cv::createTrackbar("laserX",m_polWin[0],&m_laserX,4000,
+
+        cv::createTrackbar("laserMinX",m_polWin[0],&m_laser_boundaries[0],4000,
+                           &callbackTrackbarLaserMinX,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMaxX",m_polWin[0],&m_laser_boundaries[1],4000,
+                           &callbackTrackbarLaserMaxX,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMinY",m_polWin[0],&m_laser_boundaries[2],4000,
+                           &callbackTrackbarLaserMinY,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMaxY",m_polWin[0],&m_laser_boundaries[3],4000,
+                           &callbackTrackbarLaserMaxY,static_cast<void*>(m_laser));
+
+        cv::createTrackbar("laserX",m_polWin[0],&m_laser_pos[0],m_laser->m_max_x,
                            &callbackTrackbarLaserX,static_cast<void*>(m_laser));
-        cv::createTrackbar("laserY",m_polWin[0],&m_laserY,4000,
+        cv::createTrackbar("laserY",m_polWin[0],&m_laser_pos[1],m_laser->m_max_y,
                            &callbackTrackbarLaserY,static_cast<void*>(m_laser));
-        cv::createTrackbar("laserVx",m_polWin[0],&m_laserVx,1e6,
+        cv::createTrackbar("laserVx",m_polWin[0],&m_laser_vel[0],1e6,
                            &callbackTrackbarLaserVx,static_cast<void*>(m_laser));
-        cv::createTrackbar("laserVy",m_polWin[0],&m_laserVy,1e6,
+        cv::createTrackbar("laserVy",m_polWin[0],&m_laser_vel[1],1e6,
                            &callbackTrackbarLaserVy,static_cast<void*>(m_laser));
+        cv::createTrackbar("Laser step",m_polWin[0],&m_laser_step,300,
+                           &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
+        cv::createTrackbar("Laser ratio",m_polWin[0],&m_laser_ratio_int,100,
+                           &callbackTrackbarLaserRatio,static_cast<void*>(m_laser));
     }
 
     // Initialize triangulator
@@ -501,7 +560,7 @@ void Visualizer::run()
 
         // Toogle laser swipe mode (on/off)
         case 's':
-            if (m_laser) { m_laser->toogleSwipe(); }
+            if (m_laser) { m_laser->toogleSweep(); }
             break;
 
         case 'i':

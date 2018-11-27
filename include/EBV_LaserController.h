@@ -39,6 +39,18 @@ public:
     ~LaserController();
 
     // Getters and setters
+    int getMinX() const { return m_min_x; }
+    void setMinX(const int min_x) { m_min_x = min_x; }
+
+    int getMaxX() const { return m_max_x; }
+    void setMaxX(const int max_x) { m_max_x = max_x; }
+
+    int getMinY() const { return m_min_y; }
+    void setMinY(const int min_y) { m_min_y = min_y; }
+
+    int getMaxY() const { return m_max_y; }
+    void setMaxY(const int max_y) { m_max_y = max_y; }
+
     int getX() const { return m_x; }
     void setX(const int x) { m_x = x; this->setPos(m_x,m_y);}
 
@@ -54,6 +66,13 @@ public:
     int getFreq() const { return m_freq; }
     void setFreq(const int freq);
 
+    int getStep() const { return m_step; }
+    void setStep(const int step) { m_step = step; }
+
+    float getRatio() const { return m_ratio; }
+    void setRatio(const float ratio) { m_ratio= ratio; }
+
+
     //bool getCalibrationMode() const { return m_calibrateLaser; }
     //void setCalibrationMode(bool mode);
 
@@ -64,7 +83,7 @@ public:
     void start();
     void stop();
     void toogleState();
-    void toogleSwipe();
+    void toogleSweep();
     void runThread();
     void sweep();
 
@@ -94,7 +113,8 @@ public:
 private:
     MagneticMirrorLaser* m_laser;
     int m_freq;
-    double m_step;
+    int m_step;
+    float m_ratio;
     int m_vx;
     int m_vy;
     int m_swipe_vx;

@@ -4,10 +4,11 @@
 LaserController::LaserController(int freq)
     : m_laser{new MagneticMirrorLaser},
       m_freq(freq), // Fix the offset
-      m_step(100),
+      m_step(50),
+      m_ratio(2),
       m_min_x(500),
       m_min_y(0),
-      m_max_x(3500),
+      m_max_x(4000),
       m_max_y(4000),
       m_laser_on(false),
       m_swipe_on(false),
@@ -102,7 +103,7 @@ void LaserController::toogleState()
     m_condWait.notify_one();
 }
 
-void LaserController::toogleSwipe()
+void LaserController::toogleSweep()
 {
     m_received_new_state = true;
     m_swipe_on = !m_swipe_on;
@@ -142,10 +143,10 @@ void LaserController::sweep()
     //this->setVel(m_swipe_vx,m_swipe_vy);
 
     m_y += m_step;
-    if (m_y>=m_max_y) { m_y = m_min_y; m_x += 2*m_step; }
+    if (m_y>=m_max_y) { m_y = m_min_y; m_x += m_ratio*m_step; }
     if (m_x>m_max_x) { m_x = m_min_x; }
     this->setPos(m_x,m_y);
-    std::this_thread::sleep_for (std::chrono::milliseconds(3));
+    std::this_thread::sleep_for (std::chrono::milliseconds(1));
 
 //    double t = 0.0;
 //    uint x=0, y=0;
