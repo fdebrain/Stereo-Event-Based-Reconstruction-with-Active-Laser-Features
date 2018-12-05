@@ -65,21 +65,30 @@ int MagneticMirrorLaser::toggle(bool toggle)
         return sendCommand("L-\n");
 }
 
-int MagneticMirrorLaser::blink(unsigned int us)
-{
-    unsigned int us10 = us / 10;
+//int MagneticMirrorLaser::blink(unsigned int us)
+//{
+//    unsigned int us10 = us / 10;
 
-    std::ostringstream us10S;
-    us10S << us10;
+//    std::ostringstream us10S;
+//    us10S << us10;
 
-    std::string cmd("T");
-    cmd.append(us10S.str().c_str())
-        .append("\n");
+//    std::string cmd("T");
+//    cmd.append(us10S.str().c_str())
+//        .append("\n");
 
-    return sendCommand(cmd);
+//    return sendCommand(cmd);
+//}
+
+bool MagneticMirrorLaser::blink(const std::chrono::microseconds dt) {
+    const auto us10 = dt.count() / 10;
+
+    std::ostringstream cmd;
+    cmd << 'T' << us10 << '\n';
+
+    return sendCommand(cmd.str());
 }
 
-int MagneticMirrorLaser::pos(unsigned int x,unsigned int y)
+int MagneticMirrorLaser::pos(int x, int y)
 {
     x = 4095 - x;
     y = 4095 - y;
@@ -103,7 +112,7 @@ int MagneticMirrorLaser::pos(unsigned int x,unsigned int y)
     return sendCommand(cmd);
 }
 
-int MagneticMirrorLaser::vel(unsigned int x,unsigned int y)
+int MagneticMirrorLaser::vel(const int x,const int y)
 {
     std::ostringstream xS;
     xS << x;
@@ -125,7 +134,7 @@ void MagneticMirrorLaser::close(void)
     this->toggle(false);   // laser off
     this->vel(0,0);       // velocity 0
     this->pos(2048,2048); // neutral position
-    this->blink(0);       // don't blink
+    this->blink(std::chrono::microseconds{0});       // don't blink
 
     std::cout << "> Closing " << m_device << " on " << m_ttyFd << std::endl;
     if(::close(m_ttyFd) < 0)
@@ -140,9 +149,7 @@ int MagneticMirrorLaser::sendCommand(std::string cmd)
     // DEBUG Command
     //std::cout << "\t Input command: " << cmd.substr(0,cmd.length()-1) << std::endl;
 
-    int w = write(m_ttyFd,
-                  cmd.c_str(),
-                  cmd.length());
+    int w = write(m_ttyFd, cmd.c_str(), cmd.length());
 
     return !(w==cmd.length());
 }

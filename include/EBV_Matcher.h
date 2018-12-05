@@ -37,7 +37,7 @@ public:
     void setMaxBuffer(const int maxBuffer) { m_maxTimeToKeep = maxBuffer; }
 
     void receivedNewFilterEvent(DAVIS240CEvent& event,
-                                const unsigned int id) override;
+                                const int id) override;
 //    void receivedNewLaserEvent(const LaserEvent& event) override;
     void runThread();
     void process(DAVIS240CEvent& e0, DAVIS240CEvent& e1);
@@ -55,15 +55,15 @@ public:
     std::thread m_thread;
 
 private:
-    const int m_rows;
-    const int m_cols;
-    int m_eps;
+    const int m_rows{180};
+    const int m_cols{240};
+    int m_eps{10000};
 
     // Flushing old events
     int m_currTime0;
     int m_currTime1;
     int m_currTime2;
-    int m_maxTimeToKeep;
+    int m_maxTimeToKeep{10000};
 
     // List of incoming filtered events for each camera (FIFO)
     std::list<DAVIS240CEvent> m_evtQueue0;

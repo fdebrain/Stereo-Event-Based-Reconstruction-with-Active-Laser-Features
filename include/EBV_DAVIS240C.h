@@ -16,22 +16,19 @@ namespace cv {class Mat;}
 
 static std::atomic_bool globalShutdown(false);
 
-struct DAVIS240CEvent
-{
+struct DAVIS240CEvent {
 public:
     DAVIS240CEvent()
         : m_x(0),
           m_y(0),
           m_pol(0),
-          m_timestamp(0)
-    {}
+          m_timestamp(0) {}
 
-    DAVIS240CEvent(int x, int y, bool pol, int timestamp)
+    DAVIS240CEvent(const int x, const int y, const bool pol, const int timestamp)
         : m_x(x),
           m_y(y),
           m_pol(pol),
-          m_timestamp(timestamp)
-    {}
+          m_timestamp(timestamp) {}
 
     int m_x;
     int m_y;
@@ -39,30 +36,26 @@ public:
     int m_timestamp;
 };
 
-struct DAVIS240CFrame
-{
+struct DAVIS240CFrame {
 public:
-    DAVIS240CFrame(): m_frame(240*180), m_timestamp(0)
-    {
-    }
+    DAVIS240CFrame()
+        : m_frame(240*180),
+          m_timestamp(0) {}
 
     DAVIS240CFrame(const std::vector<uchar> frame,
                    const int timestamp)
-        : m_frame(frame), m_timestamp(timestamp)
-    {
-        //m_frame.resize(240*180);
-    }
+        : m_frame(frame),
+          m_timestamp(timestamp) {}
 
      std::vector<uchar> m_frame;
      int m_timestamp;
 };
 
-class DAVIS240CEventListener
-{
+class DAVIS240CEventListener {
 public:
     DAVIS240CEventListener(void) {}
     virtual void receivedNewDAVIS240CEvent(DAVIS240CEvent& event,
-                                           const uint id) = 0;
+                                           const int id) = 0;
 };
 
 class DAVIS240CFrameListener
@@ -70,7 +63,7 @@ class DAVIS240CFrameListener
 public:
     DAVIS240CFrameListener(void) {}
     virtual void receivedNewDAVIS240CFrame(DAVIS240CFrame& frame,
-                                           const uint id) = 0;
+                                           const int id) = 0;
 };
 
 class DAVIS240C
@@ -79,8 +72,8 @@ public:
     DAVIS240C();
     ~DAVIS240C();
 
-    static uint m_nbCams;
-    static libcaer::devices::davis* m_davisMasterHandle;
+    static int m_nbCams;
+    static libcaer::devices::davis* m_davis_master_handle;
 
     // Life cycle of a DAVIS240C
     void resetMasterClock();
@@ -103,23 +96,21 @@ public:
 
 public:
     // Id of the camera
-    const uint m_id;
+    const int m_id;
 
     // Device resolution
-    const int m_rows;
-    const int m_cols;
+    const int m_rows{180};
+    const int m_cols{240};
 
 private:
-    //Device handle
-    libcaer::devices::davis m_davisHandle;
+    libcaer::devices::davis m_davis_handle;
 
-    // Reading thread related variables
-    std::thread m_readThread;
-    bool m_stopreadThread;
+    std::thread m_read_thread;
+    bool m_stop_read_thread{true};
 
     // Registered listeners
-    std::list<DAVIS240CEventListener*> m_eventListeners;
-    std::list<DAVIS240CFrameListener*> m_frameListeners;
+    std::list<DAVIS240CEventListener*> m_event_listeners;
+    std::list<DAVIS240CFrameListener*> m_frame_listeners;
 };
 
 #endif // EBV_DAVIS240C_H

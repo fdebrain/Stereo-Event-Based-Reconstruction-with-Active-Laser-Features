@@ -6,16 +6,28 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-// QUESTION: How do we forward declare this so it doesn't appear in the header ?
-//#include <libcaercpp/devices/davis.hpp>
+#define CF_N_TYPE(COARSE, FINE)                                                \
+    (struct caer_bias_coarsefine) {                                            \
+        .coarseValue = (COARSE), .fineValue = (FINE), .enabled = true,         \
+        .sexN = true, .typeNormal = true, .currentLevelNormal = true           \
+    }
 
+#define CF_P_TYPE(COARSE, FINE)                                                \
+    (struct caer_bias_coarsefine) {                                            \
+        .coarseValue = (COARSE), .fineValue = (FINE), .enabled = true,         \
+        .sexN = false, .typeNormal = true, .currentLevelNormal = true          \
+    }
+
+#define CF_N_TYPE_CAS(COARSE, FINE)                                            \
+    (struct caer_bias_coarsefine) {                                            \
+        .coarseValue = COARSE, .fineValue = FINE, .enabled = true,             \
+        .sexN = true, .typeNormal = false, .currentLevelNormal = true          \
+    }
+
+// Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
 static void globalShutdownSignalHandler(int signal)
 {
-    // Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
-    if (signal == SIGTERM || signal == SIGINT)
-    {
-        globalShutdown.store(true);
-    }
+    if (signal == SIGTERM || signal == SIGINT) { globalShutdown.store(true); }
 }
 
 static void usbShutdownHandler(void *ptr)
@@ -24,16 +36,13 @@ static void usbShutdownHandler(void *ptr)
     globalShutdown.store(true);
 }
 
-uint DAVIS240C::m_nbCams=0;
-libcaer::devices::davis* DAVIS240C::m_davisMasterHandle = nullptr;
+int DAVIS240C::m_nbCams=0;
+libcaer::devices::davis* DAVIS240C::m_davis_master_handle = nullptr;
 
 DAVIS240C::DAVIS240C()
     // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
     : m_id(m_nbCams),
-      m_rows(180),
-      m_cols(240),
-      m_davisHandle(libcaer::devices::davis(m_id)),
-      m_stopreadThread(true)
+      m_davis_handle(libcaer::devices::davis(m_id))
 {
     m_nbCams += 1;
 
@@ -67,10 +76,10 @@ DAVIS240C::~DAVIS240C()
 //=== INITIALIZING ===//
 void DAVIS240C::resetMasterClock()
 {
-    if (m_davisMasterHandle->infoGet().deviceIsMaster)
+    if (m_davis_master_handle->infoGet().deviceIsMaster)
     {
-        m_davisMasterHandle->configSet(DAVIS_CONFIG_MUX,
-                                       DAVIS_CONFIG_MUX_TIMESTAMP_RESET, 2);
+        m_davis_master_handle->configSet(DAVIS_CONFIG_MUX,
+                                         DAVIS_CONFIG_MUX_TIMESTAMP_RESET, 2);
         printf("Reset Master clock. \n\r");
     }
 }
@@ -78,15 +87,16 @@ void DAVIS240C::resetMasterClock()
 int DAVIS240C::init()
 {
     // Let's take a look at the information we have on the device.
-    struct caer_davis_info davis_info = m_davisHandle.infoGet();
+    struct caer_davis_info davis_info = m_davis_handle.infoGet();
 
-    printf("%s --- ID: %d, Master: %d, DVS X: %d, DVS Y: %d, Logic: %d.\n\r", davis_info.deviceString,
-        davis_info.deviceID, davis_info.deviceIsMaster, davis_info.dvsSizeX, davis_info.dvsSizeY,
-        davis_info.logicVersion);
+    printf("%s --- ID: %d, Master: %d, DVS X: %d, DVS Y: %d, Logic: %d.\n\r",
+           davis_info.deviceString, davis_info.deviceID,
+           davis_info.deviceIsMaster, davis_info.dvsSizeX,
+           davis_info.dvsSizeY, davis_info.logicVersion);
 
     // Send the default configuration before using the device.
     // No configuration is sent automatically!
-    m_davisHandle.sendDefaultConfig();
+    m_davis_handle.sendDefaultConfig();
 
     // Tweak some biases, to increase bandwidth in this case.
     struct caer_bias_coarsefine coarseFineBias;
@@ -98,7 +108,7 @@ int DAVIS240C::init()
     coarseFineBias.typeNormal         = true;
     coarseFineBias.currentLevelNormal = true;
 
-    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP,
+    m_davis_handle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP,
                             caerBiasCoarseFineGenerate(coarseFineBias));
 
     coarseFineBias.coarseValue        = 1;
@@ -108,9 +118,29 @@ int DAVIS240C::init()
     coarseFineBias.typeNormal         = true;
     coarseFineBias.currentLevelNormal = true;
 
-    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
+    m_davis_handle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
                             caerBiasCoarseFineGenerate(coarseFineBias));
 
+    m_davis_handle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_GLOBAL_SHUTTER, false);
+    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_AUTOEXPOSURE, false);
+    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_EXPOSURE, 4200);
+
+    // Fast biases: Filter not capable of detecting above 300Hz
+//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_DIFFBN,
+//                     caerBiasCoarseFineGenerate(CF_N_TYPE(2, 39)));
+//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_OFFBN,
+//                     caerBiasCoarseFineGenerate(CF_N_TYPE(1, 62)));
+//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_ONBN,
+//                     caerBiasCoarseFineGenerate(CF_N_TYPE(4, 200)));
+
+//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP,
+//                     caerBiasCoarseFineGenerate(CF_P_TYPE(3, 72)));
+//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
+//                     caerBiasCoarseFineGenerate(CF_P_TYPE(3, 96)));
+//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_REFRBP,
+//                     caerBiasCoarseFineGenerate(CF_P_TYPE(3, 52)));
+//
     return 0;
 }
 
@@ -119,14 +149,14 @@ int DAVIS240C::start()
     // Now let's get start getting some data from the device. We just loop in blocking mode,
     // no notification needed regarding new events. The shutdown notification, for example if
     // the device is disconnected, should be listened to.
-    m_davisHandle.dataStart(nullptr, nullptr, nullptr, &usbShutdownHandler, nullptr);
+    m_davis_handle.dataStart(nullptr, nullptr, nullptr, &usbShutdownHandler, nullptr);
 
     // Let's turn on blocking data-get mode to avoid wasting resources.
-    m_davisHandle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE,
-                            CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+    m_davis_handle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE,
+                             CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
 
     // Reset master clock when new device is added
-    if (m_id==0) { m_davisMasterHandle = &m_davisHandle; }
+    if (m_id==0) { m_davis_master_handle = &m_davis_handle; }
     else { resetMasterClock(); }
 
     return 0;
@@ -135,13 +165,13 @@ int DAVIS240C::start()
 //=== EVENT LISTENING ===//
 void DAVIS240C::registerEventListener(DAVIS240CEventListener* listener)
 {
-    m_eventListeners.push_back(listener);
+    m_event_listeners.push_back(listener);
 }
 
 int DAVIS240C::listen()
 {
-    m_stopreadThread= false;
-    m_readThread = std::thread(&DAVIS240C::readThread,this);
+    m_stop_read_thread = false;
+    m_read_thread = std::thread(&DAVIS240C::readThread,this);
     return 0;
 }
 
@@ -150,9 +180,9 @@ void DAVIS240C::readThread()
     // QUESTION: Do we need mutex lockers ? If yes, where ?
     // Frame is sent to warn function as a reference, I don't see how a mutex is benefitial here
     std::vector<DAVIS240CEvent> events;
-    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThread)
+    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stop_read_thread)
     {
-        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
+        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davis_handle.dataGet();
 
         // Skip if nothing there.
         if (packetContainer == nullptr) { continue; }
@@ -216,34 +246,34 @@ void DAVIS240C::readThread()
 
 int DAVIS240C::stopListening()
 {
-    m_stopreadThread = true;
+    m_stop_read_thread = true;
     return 0;
 }
 
 void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
 {
-    for(auto it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
+    for(auto it = m_event_listeners.begin(); it!=m_event_listeners.end(); it++)
     {
-        for(uint i=0; i<events.size(); i++)
+        for(int i=0; i<events.size(); i++)
             (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
     }
 }
 
 void DAVIS240C::deregisterEventListener(DAVIS240CEventListener* listener)
 {
-    m_eventListeners.remove(listener);
+    m_event_listeners.remove(listener);
 }
 
 //=== FRAME LISTENING ===//
 // QUESTION: I cannot launch both events and frames threads (double free or corruption)
 void DAVIS240C::registerFrameListener(DAVIS240CFrameListener* listener)
 {
-    m_frameListeners.push_back(listener);
+    m_frame_listeners.push_back(listener);
 }
 
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 {
-    for(auto it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
+    for(auto it = m_frame_listeners.begin(); it!=m_frame_listeners.end(); it++)
     {
         (*it)->receivedNewDAVIS240CFrame(frame,m_id);
     }
@@ -251,12 +281,12 @@ void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 
 void DAVIS240C::deregisterFrameListener(DAVIS240CFrameListener* listener)
 {
-    m_frameListeners.remove(listener);
+    m_frame_listeners.remove(listener);
 }
 
 //=== CLOSING ===/
 int DAVIS240C::stop()
 {
-    m_davisHandle.dataStop();
+    m_davis_handle.dataStop();
     return 0;
 }

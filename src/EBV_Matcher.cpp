@@ -3,14 +3,9 @@
 Matcher::Matcher(Filter* filter0,
                  Filter* filter1,
                  LaserController* laser)
-    : m_rows(180), m_cols(240),
-      m_filter0(filter0), m_filter1(filter1),
+    : m_filter0(filter0), m_filter1(filter1),
       m_laser(laser)
 {
-    // Matching parameters
-    m_eps = 10e3;
-    m_maxTimeToKeep = 10e3; // Keep 10ms buffer in each filtered events queue
-
     // Initialize filters listeners
     m_filter0->registerFilterListener(this);
     m_filter1->registerFilterListener(this);
@@ -111,7 +106,7 @@ void Matcher::runThread()
 
 // Called by the thread of previous agent (here Filter)
 void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
-                                     const unsigned int id)
+                                     const int id)
 {
     // DEBUG - CHECK IF EVENTS SYNCHRONIZED
     //printf("Camera %d - Timestamp %d. \n\r",id,event.m_timestamp);

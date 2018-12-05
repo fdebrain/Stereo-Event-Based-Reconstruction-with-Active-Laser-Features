@@ -22,9 +22,8 @@ class Visualizer : public DAVIS240CEventListener,
                    public FilterListener,
                    public TriangulatorListener
 {
-
 public:
-    Visualizer(const uint nbCams,
+    Visualizer(const int nbCams,
                DAVIS240C* davis0 = nullptr,
                DAVIS240C* davis1 = nullptr,
                Filter* filter0 = nullptr,
@@ -36,63 +35,60 @@ public:
 
     //void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const uint id) override;
+                                   const int id) override;
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
-                                   const uint id) override;
+                                   const int id) override;
     void receivedNewFilterEvent(DAVIS240CEvent& e,
-                                const uint id) override;
+                                const int id) override;
     void receivedNewDepth(const int &u,
                           const int &v,
                           const double &X,
                           const double &Y,
                           const double &Z) override;
-
     void run();
 
 public:
     // Parameters for camera settings
-    const int          m_rows;
-    const int          m_cols;
-    const uint         m_nbCams;
+    const int          m_rows{180};
+    const int          m_cols{240};
+    const int         m_nbCams{2};
 
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime{};
 
     // Structures for data storing
-    std::array<std::vector<bool>,2>    m_polEvts;
-    std::array<std::vector<int>,2>     m_ageEvts;
-    std::array<cv::Mat,2>              m_grayFrame;
-    std::array<std::vector<int>,2>     m_filtEvts;
-    std::vector<float>                 m_depthMap;
+    std::array<std::vector<bool>,2>    m_pol_evts;
+    std::array<std::vector<int>,2>     m_age_evts;
+    std::array<cv::Mat,2>              m_frame;
+    std::array<std::vector<int>,2>     m_filt_evts;
+    std::vector<float>                 m_depthmap;
     cv::Mat                            m_mask;
 
     // Display window related variables
-    std::array<std::string,2>   m_polWin{};
-    std::array<std::string,2>   m_ageWin{};
-    std::array<std::string,2>   m_frameWin{};
-    std::array<std::string,2>   m_filtWin{};
-    std::string                 m_depthWin{};
-    std::string                 m_depthInpaintedWin{};
+    std::array<std::string,2>   m_pol_win{};
+    std::array<std::string,2>   m_age_win{};
+    std::array<std::string,2>   m_frame_win{};
+    std::array<std::string,2>   m_filt_win{};
+    std::string                 m_depth_win{};
+    std::string                 m_depth_inpainted_win{};
 
     // Trackbar parameters (events age)
-    int        m_ageThresh{};
-    int        m_max_trackbar_val{};
+    int        m_age_thresh = int(40e3);
+    int        m_max_trackbar_val = 1e6;
 
     // Trackbar parameters (laser)
     std::array<int,2> m_laser_pos{};
-    //int m_laser_y{};
     std::array<int,2> m_laser_vel{};
-    //int m_laser_vx{};
-    //int m_laser_vy{};
     int m_lrInt{};
     int m_laser_freq{};
     int m_laser_step{};
     int m_laser_ratio_int{};
     std::array<int,4> m_laser_boundaries{};
+
     // Trackbar parameters (filter)
     std::array<int,2> m_filter_freq{};
     std::array<int,2> m_filter_eps{};
-    std::array<int,2> m_filter_neighborSize{};
+    std::array<int,2> m_filter_neighbor_size{};
     std::array<int,2> m_filter_threshA{};
     std::array<int,2> m_filter_threshB{};
     std::array<int,2> m_filter_threshAnti{};
@@ -100,11 +96,11 @@ public:
     std::array<int,2> m_filter_sigma{};
     std::array<int,2> m_filter_max_t{};
 
-    // Trackbar parameters (depth in c,)
-    int        m_min_depth{};
-    int        m_max_depth{};
+    // Trackbar parameters
+    int        m_min_depth{20};
+    int        m_max_depth{40};
     int        m_matcherEps{};
-    int        m_matcherMaxBuffer{};
+    int        m_matcher_max_buffer{};
 
     // Event recorder
     std::ofstream m_recorder;
@@ -113,15 +109,15 @@ public:
     std::array<DAVIS240C*,2>          m_davis;
 
     // Laser object
-    LaserController* m_laser;
+    LaserController*                  m_laser;
 
     // Filter object
     std::array<Filter*,2>             m_filter;
-    std::mutex                        m_laserMutex;
+    std::mutex                        m_laser_mutex;
 
     // Triangulator (depth estimator)
-    StereoCalibrator*    m_calibrator;
-    Triangulator*        m_triangulator;
+    StereoCalibrator*                 m_calibrator;
+    Triangulator*                     m_triangulator;
 };
 
 #endif // EBV_VISUALIZER_H

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <chrono>
 
 class MagneticMirrorLaser
 {
@@ -23,8 +24,9 @@ public:
     // Actions on the laser
     int toggle(bool toggle);
     int blink(unsigned int us);
-    int pos(unsigned int x,unsigned int y);
-    int vel(unsigned int x,unsigned int y);
+    bool blink(const std::chrono::microseconds dt);
+    int pos(int x,int y);
+    int vel(const int vx,const int vy);
 
 private:
     int sendCommand(std::string cmd);
