@@ -3,6 +3,8 @@
 
 #include <EBV_DAVIS240C.h>
 
+#include <iostream>
+#include <fstream>
 #include <string>
 #include <list>
 #include <vector>
@@ -10,12 +12,14 @@
 #include <mutex>
 #include <condition_variable>
 
+constexpr float m_pi{3.14159f};
+
 class FilterListener
 {
 public:
     FilterListener(void) {}
     virtual void receivedNewFilterEvent(DAVIS240CEvent& filterEvent,
-                                        const uint id) = 0;
+                                        const int id) = 0;
 };
 
 class Filter : public DAVIS240CEventListener
@@ -25,7 +29,7 @@ public:
     ~Filter();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id);
+                                   const int id);
 
     void registerFilterListener(FilterListener* listener);
     void deregisterFilterListener(FilterListener* listener);
@@ -48,24 +52,27 @@ public:
 
     // Who filter listens to
     DAVIS240C* m_davis;
+    const int  m_id{-1};
 
     // Datastructure matrix of list of events
-    const int m_rows;
-    const int m_cols;
+    const int m_rows{180};
+    const int m_cols{240};
 
     // Parameters for events filtering
     int m_frequency;
     int m_targetPeriod;
-    int m_eps;
+    int m_eps{10};
     int m_epsPeriod;
+    bool m_record{true};
 
     // Parameters for flushing old events
     int m_current_t;
     int m_max_t;
 
     // Center of mass tracker
-    int m_xc, m_yc;
-    float m_eta;
+    int m_xc{0};
+    int m_yc{0};
+    float m_eta{0.01f};
 
     // List of filter listeners
     std::list<FilterListener*> m_filteredEventListeners;
@@ -78,7 +85,7 @@ public:
     ~BaseFilter(){}
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id) override;
+                                   const int id) override;
 
     int getNeighborSize() const {return m_neighborSize;}
     void setNeighborSize(int size) {m_neighborSize=size;}
@@ -95,36 +102,66 @@ public:
     std::vector<std::list<int>> m_events;
 
     // Parameters for events filtering
-    int m_neighborSize;
-    int m_threshSupportsA;
-    int m_threshSupportsB;
-    int m_threshAntiSupports;
+    int m_neighborSize{3};
+    int m_threshSupportsA{2};
+    int m_threshSupportsB{2};
+    int m_threshAntiSupports{20};
 };
 
 class AdaptiveFilter : public Filter
 {
 public:
     AdaptiveFilter(int freq, DAVIS240C* davis);
-    ~AdaptiveFilter(){}
+    ~AdaptiveFilter();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
-                                   const unsigned int id) override;
+                                   const int id) override;
     void receivedNewTransition(DAVIS240CEvent& e, const bool transition);
     void receivedNewHyperTransition(DAVIS240CEvent& e, const int dt);
 
-    int getSigma() const {return m_sigma;}
-    void setSigma(int sigma) {m_sigma=sigma;}
+    int getSigma() const { return m_sigma; }
+    void setSigma(int sigma) { m_sigma=sigma; }
 
     int getMaxT() const {return m_max_t;}
-    void setMaxT(int max_t) {m_max_t=max_t;}
+    void setMaxT(int max_t) { m_max_t=max_t; }
 
-    int m_sigma;
-    const float m_pi{3.14159f};
+    //const float m_pi{3.14159f};
 
     // Data structure matrix of list of events
     std::vector<std::pair<bool,int>> m_last_event;
     std::vector<std::array<int,2>> m_last_transitions;
     std::vector<DAVIS240CEvent> m_last_filtered_events;
+
+    int m_sigma{30};
+
+private:
+    // Event recordings
+    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
+            + std::to_string(m_id) + ".txt";
+    std::ofstream m_recorder;
+};
+
+
+class AdaptiveFilterBis : public AdaptiveFilter
+{
+public:
+    AdaptiveFilterBis(int freq, DAVIS240C* davis);
+    ~AdaptiveFilterBis();
+
+    void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                   const int id) override;
+    void receivedNewTransition(DAVIS240CEvent& e, const bool transition);
+    void receivedNewHyperTransition(DAVIS240CEvent& e, const int dt);
+
+    std::vector<int> m_last_hypertransitions;
+    int m_thresh_supports{4};
+
+private:
+
+    // Event recordings
+    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
+            + std::to_string(m_id) + ".txt";
+    std::ofstream m_recorder;
 };
 
 #endif // EBV_FILTER_H
