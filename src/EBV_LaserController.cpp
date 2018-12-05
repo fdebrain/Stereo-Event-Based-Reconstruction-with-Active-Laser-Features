@@ -3,26 +3,14 @@
 
 LaserController::LaserController(int freq)
     : m_laser{new MagneticMirrorLaser},
-      m_freq(freq), // Fix the offset
-      m_step(50),
-      m_ratio(2),
-      m_min_x(500),
-      m_min_y(0),
-      m_max_x(4000),
-      m_max_y(4000),
-      m_laser_on(false),
-      m_swipe_on(false),
-      m_received_new_state(false),
-      m_vx(0),
-      m_vy(0),
-      m_swipe_vx(15e3), //(15e3),
-      m_swipe_vy(200e3) //(400ee),
+      m_freq(freq) // Fix the offset
 { 
     // Initialize laser
     m_laser->init("/dev/ttyUSB0");
     m_x = m_max_x/2;
     m_y = m_max_y/2;
     m_laser->pos(m_x,m_y);
+    m_t_start = std::chrono::system_clock::now();
 
     // Initialize thread
     m_thread = std::thread(&LaserController::runThread,this);
@@ -38,13 +26,17 @@ LaserController::~LaserController()
 void LaserController::setFreq(const int freq)
 {
     m_freq = freq;
-    m_laser->blink(static_cast<uint>(1e6/static_cast<double>(2*m_freq)));
+    std::chrono::microseconds dt{static_cast<int>(1e6f/static_cast<float>(2*m_freq))};
+    m_laser->blink(dt);
 }
 
 void LaserController::setPos(const int x, const int y)
 {
+    auto now = std::chrono::system_clock::now();
+    m_t = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t_start).count();
     m_x = x;
     m_y = y;
+    //printf("Laser t: %ld. \n\r",m_t);
 
     // Boundaries check
     if (m_x<m_min_x) { m_x = m_min_x; }
@@ -56,14 +48,14 @@ void LaserController::setPos(const int x, const int y)
     m_laser->pos(m_x,m_y);
 
     // Wait for laser to reach target
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
     // Warn new laser event
 //    const auto now = std::chrono::high_resolution_clock::now();
 //    auto t = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
 
-    //LaserEvent event(x,y,t);
-    //this->warnCommand(event);
+    LaserEvent event(m_x,m_y,m_t);
+    this->warnCommand(event);
 }
 
 void LaserController::setVel(const int vx, const int vy)
@@ -71,6 +63,11 @@ void LaserController::setVel(const int vx, const int vy)
     m_vx = vx;
     m_vy = vy;
     m_laser->vel(m_vx,m_vy);
+}
+
+void LaserController::init()
+{
+    m_t_start = std::chrono::system_clock::now();
 }
 
 void LaserController::start()
@@ -137,16 +134,49 @@ void LaserController::runThread()
 
 void LaserController::sweep()
 {
-    const auto now = std::chrono::high_resolution_clock::now();
-    m_chrono = now;
-
+    //const auto now = std::chrono::high_resolution_clock::now();
+    //m_chrono = now;
     //this->setVel(m_swipe_vx,m_swipe_vy);
 
+    // Sweep mode 1
     m_y += m_step;
     if (m_y>=m_max_y) { m_y = m_min_y; m_x += m_ratio*m_step; }
     if (m_x>m_max_x) { m_x = m_min_x; }
     this->setPos(m_x,m_y);
-    std::this_thread::sleep_for (std::chrono::milliseconds(1));
+
+    // Sweep mode 2
+//    m_y += m_direction_y*m_step;
+//    if (m_y>m_max_y) { m_direction_y = -1; m_x += m_direction_x*m_ratio*m_step; }
+//    else if (m_y<m_min_y) { m_direction_y = 1; m_x += m_direction_x*m_ratio*m_step; }
+//    if (m_x>m_max_x) { m_direction_x = -1; }
+//    else if (m_x<m_min_x) { m_direction_x = 1; }
+//    this->setPos(m_x,m_y);
+
+    // Sweep mode 3
+//    m_y += m_direction_y*m_step;
+//    if (m_y>m_max_y)
+//    {
+//        m_y = m_max_y;
+//        m_x += m_direction_x*m_ratio*m_step;
+//        m_direction_y = -1;
+//    }
+//    else if (m_y<m_min_y)
+//    {
+//        m_y = m_min_y;
+//        m_x += m_direction_x*m_ratio*m_step;
+//        m_direction_y = 1;
+//    }
+//    if (m_x>m_max_x)
+//    {
+//        m_x = m_max_x;
+//        m_direction_x = -1;
+//    }
+//    else if (m_x<m_min_x)
+//    {
+//        m_x = m_min_x;
+//        m_direction_x = 1;
+//    }
+//    this->setPos(m_x,m_y);
 
 //    double t = 0.0;
 //    uint x=0, y=0;

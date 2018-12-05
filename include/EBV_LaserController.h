@@ -51,10 +51,10 @@ public:
     int getMaxY() const { return m_max_y; }
     void setMaxY(const int max_y) { m_max_y = max_y; }
 
-    int getX() const { return m_x; }
+    int const& getX() const { return m_x; }
     void setX(const int x) { m_x = x; this->setPos(m_x,m_y);}
 
-    int getY() const { return m_y; }
+    int const& getY() const { return m_y; }
     void setY(const int y) { m_y = y; this->setPos(m_x,m_y);}
 
     int getVx() const { return m_vx; }
@@ -72,14 +72,11 @@ public:
     float getRatio() const { return m_ratio; }
     void setRatio(const float ratio) { m_ratio= ratio; }
 
-
-    //bool getCalibrationMode() const { return m_calibrateLaser; }
-    //void setCalibrationMode(bool mode);
-
     void setPos(const int x, const int y);
     void setVel(const int vx, const int vy);
 
     // Life cycle
+    void init();
     void start();
     void stop();
     void toogleState();
@@ -101,24 +98,28 @@ public:
     // Laser state
     int m_x;
     int m_y;
-    bool m_laser_on;
-    bool m_swipe_on;
-    bool m_received_new_state;
+    long m_t;
+    std::chrono::high_resolution_clock::time_point m_t_start;
+    bool m_laser_on{false};
+    bool m_swipe_on{false};
+    bool m_received_new_state{false};
 
-    int m_min_x;
-    int m_min_y;
-    int m_max_x;
-    int m_max_y;
+    int m_min_x{500};
+    int m_min_y{0};
+    int m_max_x{4000};
+    int m_max_y{4000};
 
 private:
     MagneticMirrorLaser* m_laser;
     int m_freq;
-    int m_step;
-    float m_ratio;
-    int m_vx;
-    int m_vy;
-    int m_swipe_vx;
-    int m_swipe_vy;
+    int m_step{50};
+    float m_ratio{2};
+    int m_vx{0};
+    int m_vy{0};
+    int m_swipe_vx{15000};
+    int m_swipe_vy{200000};
+    int m_direction_x{1};
+    int m_direction_y{1};
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
