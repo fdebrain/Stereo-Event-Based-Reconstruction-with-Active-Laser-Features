@@ -1,12 +1,23 @@
 #include <EBV_Triangulator.h>
+#include <EBV_Benchmarking.h>
 
-void Triangulator::calibrateLaser()
+void Triangulator::resetCalibration()
 {
-    m_recorder.open(m_eventRecordFile);
+    for (auto &k : m_K) { k = cv::Mat(3,3,CV_32FC1); }
+    for (auto &d : m_D) { d = cv::Mat(1,5,CV_32FC1); }
+    for (auto &p : m_P) { p = cv::Mat(3,4,CV_32FC1); }
+    for (auto &r : m_R) { r = cv::Mat(3,3,CV_32FC1); }
+    for (auto &t : m_T) { t = cv::Mat(3,1,CV_32FC1); }
+    for (auto &f : m_F) { f = cv::Mat(3,3,CV_32FC1); }
+    for (auto &rect : m_Rect) { rect = cv::Mat(3,3,CV_32FC1); }
+    for (auto &q : m_Q) { q = cv::Mat(4,4,CV_32FC1); }
 }
+
 
 void Triangulator::importCalibration()
 {
+    resetCalibration();
+
     cv::FileStorage fs;
     if (m_camera_stereo)
     {
@@ -38,7 +49,6 @@ void Triangulator::importCalibration()
                               m_Rect[0], m_Rect[1],
                               m_P[0], m_P[1],
                               m_Q[0], cv::CALIB_ZERO_DISPARITY);
-
             printf("Triangulation Camera-Camera stereo mode. \n\r");
         }
         else
@@ -106,7 +116,6 @@ void Triangulator::importCalibration()
 //                              m_P[1], m_P[2],
 //                              m_Q[2], cv::CALIB_ZERO_DISPARITY);
             printf("Triangulation Camera-Laser stereo mode. \n\r");
-
         }
         else
         {
@@ -128,20 +137,16 @@ Triangulator::Triangulator(Matcher* matcher,
       m_laser(laser)
 {
     // Initialize datastructures
-    for (auto &k : m_K) { k = cv::Mat(3,3,CV_32FC1); }
-    for (auto &d : m_D) { d = cv::Mat(1,5,CV_32FC1); }
-    for (auto &p : m_P) { p = cv::Mat(3,4,CV_32FC1); }
-    for (auto &r : m_R) { r = cv::Mat(3,3,CV_32FC1); }
-    for (auto &t : m_T) { t = cv::Mat(3,1,CV_32FC1); }
-    for (auto &f : m_F) { f = cv::Mat(1,5,CV_32FC1); }
-    for (auto &rect : m_Rect) { rect = cv::Mat(3,3,CV_32FC1); }
-    for (auto &q : m_Q) { q = cv::Mat(4,4,CV_32FC1); }
+    resetCalibration();
 
     // Listen to matcher
     m_matcher->registerMatcherListener(this);
 
-    // Laser calibration
-    //if (m_laser->m_calibrateLaser) { calibrateLaser(); }
+    // Listen to laser
+    m_laser->registerLaserListener(this);
+
+    // Recording triangulation
+    if (m_record){ m_recorder.open(m_eventRecordFile); }
 
     // Calibration
     this->importCalibration();
@@ -152,7 +157,7 @@ Triangulator::Triangulator(Matcher* matcher,
 Triangulator::~Triangulator()
 {
     m_matcher->deregisterMatcherListener(this);
-    //if (m_laser->m_calibrateLaser) { m_recorder.close(); }
+    if (m_record){ m_recorder.close(); }
 }
 
 void Triangulator::run()
@@ -211,6 +216,13 @@ void Triangulator::receivedNewMatch(const DAVIS240CEvent& event0,
     m_condWait.notify_one();
 }
 
+void Triangulator::receivedNewLaserEvent(const LaserEvent& event)
+{
+    m_laser_x = 180*(event.m_x-500)/(4000 - 500);
+    m_laser_y = 240*(event.m_y)/(4000);
+    //printf("New laser command: (%d,%d). \n\r", m_laser_x,m_laser_y);
+}
+
 void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& event1)
 {
     // DEBUG - CHECK EVENTS POSITION
@@ -222,30 +234,31 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     //m_queueAccessMutex1.unlock();
     // END DEBUG
 
+    //Timer timer; // 0.1ms on average
+
     std::vector<cv::Point2d> coords0, coords1;
     std::vector<cv::Point2d> undistCoords0, undistCoords1;
     std::vector<cv::Point2d> undistCoordsCorrected0, undistCoordsCorrected1;
     cv::Vec4d point3D;
 
     m_queueAccessMutex0.lock();
-        const int x0 = event0.m_x;
-        const int y0 = event0.m_y;
-        const int x1 = event1.m_x;
-        const int y1 = event1.m_y;
-        int xLaser = 180*(m_laser->getX()-m_laser->m_min_x)/(m_laser->m_max_x - m_laser->m_min_x);
-        int yLaser = 240*(m_laser->getY()-m_laser->m_min_y)/(m_laser->m_max_y - m_laser->m_min_y);
+    const int x0 = event0.m_x;
+    const int y0 = event0.m_y;
+    const int x1 = event1.m_x;
+    const int y1 = event1.m_y;
+    //int xLaser = 180*(m_laser->getX()-500)/(4000 - 500);
+    //int yLaser = 240*(m_laser->getY())/(4000);
     m_queueAccessMutex0.unlock();
 
     //printf("xLaser: %d - yLaser: %d - xEvent0: %d - yEvent0: %d - xEvent1: %d - yEvent1: %d. \n\r",
     //       xLaser, yLaser, x0, y0, x1, y1);
 
+    // Camera0-Camera1 stereo
     if (m_camera_stereo)
     {
-        // Camera0-Camera1 stereo
         coords0.emplace_back(y0,x0);
         coords1.emplace_back(y1,x1);
 
-        // Undistort 2D points
         cv::undistortPoints(coords0, undistCoords0,
                             m_K[0], m_D[0],
                             m_Rect[0],
@@ -255,51 +268,49 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_Rect[1],
                             m_P[1]);
 
-        // Correct matches
+        // Refine matches coordinates (epipolar constraint)
         cv::correctMatches(m_F[0],undistCoords0,undistCoords1,
                            undistCoordsCorrected0,
                            undistCoordsCorrected1);
 
-        // Triangulate
         cv::triangulatePoints(m_P[0], m_P[1],
                               undistCoordsCorrected0,
                               undistCoordsCorrected1,
                               point3D);
     }
+    // Camera0-Laser stereo
     else
     {
-        // Camera0-Laser stereo
         coords0.emplace_back(y0,x0);
-        coords1.emplace_back(yLaser,xLaser);
+        //coords1.emplace_back(yLaser,xLaser);
+        coords1.emplace_back(m_laser_y,m_laser_x);
 
-        // Undistort 2D points
         cv::undistortPoints(coords0, undistCoords0,
                             m_K[0], m_D[0],
                             m_Rect[0],
                             m_P[0]);
 
-        //undistCoords1 = coords1;
         cv::undistortPoints(coords1, undistCoords1,
                             m_K[2], m_D[2],
                             m_Rect[2],
                             m_P[2]);
 
-        // Correct matches
         cv::correctMatches(m_F[1],undistCoords0,undistCoords1,
                           undistCoordsCorrected0,
                           undistCoordsCorrected1);
 
-        // Triangulate
         cv::triangulatePoints(m_P[0], m_P[2],
-                              //coords0,
-                              //coords1,
-                              //undistCoords0,
-                              //undistCoords1,
                               undistCoordsCorrected0,
                               undistCoordsCorrected1,
                               point3D);
     }
 
+    // Compute uncertainty
+    double uncertainty =   cv::norm(undistCoords0[0]-undistCoordsCorrected0[0])
+                         + cv::norm(undistCoords0[1]-undistCoordsCorrected0[1]);
+    //printf("Uncertainty: %f. \n\r", uncertainty);
+
+    // Convert to cm
     double X = 100*point3D[0]/point3D[3];
     double Y = 100*point3D[1]/point3D[3];
     double Z = 100*point3D[2]/point3D[3];
@@ -318,8 +329,8 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                    << y0 << '\t'
                    << x1 << '\t'
                    << y1 << '\t'
-                   << xLaser << '\t'
-                   << yLaser << '\t'
+                   << m_laser_x << '\t'
+                   << m_laser_y << '\t'
                    << X << '\t'
                    << Y << '\t'
                    << Z << '\n';

@@ -19,19 +19,20 @@ public:
                                   const double &Z) = 0;
 };
 
-class Triangulator : public MatcherListener
+class Triangulator : public MatcherListener, public LaserListener
 {
 public:
     Triangulator(Matcher* matcher = nullptr,
                  LaserController* laser = nullptr);
     ~Triangulator();
 
-    void calibrateLaser();
+    void resetCalibration();
     void importCalibration();
     bool isValid(const int id) const;
     void run();
     void receivedNewMatch(const DAVIS240CEvent& event1,
                           const DAVIS240CEvent& event2) override;
+    void receivedNewLaserEvent(const LaserEvent& event) override;
     void process(const DAVIS240CEvent& event0,
                  const DAVIS240CEvent& event1);
 
@@ -48,11 +49,13 @@ public:
     bool m_enable{false};
     bool m_camera_stereo{true};
     bool m_debug{false};
-    bool m_record{false};
 
     // Who triangulator is listening to
     Matcher* m_matcher;
     LaserController* m_laser;
+
+    int m_laser_x{0};
+    int m_laser_y{0};
 
     // Calibration paths
     std::string m_path_calib_cam = "../calibration/calibCameras.yaml";
@@ -70,7 +73,8 @@ public:
 
 private:
     // Event recordings
-    const std::string m_eventRecordFile = "../calibration/laserCalibPoints.txt";
+    bool m_record{true};
+    const std::string m_eventRecordFile = "../experiments/triangulatedPoints.txt";
     std::ofstream m_recorder;
 
     // List of incoming filtered events for each camera (FIFO)
