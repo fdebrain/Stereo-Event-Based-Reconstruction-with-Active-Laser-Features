@@ -63,7 +63,12 @@ public:
     int m_targetPeriod;
     int m_eps{10};
     int m_epsPeriod;
-    bool m_record{true};
+
+    // Event recordings
+    bool m_record{false};
+    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
+            + std::to_string(m_id) + ".txt";
+    std::ofstream m_recorder;
 
     // Parameters for flushing old events
     int m_current_t;
@@ -133,12 +138,6 @@ public:
     std::vector<DAVIS240CEvent> m_last_filtered_events;
 
     int m_sigma{30};
-
-private:
-    // Event recordings
-    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
-            + std::to_string(m_id) + ".txt";
-    std::ofstream m_recorder;
 };
 
 
