@@ -19,43 +19,53 @@ public:
                                   const double &Z) = 0;
 };
 
-class Triangulator : public MatcherListener, public LaserListener
+class Triangulator : public MatcherListener
 {
 public:
     Triangulator(Matcher* matcher = nullptr,
                  LaserController* laser = nullptr);
     ~Triangulator();
 
+    void switchMode();
     void resetCalibration();
     void importCalibration();
     bool isValid(const int id) const;
     void run();
     void receivedNewMatch(const DAVIS240CEvent& event1,
                           const DAVIS240CEvent& event2) override;
-    void receivedNewLaserEvent(const LaserEvent& event) override;
     void process(const DAVIS240CEvent& event0,
                  const DAVIS240CEvent& event1);
 
     void registerTriangulatorListener(TriangulatorListener* listener);
     void deregisterTriangulatorListener(TriangulatorListener* listener);
-    void warnDepth(const int u,
-                   const int v,
-                   const double X,
-                   const double Y,
-                   const double Z);
+    void warnDepth(const int u, const int v,
+                   const double X, const double Y, const double Z);
+    void recordPoint(int x0, int y0, int x1, int y1, int x2, int y2,
+                     float X, float Y, float Z);
 
+    // DAVIS camera settings
     const int m_rows{180};
     const int m_cols{240};
+
+    // Triangulator settings
     bool m_enable{false};
-    bool m_camera_stereo{true};
     bool m_debug{false};
 
     // Who triangulator is listening to
     Matcher* m_matcher;
     LaserController* m_laser;
 
-    int m_laser_x{0};
-    int m_laser_y{0};
+    // Stereo mode
+    enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2 };
+    std::string stereoPairNames[3] = {"Cameras", "CamLeftLaser", "CamRightLaser"};
+    StereoPair m_mode{Cameras};
+
+    // Event recordings
+    bool m_record{false};
+    bool m_record_pointwise{false};
+    bool m_record_next_point{false};
+    std::ofstream m_recorder;
+    const std::string m_eventRecordFile = "../experiments/triangulation_scene.txt";
 
     // Calibration paths
     std::string m_path_calib_cam = "../calibration/calibCameras.yaml";
@@ -64,19 +74,16 @@ public:
     // Calibration matrices (camera0,camera1,laser)
     std::array<cv::Mat, 3> m_K;
     std::array<cv::Mat, 3> m_D;
-    std::array<cv::Mat, 3> m_P;
     std::array<cv::Mat, 3> m_R;
     std::array<cv::Mat, 3> m_T;
     std::array<cv::Mat, 3> m_F;
-    std::array<cv::Mat, 3> m_Rect;
     std::array<cv::Mat, 3> m_Q;
 
-private:
-    // Event recordings
-    bool m_record{true};
-    const std::string m_eventRecordFile = "../experiments/triangulatedPoints.txt";
-    std::ofstream m_recorder;
+    // Two matrices for each stereo pairs (cam0-cam1, cam0-laser, cam1-laser)
+    std::array<std::array<cv::Mat,2>, 3> m_P;
+    std::array<std::array<cv::Mat,2>, 3> m_Rect;
 
+private:
     // List of incoming filtered events for each camera (FIFO)
     std::list<DAVIS240CEvent> m_evtQueue0;
     std::list<DAVIS240CEvent> m_evtQueue1;
@@ -84,7 +91,6 @@ private:
     // Mutex to access the queue
     std::mutex m_queueAccessMutex0;
     std::mutex m_queueAccessMutex1;
-    std::mutex m_mutex;
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
