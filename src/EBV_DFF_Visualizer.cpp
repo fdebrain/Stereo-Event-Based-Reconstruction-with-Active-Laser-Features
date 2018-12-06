@@ -288,7 +288,7 @@ Visualizer::Visualizer(const int nbCams,
 //                           &callbackTrackbarLaserVy,static_cast<void*>(m_laser));
         cv::createTrackbar("Laser step",m_pol_win[0],&m_laser_step,300,
                            &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
-        cv::createTrackbar("Laser ratio",m_pol_win[0],&m_laser_ratio_int,100,
+        cv::createTrackbar("Laser ratio",m_pol_win[0],&m_laser_ratio_int,300,
                            &callbackTrackbarLaserRatio,static_cast<void*>(m_laser));
     }
 
@@ -562,7 +562,7 @@ void Visualizer::run()
 
         case 'e':
             printf("Export depthmap.\n\r");
-            writeMatToFile(m_depthmap,"depthmap.txt");
+            writeMatToFile(m_depthmap,"../experiments/depthmaps/depthmap_scene.txt");
             break;
 
         case 'i':
@@ -582,7 +582,6 @@ void Visualizer::run()
             }
             break;
 
-        // Toogle laser state (on/off)
         case 'o':
             if (m_laser) { m_laser->toogleState(); }
             break;
@@ -593,17 +592,29 @@ void Visualizer::run()
             m_depthmap.resize(m_rows*m_cols,0);
             break;
 
-        // Toogle laser sweep mode (on/off)
         case 's':
             if (m_laser) { m_laser->toogleSweep(); }
             break;
 
         case 't':
-            //m_laser->toogleState();
-            printf("Switch triangulation mode. \n\r");
-            m_triangulator->m_camera_stereo = !m_triangulator->m_camera_stereo;
-            m_triangulator->importCalibration();
-            //m_laser->toogleSweep();
+            //m_triangulator->importCalibration();
+            m_triangulator->switchMode();
+            break;
+
+        case 'z':
+            if (m_triangulator->m_record==false)
+            {
+                printf("Record pointwise. \n\r");
+                m_triangulator->m_recorder.open(m_triangulator->m_eventRecordFile);
+                m_triangulator->m_record = true;
+                m_triangulator->m_record_pointwise = true;
+            }
+            else
+            {
+                printf("Save 3D point. \n\r");
+                m_triangulator->m_record_next_point = true;
+            }
+
             break;
         }
 

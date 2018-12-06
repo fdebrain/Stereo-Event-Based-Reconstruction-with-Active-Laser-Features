@@ -51,7 +51,7 @@ public:
     // Parameters for camera settings
     const int          m_rows{180};
     const int          m_cols{240};
-    const int         m_nbCams{2};
+    const int          m_nbCams{2};
 
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime{};
