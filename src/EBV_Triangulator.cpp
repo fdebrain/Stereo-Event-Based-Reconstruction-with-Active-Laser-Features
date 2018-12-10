@@ -9,7 +9,7 @@ void Triangulator::switchMode()
 
 void Triangulator::resetCalibration()
 {
-    for (auto &k : m_K) { k = cv::Mat(3,3,CV_32FC1); }
+    for (auto &k : m_K) { k = cv::Mat(3,3,CV_64FC1); }
     for (auto &d : m_D) { d = cv::Mat(1,5,CV_32FC1); }
     for (auto &r : m_R) { r = cv::Mat(3,3,CV_32FC1); }
     for (auto &t : m_T) { t = cv::Mat(3,1,CV_32FC1); }
@@ -53,6 +53,11 @@ void Triangulator::importCalibration()
                           m_Rect[0][0], m_Rect[0][1],
                           m_P[0][0], m_P[0][1],
                           m_Q[0], cv::CALIB_ZERO_DISPARITY);
+
+        auto R0 = cv::Mat::eye(3,3,CV_64FC1);
+        auto T0 = cv::Mat::zeros(3,1,CV_64FC1);
+        computeProjectionMatrix(m_K[0],R0,T0,m_P[0][0]);
+        computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[0][1]);
     }
     else
     {
@@ -87,11 +92,6 @@ void Triangulator::importCalibration()
         m_enable = true;
 
         // Camera0-laser
-        cv::Mat tmpR;
-        cv::Mat tmpT;
-        cv::transpose(m_R[1],tmpR);
-        tmpT = -tmpR*m_T[1];
-
         cv::stereoRectify(m_K[0],m_D[0],
                           m_K[2],m_D[2],
                           cv::Size(m_cols,m_rows),
@@ -99,6 +99,12 @@ void Triangulator::importCalibration()
                           m_Rect[1][0], m_Rect[1][1],
                           m_P[1][0], m_P[1][1],
                           m_Q[1], cv::CALIB_ZERO_DISPARITY);
+
+        auto R0 = cv::Mat::eye(3,3,CV_64FC1);
+        auto T0 = cv::Mat::zeros(3,1,CV_64FC1);
+        computeProjectionMatrix(m_K[0],R0,T0,m_P[1][0]);
+        computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[1][1]);
+
         //Camera1-laser
         cv::stereoRectify(m_K[1],m_D[1],
                           m_K[2],m_D[2],
@@ -107,6 +113,9 @@ void Triangulator::importCalibration()
                           m_Rect[2][0], m_Rect[2][1],
                           m_P[2][0], m_P[2][1],
                           m_Q[2], cv::CALIB_ZERO_DISPARITY);
+
+        computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[2][0]);
+        computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[2][1]);
     }
     else
     {
@@ -260,7 +269,6 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[0], m_D[0],
                             m_Rect[m_mode][0],
                             m_P[m_mode][0]);
-
         cv::undistortPoints(coords1, undistCoords1,
                             m_K[2], m_D[2],
                             m_Rect[m_mode][1],
@@ -276,14 +284,10 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[1], m_D[1],
                             m_Rect[m_mode][0],
                             m_P[m_mode][0]);
-
         cv::undistortPoints(coords1, undistCoords1,
                             m_K[2], m_D[2],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
-//        cv::Mat res = m_P[0]*cv::Mat(point3D);
-//        std::cout << res << "\n\r";
-//        point3D_bis = cv::Vec4d(res.at<double>(0,0),res.at<double>(0,1),res.at<double>(0,2),res.at<double>(0,3));
     }
 
     // Refine matches coordinates (using epipolar constraint)
@@ -344,6 +348,18 @@ void Triangulator::recordPoint(int x0, int y0, int x1, int y1, int x2, int y2,
                << X << '\t'
                << Y << '\t'
                << Z << '\n';
+}
+
+void Triangulator::computeProjectionMatrix(cv::Mat K, cv::Mat R,
+                                           cv::Mat T, cv::Mat& P)
+{
+    cv::Mat Rt;
+    K.convertTo(K,CV_64FC1);
+    cv::hconcat(K*R,K*T,P);
+
+    cv::transpose(R,Rt);
+    //cv::hconcat(K*Rt,-K*Rt*T,P);
+    std::cout << "P: " << P << "\n\r";
 }
 
 void Triangulator::registerTriangulatorListener(TriangulatorListener* listener)

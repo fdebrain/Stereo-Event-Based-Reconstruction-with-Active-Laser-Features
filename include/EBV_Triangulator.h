@@ -43,6 +43,9 @@ public:
     void recordPoint(int x0, int y0, int x1, int y1, int x2, int y2,
                      float X, float Y, float Z);
 
+    void computeProjectionMatrix(cv::Mat K, cv::Mat R,
+                                 cv::Mat T, cv::Mat& P);
+
     // DAVIS camera settings
     const int m_rows{180};
     const int m_cols{240};
