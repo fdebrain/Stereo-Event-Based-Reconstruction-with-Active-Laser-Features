@@ -98,7 +98,7 @@ public:
 
     // Trackbar parameters
     int        m_min_depth{20};
-    int        m_max_depth{40};
+    int        m_max_depth{50};
     int        m_matcherEps{};
     int        m_matcher_max_buffer{};
 

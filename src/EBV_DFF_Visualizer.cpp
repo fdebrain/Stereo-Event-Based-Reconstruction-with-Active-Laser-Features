@@ -8,6 +8,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+// Exporting depth maps into txt file
 static void writeMatToFile(std::vector<float>& v, const char* filename)
 {
     std::ofstream fout(filename);
@@ -184,12 +185,12 @@ Visualizer::Visualizer(const int nbCams,
             m_frame_win[idx] = "Frame - "  + std::to_string(idx);
 
             cv::namedWindow(m_pol_win[idx],
-                            cv::WindowFlags::WINDOW_AUTOSIZE |
+                            cv::WindowFlags::WINDOW_NORMAL |
                             cv::WindowFlags::WINDOW_KEEPRATIO |
                             cv::WindowFlags::WINDOW_GUI_EXPANDED);
             //cv::namedWindow(m_age_win[idx],0);
             cv::namedWindow(m_frame_win[idx],
-                            cv::WindowFlags::WINDOW_AUTOSIZE |
+                            cv::WindowFlags::WINDOW_NORMAL |
                             cv::WindowFlags::WINDOW_KEEPRATIO |
                             cv::WindowFlags::WINDOW_GUI_EXPANDED);
 
@@ -213,7 +214,7 @@ Visualizer::Visualizer(const int nbCams,
             // Initialize window
             m_filt_win[idx] = "Filtered Events - "  + std::to_string(idx);
             cv::namedWindow(m_filt_win[idx],
-                            cv::WindowFlags::WINDOW_AUTOSIZE |
+                            cv::WindowFlags::WINDOW_NORMAL |
                             cv::WindowFlags::WINDOW_KEEPRATIO |
                             cv::WindowFlags::WINDOW_GUI_EXPANDED);
 
@@ -301,13 +302,13 @@ Visualizer::Visualizer(const int nbCams,
         // Initialize window
         m_depth_win = "Depth Map";
         cv::namedWindow(m_depth_win,
-                        cv::WindowFlags::WINDOW_AUTOSIZE |
+                        cv::WindowFlags::WINDOW_NORMAL |
                         cv::WindowFlags::WINDOW_KEEPRATIO |
                         cv::WindowFlags::WINDOW_GUI_EXPANDED);
 
         m_depth_inpainted_win = "Depth Map Inpainted";
         cv::namedWindow(m_depth_inpainted_win,
-                        cv::WindowFlags::WINDOW_AUTOSIZE |
+                        cv::WindowFlags::WINDOW_NORMAL |
                         cv::WindowFlags::WINDOW_KEEPRATIO |
                         cv::WindowFlags::WINDOW_GUI_EXPANDED);
 
@@ -515,7 +516,6 @@ void Visualizer::run()
                 {
                     if (m_calibrator->m_calibrate_cameras)
                     {
-                        //cv::equalizeHist(m_frame[idx],m_frame[idx]);
                         m_calibrator->calibrateCameras(m_frame[idx],idx);
                     }
                 }
@@ -597,7 +597,6 @@ void Visualizer::run()
             break;
 
         case 't':
-            //m_triangulator->importCalibration();
             m_triangulator->switchMode();
             break;
 
