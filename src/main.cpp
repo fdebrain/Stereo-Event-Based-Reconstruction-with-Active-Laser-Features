@@ -12,14 +12,14 @@ int main(int argc, char** argv)
     int freq = 500;
     int filter_offset = 20;
 
-    DAVIS240C    davis_master;
-    DAVIS240C    davis_slave;
+    DAVIS240C       davis_master;
+    DAVIS240C       davis_slave;
     LaserController laser(freq);
 
-    AdaptiveFilter filter0(freq+filter_offset,&davis_master);
-    AdaptiveFilter filter1(freq+filter_offset,&davis_slave);
-    Matcher      matcher(&filter0,&filter1,&laser);
-    Triangulator triangulator(&matcher,
+    AdaptiveFilter  filter0(freq+filter_offset,&davis_master);
+    AdaptiveFilter  filter1(freq+filter_offset,&davis_slave);
+    Matcher         matcher(&filter0,&filter1,&laser);
+    Triangulator    triangulator(&matcher,
                               &laser);
     StereoCalibrator calibrator(&laser,
                                 &filter0,
@@ -33,6 +33,10 @@ int main(int argc, char** argv)
                       &laser);
 
     visu.run();
+
+//    DLT dlt;
+//    //dlt.test();
+//    dlt.extractCalibration();
 
     return 0;
 }
