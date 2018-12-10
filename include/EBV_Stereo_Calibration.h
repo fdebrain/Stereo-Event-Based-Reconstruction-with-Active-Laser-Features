@@ -28,7 +28,9 @@ public:
                          cv::Mat& points3D);
     void extractProjectionMatrix(const std::vector<cv::Point3d>& points3D,
                                  const std::vector<cv::Point2d>& points2D,
-                                 cv::Mat& ctw, cv::Mat& cRw);
+                                 cv::Mat& t, cv::Mat& R, cv::Mat& K);
+    void test();
+    void extractCalibration();
 
     // Normalization matrices
     cv::Mat m_U;
@@ -71,9 +73,9 @@ public:
     const std::string m_path_calib_laser;
 
     // Intrinsics
-    const cv::Point2i m_pattern_size{8,5};
+    const cv::Point2i m_pattern_size{8,5}; // 8-5
     const float m_pattern_square_size{0.03f};
-    const size_t m_min_frames_to_capture{20};
+    const size_t m_min_frames_to_capture{10};
     const int m_step{3};
     const std::chrono::milliseconds m_min_capture_delay{1000};
     std::array<std::chrono::high_resolution_clock::time_point,2> m_last_frame_captured;

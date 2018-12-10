@@ -379,9 +379,9 @@ void StereoCalibrator::pointLaserToPixel(const int rGoal, const int cGoal, const
     }
 
     //=== DEBUG ===//
-    printf("Current laser position (%d,%d). \n\r",r,c);
-    printf("Diff: (%d,%d) - MSE: %d. \n\r", diff[0],diff[1],mse);
-    printf("Laser commands: (%d,%d). \n\r",m_laser->getX(),m_laser->getY());
+//    printf("Current laser position (%d,%d). \n\r",r,c);
+//    printf("Diff: (%d,%d) - MSE: %d. \n\r", diff[0],diff[1],mse);
+//    printf("Laser commands: (%d,%d). \n\r",m_laser->getX(),m_laser->getY());
     //=== END DEBUG ===//
     return;
 }
@@ -426,7 +426,7 @@ void DLT::normalizePoints(cv::Mat& points2D,
 // Code from https://github.com/lagadic/camera_localization/blob/master/opencv/pose-basis/pose-dlt-opencv.cpp
 void DLT::extractProjectionMatrix(const std::vector<cv::Point3d>& wX,
                                   const std::vector<cv::Point2d>& x,
-                                  cv::Mat& ctw, cv::Mat& cRw)
+                                  cv::Mat& t, cv::Mat& R, cv::Mat& K)
 {
     int nbpoints = (int)wX.size();
     cv::Mat A(2*nbpoints, 12, CV_64F, cv::Scalar(0));
@@ -474,16 +474,121 @@ void DLT::extractProjectionMatrix(const std::vector<cv::Point3d>& wX,
     if (rnv.at<double>(0, 11) < 0) // tz < 0
         rnv *=-1;
 
-    // Normalization to ensure that ||r3|| = 1
-    double norm = sqrt(   rnv.at<double>(0,8)*rnv.at<double>(0,8)
-                        + rnv.at<double>(0,9)*rnv.at<double>(0,9)
-                        + rnv.at<double>(0,10)*rnv.at<double>(0,10));
-    rnv /= norm;
+    // Extract rotation and intrinsics matrix
+    cv::Mat P = cv::Mat_<double>(3,4,CV_64F);
+    P = rnv.reshape(1,3);
+    cv::decomposeProjectionMatrix(P,K,R,t);
 
-    // Extract translation vector and rotation matrix
-    for (int i = 0 ; i < 3 ; i++) {
-        ctw.at<double>(i,0) = rnv.at<double>(0, 4*i+3); // Translation
-        for (int j = 0 ; j < 3 ; j++)
-          cRw.at<double>(i,j) = rnv.at<double>(0, 4*i+j); // Rotation
+    // Scale intrinsic matrix
+    K = K/K.at<double>(2,2);
+
+    // Extract translation vector (right-null vector of P)
+    cv::SVD::compute(P, S, U, Vt);
+    smallestSv = S.at<double>(0, 0);
+    indexSmallestSv = 0 ;
+    for (int i = 1; i < S.rows; i++)
+    {
+        if ((S.at<double>(i, 0) < smallestSv) )
+        {
+            smallestSv = S.at<double>(i, 0);
+            indexSmallestSv = i;
+        }
     }
+    t = Vt.row(indexSmallestSv);
+    t = t/t.at<double>(0,3);
+}
+
+void DLT::test()
+{
+    std::vector< cv::Point3d > wX;
+    std::vector< cv::Point2d >  x;
+
+    // Ground truth pose used to generate the data
+    cv::Mat ctw_truth = (cv::Mat_<double>(3,1) << -0.1, 0.1, 1.2); // Translation vector
+    cv::Mat crw_truth = (cv::Mat_<double>(3,1) << CV_PI/180*(5), CV_PI/180*(0), CV_PI/180*(45)); // Rotation vector
+    cv::Mat cRw_truth(3,3,cv::DataType<double>::type); // Rotation matrix
+    cv::Rodrigues(crw_truth, cRw_truth);
+
+    // Intrinsics
+    cv::Mat K = ( cv::Mat_<double>(3,3) << 2.23616547e+02, 0., 1.12623787e+02, 0., 2.23256653e+02, 6.52757416e+01, 0., 0., 1.);
+
+    // Input data: 3D coordinates of at least 6 non coplanar points
+    double L = 0.2;
+    wX.push_back( cv::Point3d(  -L, -L, 0  ) ); // wX_0 ( -L, -L, 0  )^T
+    wX.push_back( cv::Point3d( 2*L, -L, 0.2) ); // wX_1 (-2L, -L, 0.2)^T
+    wX.push_back( cv::Point3d(   L,  L, 0.2) ); // wX_2 (  L,  L, 0.2)^T
+    wX.push_back( cv::Point3d(  -L,  L, 0  ) ); // wX_3 ( -L,  L, 0  )^T
+    wX.push_back( cv::Point3d(-2*L,  L, 0  ) ); // wX_4 (-2L,  L, 0  )^T
+    wX.push_back( cv::Point3d(   0,  0, 0.5) ); // wX_5 (  0,  0, 0.5)^T
+
+    // Input data: 2D coordinates of the points on the image plane
+    for(int i = 0; i < wX.size(); i++)
+    {
+        cv::Mat cX = K*(cRw_truth*cv::Mat(wX[i]) + ctw_truth); // Update cX, cY, cZ
+        x.push_back( cv::Point2d( cX.at<double>(0, 0)/cX.at<double>(2, 0),
+                                  cX.at<double>(1, 0)/cX.at<double>(2, 0) ) ); // x = (cX/cZ, cY/cZ)
+    }
+
+    cv::Mat t(3, 1, CV_64F); // Translation vector
+    cv::Mat R(3, 3, CV_64F); // Rotation matrix
+    cv::Mat K0(3, 3, CV_64F); // Intrinsics matrix
+    DLT dlt;
+    dlt.extractProjectionMatrix(wX, x, t, R, K0);
+
+    std::cout << "K (ground truth):\n" << K << std::endl;
+    std::cout << "K (computed with DLT):\n" << K0 << std::endl;
+    std::cout << "t (ground truth):\n" << ctw_truth << std::endl;
+    std::cout << "t (computed with DLT):\n" << t << std::endl;
+    std::cout << "R (ground truth):\n" << cRw_truth << std::endl;
+    std::cout << "R (computed with DLT):\n" << R << std::endl;
+}
+
+
+void DLT::extractCalibration()
+{
+    std::vector<cv::Point3d>  wX;
+    std::vector<cv::Point2d>  x_cam0;
+    std::vector<cv::Point2d>  x_cam1;
+    std::vector<cv::Point2d>  x_laser;
+
+    std::ifstream data;
+    data.open ("../experiments/pointwise_biplanar_1.txt");
+
+    double x0,y0,x1,y1,x2,y2,X,Y,Z;
+    while (data >> x0 >> y0 >> x1 >> y1 >> x2 >> y2 >> X >> Y >> Z)
+    {
+        wX.push_back(cv::Point3d(X,Y,Z));
+        x_cam0.push_back(cv::Point2d(y0,x0));
+        x_cam1.push_back(cv::Point2d(y1,x1));
+        x_laser.push_back(cv::Point2d(y2,x2));
+
+        //std::cout << x0 << ' ' << y0 << ' ' << x1 << ' ' <<
+        //             y1 << ' ' << x2 << ' ' << y2 << ' ' <<
+        //             X << ' ' << Y << ' ' << Z << std::endl;
+    }
+
+    cv::Mat t0(3, 1, CV_64F); // Translation vector
+    cv::Mat R0(3, 3, CV_64F); // Rotation matrix
+    cv::Mat K0(3, 3, CV_64F); // Intrinsics matrix
+    cv::Mat t1(3, 1, CV_64F); // Translation vector
+    cv::Mat R1(3, 3, CV_64F); // Rotation matrix
+    cv::Mat K1(3, 3, CV_64F); // Intrinsics matrix
+    cv::Mat t2(3, 1, CV_64F); // Translation vector
+    cv::Mat R2(3, 3, CV_64F); // Rotation matrix
+    cv::Mat K2(3, 3, CV_64F); // Intrinsics matrix
+    DLT dlt;
+    dlt.extractProjectionMatrix(wX, x_cam0, t0, R0, K0);
+    dlt.extractProjectionMatrix(wX, x_cam1, t1, R1, K1);
+    dlt.extractProjectionMatrix(wX, x_laser,t2, R2, K2);
+
+    cv::Mat R0t;
+    cv::transpose(R0,R0t);
+    cv::Mat R1_bis = R1*R0t;
+    cv::Mat t1_bis = t1 - t0;
+
+    //std::cout << "K (computed with DLT):\n" << K1 << std::endl;
+    std::cout << "t (computed with DLT):\n" << t0 << std::endl;
+    std::cout << "t (computed with DLT):\n" << t1 << std::endl;
+    std::cout << "t (computed with DLT):\n" << t2 << std::endl;
+    //std::cout << "R (computed with DLT):\n" << R1 << std::endl;
 }
