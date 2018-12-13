@@ -26,7 +26,8 @@ public:
     ~DLT();
     void normalizePoints(cv::Mat& points2D,
                          cv::Mat& points3D);
-    void extractProjectionMatrix(const std::vector<cv::Point3d>& points3D,
+    void extractProjectionMatrix(//cv::Mat wX, cv::Mat x,
+            const std::vector<cv::Point3d>& points3D,
                                  const std::vector<cv::Point2d>& points2D,
                                  cv::Mat& t, cv::Mat& R, cv::Mat& K);
     void test();

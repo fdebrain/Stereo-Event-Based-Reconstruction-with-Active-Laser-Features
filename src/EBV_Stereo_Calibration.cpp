@@ -405,26 +405,30 @@ void DLT::normalizePoints(cv::Mat& points2D,
 
     // Compute normalization matrices
     cv::Scalar s_2D = sigma2D/std::sqrt(2);
-    cv::Mat U = (cv::Mat_<double>(3,3) << s_2D[0],       0, mean2D[0],
-                                                0, s_2D[1], mean2D[1],
-                                                0,       0,         1);
+    cv::Mat U = (cv::Mat_<double>(3,3,CV_64F) << s_2D[0],       0, mean2D[0],
+                                                       0, s_2D[1], mean2D[1],
+                                                       0,       0,         1);
     cv::invert(U,m_U);
 
     cv::Scalar s_3D = sigma3D/std::sqrt(3);
-    cv::Mat T = (cv::Mat_<double>(4,4) << s_3D[0],       0,       0, mean3D[0],
-                                                0, s_3D[1],       0, mean3D[1],
-                                                0,       0, s_3D[2], mean3D[2],
-                                                0,       0,       0,         1);
+    cv::Mat T = (cv::Mat_<double>(4,4,CV_64F) << s_3D[0],       0,       0, mean3D[0],
+                                                       0, s_3D[1],       0, mean3D[1],
+                                                       0,       0, s_3D[2], mean3D[2],
+                                                       0,       0,       0,         1);
     cv::invert(T,m_T);
 
+    std::cout << "m_T: " << m_T.size << std::endl;
+    std::cout << "points: " << points2D.size << std::endl;
+
     // Normalize points
-    //points2D = m_U * points2D;
-    //points3D = m_T * points3D;
+    points2D = m_U * points2D;
+    points3D = m_T * points3D;
 }
 
 
 // Code from https://github.com/lagadic/camera_localization/blob/master/opencv/pose-basis/pose-dlt-opencv.cpp
-void DLT::extractProjectionMatrix(const std::vector<cv::Point3d>& wX,
+void DLT::extractProjectionMatrix(//const cv::Mat wX, const cv::Mat x,
+        const std::vector<cv::Point3d>& wX,
                                   const std::vector<cv::Point2d>& x,
                                   cv::Mat& t, cv::Mat& R, cv::Mat& K)
 {
@@ -457,6 +461,7 @@ void DLT::extractProjectionMatrix(const std::vector<cv::Point3d>& wX,
     cv::Mat S, U, Vt;
     cv::SVD::compute(A, S, U, Vt);
 
+    std::cout << "Helloooo" << std::endl;
     // Find smallest eigenvalue in S
     double smallestSv = S.at<double>(0, 0);
     unsigned int indexSmallestSv = 0 ;
@@ -474,9 +479,16 @@ void DLT::extractProjectionMatrix(const std::vector<cv::Point3d>& wX,
     if (rnv.at<double>(0, 11) < 0) // tz < 0
         rnv *=-1;
 
-    // Extract rotation and intrinsics matrix
+    // Reshape projection matrix
     cv::Mat P = cv::Mat_<double>(3,4,CV_64F);
     P = rnv.reshape(1,3);
+
+    // Denormalize
+    //cv::Mat Tinv;
+    //cv::invert(m_T,Tinv);
+    //P = Tinv*P*m_U;
+
+    // Extract rotation and intrinsics matrix
     cv::decomposeProjectionMatrix(P,K,R,t);
 
     // Scale intrinsic matrix
@@ -500,8 +512,10 @@ void DLT::extractProjectionMatrix(const std::vector<cv::Point3d>& wX,
 
 void DLT::test()
 {
-    std::vector< cv::Point3d > wX;
-    std::vector< cv::Point2d >  x;
+    //std::vector<cv::Point3d> wX;
+    //std::vector<cv::Point2d>  x;
+    std::vector<cv::Vec4d> wX;
+    std::vector<cv::Vec3d> x;
 
     // Ground truth pose used to generate the data
     cv::Mat ctw_truth = (cv::Mat_<double>(3,1) << -0.1, 0.1, 1.2); // Translation vector
@@ -514,26 +528,52 @@ void DLT::test()
 
     // Input data: 3D coordinates of at least 6 non coplanar points
     double L = 0.2;
-    wX.push_back( cv::Point3d(  -L, -L, 0  ) ); // wX_0 ( -L, -L, 0  )^T
-    wX.push_back( cv::Point3d( 2*L, -L, 0.2) ); // wX_1 (-2L, -L, 0.2)^T
-    wX.push_back( cv::Point3d(   L,  L, 0.2) ); // wX_2 (  L,  L, 0.2)^T
-    wX.push_back( cv::Point3d(  -L,  L, 0  ) ); // wX_3 ( -L,  L, 0  )^T
-    wX.push_back( cv::Point3d(-2*L,  L, 0  ) ); // wX_4 (-2L,  L, 0  )^T
-    wX.push_back( cv::Point3d(   0,  0, 0.5) ); // wX_5 (  0,  0, 0.5)^T
+    wX.push_back(cv::Vec4d(-L, -L, 0, 1)); // wX_0 ( -L, -L, 0  )^T
+    wX.push_back(cv::Vec4d(2*L, -L, 0.2, 1)); // wX_1 (-2L, -L, 0.2)^T
+    wX.push_back(cv::Vec4d(L, L, 0.2, 1)); // wX_2 (  L,  L, 0.2)^T
+    wX.push_back(cv::Vec4d(-L, L, 0, 1)); // wX_3 ( -L,  L, 0  )^T
+    wX.push_back(cv::Vec4d(-2*L, L, 0, 1)); // wX_4 (-2L,  L, 0  )^T
+    wX.push_back(cv::Vec4d(0, 0, 0.5, 1)); // wX_5 (  0,  0, 0.5)^T
+
+//    wX.push_back( cv::Point3d(-L, -L, 0) ); // wX_0 ( -L, -L, 0  )^T
+//    wX.push_back( cv::Point3d( 2*L, -L, 0.2) ); // wX_1 (-2L, -L, 0.2)^T
+//    wX.push_back( cv::Point3d(   L,  L, 0.2) ); // wX_2 (  L,  L, 0.2)^T
+//    wX.push_back( cv::Point3d(  -L,  L, 0  ) ); // wX_3 ( -L,  L, 0  )^T
+//    wX.push_back( cv::Point3d(-2*L,  L, 0  ) ); // wX_4 (-2L,  L, 0  )^T
+//    wX.push_back( cv::Point3d(   0,  0, 0.5) ); // wX_5 (  0,  0, 0.5)^T
+
+
 
     // Input data: 2D coordinates of the points on the image plane
     for(int i = 0; i < wX.size(); i++)
     {
         cv::Mat cX = K*(cRw_truth*cv::Mat(wX[i]) + ctw_truth); // Update cX, cY, cZ
-        x.push_back( cv::Point2d( cX.at<double>(0, 0)/cX.at<double>(2, 0),
-                                  cX.at<double>(1, 0)/cX.at<double>(2, 0) ) ); // x = (cX/cZ, cY/cZ)
+        std::cout << "Helloooo" << std::endl;
+        //x.push_back( cv::Point2d( cX.at<double>(0, 0)/cX.at<double>(2, 0),
+        //                          cX.at<double>(1, 0)/cX.at<double>(2, 0) ) ); // x = (cX/cZ, cY/cZ)
+        x.push_back(cv::Vec3d(cX.at<double>(0, 0)/cX.at<double>(2, 0),
+                              cX.at<double>(1, 0)/cX.at<double>(2, 0),1)); // x = (cX/cZ, cY/cZ)
     }
 
+    // Homogeneous coordinates
+    //cv::convertPointsToHomogeneous(x,x);
+    //cv::convertPointsToHomogeneous(wX,wX);
+
+    std::cout << "Helloooo" << std::endl;
+
+    // Normalize points
+    cv::Mat points2D = cv::Mat(x).reshape(1,3);
+    cv::Mat points3D = cv::Mat(wX).reshape(1,4);
+    normalizePoints(points2D,points3D);
+
+    std::cout << "Helloooo" << std::endl;
+
+    // Apply DLT
     cv::Mat t(3, 1, CV_64F); // Translation vector
     cv::Mat R(3, 3, CV_64F); // Rotation matrix
     cv::Mat K0(3, 3, CV_64F); // Intrinsics matrix
     DLT dlt;
-    dlt.extractProjectionMatrix(wX, x, t, R, K0);
+    dlt.extractProjectionMatrix(points3D, points2D, t, R, K0);
 
     std::cout << "K (ground truth):\n" << K << std::endl;
     std::cout << "K (computed with DLT):\n" << K0 << std::endl;

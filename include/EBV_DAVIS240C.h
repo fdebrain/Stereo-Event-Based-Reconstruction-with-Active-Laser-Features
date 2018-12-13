@@ -10,6 +10,8 @@
 #include <vector>
 #include <mutex>
 
+#include <EBV_LaserController.h>
+
 #include <libcaercpp/devices/davis.hpp>
 
 namespace cv {class Mat;}
@@ -24,16 +26,30 @@ public:
           m_pol(0),
           m_timestamp(0) {}
 
-    DAVIS240CEvent(const int x, const int y, const bool pol, const int timestamp)
+    DAVIS240CEvent(const int x, const int y, const bool pol,
+                   const int timestamp)
         : m_x(x),
           m_y(y),
           m_pol(pol),
           m_timestamp(timestamp) {}
 
+    DAVIS240CEvent(const int x, const int y, const bool pol,
+                   const int timestamp, const int laser_x, const int laser_y)
+        : m_x(x),
+          m_y(y),
+          m_pol(pol),
+          m_timestamp(timestamp),
+          m_laser_x(laser_x),
+          m_laser_y(laser_y) {}
+
     int m_x;
     int m_y;
     bool m_pol;
     int m_timestamp;
+
+    // For laser synchronization
+    int m_laser_x{-1};
+    int m_laser_y{-1};
 };
 
 struct DAVIS240CFrame {
@@ -70,6 +86,7 @@ class DAVIS240C
 {
 public:
     DAVIS240C();
+    DAVIS240C(LaserController *laser = nullptr);
     ~DAVIS240C();
 
     static int m_nbCams;
@@ -97,6 +114,9 @@ public:
 public:
     // Id of the camera
     const int m_id;
+
+    // Laser
+    LaserController *m_laser;
 
     // Device resolution
     const int m_rows{180};

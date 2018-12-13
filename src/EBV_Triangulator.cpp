@@ -99,7 +99,6 @@ void Triangulator::importCalibration()
                           m_Rect[1][0], m_Rect[1][1],
                           m_P[1][0], m_P[1][1],
                           m_Q[1], cv::CALIB_ZERO_DISPARITY);
-
         auto R0 = cv::Mat::eye(3,3,CV_64FC1);
         auto T0 = cv::Mat::zeros(3,1,CV_64FC1);
         computeProjectionMatrix(m_K[0],R0,T0,m_P[1][0]);
@@ -113,9 +112,8 @@ void Triangulator::importCalibration()
                           m_Rect[2][0], m_Rect[2][1],
                           m_P[2][0], m_P[2][1],
                           m_Q[2], cv::CALIB_ZERO_DISPARITY);
-
-        computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[2][0]);
-        computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[2][1]);
+        //computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[2][0]);
+        //computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[2][1]);
     }
     else
     {
@@ -305,16 +303,8 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     double Y = 100*point3D[1]/point3D[3];
     double Z = 100*point3D[2]/point3D[3];
 
-//    double X2 = 100*point3D_bis[0]/point3D_bis[3];
-//    double Y2 = 100*point3D_bis[1]/point3D_bis[3];
-//    double Z2 = 100*point3D_bis[2]/point3D_bis[3];
-
     // DEBUG - CHECK 3D POINT POSITION
-    if (m_debug)
-    {
-        printf("Point at: (%2.1f,%2.1f,%2.1f). \n\r ",X,Y,Z);
-        //printf("Point at: (%2.1f,%2.1f,%2.1f) - (%2.1f,%2.1f,%2.1f).\n\r",X,Y,Z,X2,Y2,Z2);
-    }
+    if (m_debug) { printf("Point at: (%2.1f,%2.1f,%2.1f). \n\r ",X,Y,Z); }
     // END DEBUG
 
     if (m_record)
@@ -356,9 +346,6 @@ void Triangulator::computeProjectionMatrix(cv::Mat K, cv::Mat R,
     cv::Mat Rt;
     K.convertTo(K,CV_64FC1);
     cv::hconcat(K*R,K*T,P);
-
-    cv::transpose(R,Rt);
-    //cv::hconcat(K*Rt,-K*Rt*T,P);
     std::cout << "P: " << P << "\n\r";
 }
 

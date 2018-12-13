@@ -12,9 +12,9 @@ int main(int argc, char** argv)
     int freq = 500;
     int filter_offset = 20;
 
-    DAVIS240C       davis_master;
-    DAVIS240C       davis_slave;
     LaserController laser(freq);
+    DAVIS240C       davis_master(&laser);
+    DAVIS240C       davis_slave(&laser);
 
     AdaptiveFilter  filter0(freq+filter_offset,&davis_master);
     AdaptiveFilter  filter1(freq+filter_offset,&davis_slave);
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     visu.run();
 
 //    DLT dlt;
-//    //dlt.test();
+//    dlt.test();
 //    dlt.extractCalibration();
 
     return 0;

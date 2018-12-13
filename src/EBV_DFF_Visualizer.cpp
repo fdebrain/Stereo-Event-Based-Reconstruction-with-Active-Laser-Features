@@ -8,13 +8,41 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+//
+
+
 // Exporting depth maps into txt file
-static void writeMatToFile(std::vector<float>& v, const char* filename)
+static void writeMatToFile(std::vector<float>& v, const std::string filename)
 {
     std::ofstream fout(filename);
-    for(size_t i=0; i<v.size( ); ++i)
-       fout << v[i] << std::endl;
-    fout.close( );
+    for(size_t i=0; i<v.size(); ++i) { fout << v[i] << std::endl; }
+    fout.close();
+}
+
+// Setting laser ROI with depthmap window
+static void onMouse(int event, int x, int y, int, void* data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+
+    // Remapping (TODO: fix offset on screen)
+    int y_bis = x*static_cast<int>(4000.f/240.f) - 200;
+    int x_bis = y*static_cast<int>((3500.f/180.f)) + 700;
+
+    if (event == cv::EVENT_LBUTTONDOWN)
+    {
+        printf("Set laser boundaries to xMin: %d, yMin: %d. \n\r",x_bis,y_bis);
+        laser->setMinX(x_bis);
+        laser->setMinY(y_bis);
+    }
+    else if (event == cv::EVENT_LBUTTONUP)
+    {
+        if (x_bis>laser->getMinX() && y_bis>laser->getMinY())
+        {
+            printf("Set laser boundaries to xMax: %d, yMax: %d. \n\r",x_bis,y_bis);
+            laser->setMaxX(x_bis);
+            laser->setMaxY(y_bis);
+        }
+    }
 }
 
 //=== TRACKBAR CALLBACKS ===//
@@ -167,7 +195,7 @@ Visualizer::Visualizer(const int nbCams,
       m_triangulator(triangulator)
 {
     // Initialize data structure
-    for (auto& v : m_pol_evts) { v.resize(m_rows*m_cols,0); }
+    for (auto& v : m_pol_evts) { v.resize(m_rows*m_cols,false); }
     for (auto& v : m_age_evts) { v.resize(m_rows*m_cols,0); }
     for (auto& v : m_filt_evts) { v.resize(m_rows*m_cols,0); }
     for (auto& v : m_frame) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC1); }
@@ -269,7 +297,6 @@ Visualizer::Visualizer(const int nbCams,
         // Laser trackbars
         cv::createTrackbar("Laser frequency",m_pol_win[0],&m_laser_freq,1500,
                            &callbackTrackbarLaserFreq,static_cast<void*>(m_laser));
-
         cv::createTrackbar("laserMinX",m_pol_win[0],&m_laser_boundaries[0],4000,
                            &callbackTrackbarLaserMinX,static_cast<void*>(m_laser));
         cv::createTrackbar("laserMaxX",m_pol_win[0],&m_laser_boundaries[1],4000,
@@ -278,19 +305,10 @@ Visualizer::Visualizer(const int nbCams,
                            &callbackTrackbarLaserMinY,static_cast<void*>(m_laser));
         cv::createTrackbar("laserMaxY",m_pol_win[0],&m_laser_boundaries[3],4000,
                            &callbackTrackbarLaserMaxY,static_cast<void*>(m_laser));
-
         cv::createTrackbar("laserX",m_pol_win[0],&m_laser_pos[0],m_laser->m_max_x,
                            &callbackTrackbarLaserX,static_cast<void*>(m_laser));
         cv::createTrackbar("laserY",m_pol_win[0],&m_laser_pos[1],m_laser->m_max_y,
                            &callbackTrackbarLaserY,static_cast<void*>(m_laser));
-//        cv::createTrackbar("laserVx",m_pol_win[0],&m_laser_vel[0],1e6,
-//                           &callbackTrackbarLaserVx,static_cast<void*>(m_laser));
-//        cv::createTrackbar("laserVy",m_pol_win[0],&m_laser_vel[1],1e6,
-//                           &callbackTrackbarLaserVy,static_cast<void*>(m_laser));
-        cv::createTrackbar("Laser step",m_pol_win[0],&m_laser_step,300,
-                           &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
-        cv::createTrackbar("Laser ratio",m_pol_win[0],&m_laser_ratio_int,300,
-                           &callbackTrackbarLaserRatio,static_cast<void*>(m_laser));
     }
 
     // Initialize triangulator
@@ -325,6 +343,15 @@ Visualizer::Visualizer(const int nbCams,
         // Depth trackbars
         cv::createTrackbar("minDepth",m_depth_win,&m_min_depth,100,nullptr);
         cv::createTrackbar("maxDepth",m_depth_win,&m_max_depth,100,nullptr);
+
+        // Laser
+        cv::createTrackbar("Laser step",m_depth_win,&m_laser_step,300,
+                           &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
+        cv::createTrackbar("Laser ratio",m_depth_win,&m_laser_ratio_int,300,
+                           &callbackTrackbarLaserRatio,static_cast<void*>(m_laser));
+
+        // Mouse
+        cv::setMouseCallback(m_depth_win,&onMouse,static_cast<void*>(m_laser));
     }
 
     // Initialize calibrator
@@ -561,8 +588,10 @@ void Visualizer::run()
            break;
 
         case 'e':
-            printf("Export depthmap.\n\r");
-            writeMatToFile(m_depthmap,"../experiments/depthmaps/depthmap_scene.txt");
+            static int nb_maps = 1;
+            printf("Export new depthmap.\n\r");
+            writeMatToFile(m_depthmap,m_depthmap_path + std::to_string(nb_maps) + ".txt");
+            nb_maps++;
             break;
 
         case 'i':
@@ -613,7 +642,6 @@ void Visualizer::run()
                 printf("Save 3D point. \n\r");
                 m_triangulator->m_record_next_point = true;
             }
-
             break;
         }
 

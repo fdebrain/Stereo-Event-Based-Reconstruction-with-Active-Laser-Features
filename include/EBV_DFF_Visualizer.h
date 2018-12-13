@@ -65,6 +65,7 @@ public:
     cv::Mat                            m_mask;
 
     // Display window related variables
+    std::string m_depthmap_path{"../experiments/Depthmaps/depthmap_scene_laser_"};
     std::array<std::string,2>   m_pol_win{};
     std::array<std::string,2>   m_age_win{};
     std::array<std::string,2>   m_frame_win{};
@@ -97,7 +98,7 @@ public:
     std::array<int,2> m_filter_max_t{};
 
     // Trackbar parameters
-    int        m_min_depth{20};
+    int        m_min_depth{30};
     int        m_max_depth{50};
     int        m_matcherEps{};
     int        m_matcher_max_buffer{};

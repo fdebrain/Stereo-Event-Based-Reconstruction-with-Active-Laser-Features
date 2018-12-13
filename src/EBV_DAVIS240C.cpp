@@ -67,6 +67,12 @@ DAVIS240C::DAVIS240C()
     }
 }
 
+DAVIS240C::DAVIS240C(LaserController *laser)
+    : DAVIS240C()
+{
+     m_laser = laser;
+}
+
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
@@ -213,6 +219,13 @@ void DAVIS240C::readThread()
                     int x = polarityEvent.getY();
                     int t = polarityEvent.getTimestamp();
                     bool p = polarityEvent.getPolarity(); // {0,1}
+
+                    if (m_laser)
+                    {
+                        int laser_x = m_laser->getX();
+                        int laser_y = m_laser->getY();
+                        events.emplace_back(x,y,p,t,laser_x,laser_y);
+                    }
                     events.emplace_back(x,y,p,t);
                 }
                 this->warnEvent(events);
