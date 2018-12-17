@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
     AdaptiveFilter  filter0(freq+filter_offset,&davis_master);
     AdaptiveFilter  filter1(freq+filter_offset,&davis_slave);
-    Matcher         matcher(&filter0,&filter1,&laser);
+    Matcher         matcher(&filter0,&filter1);
     Triangulator    triangulator(&matcher,
                               &laser);
     StereoCalibrator calibrator(&laser,
@@ -31,7 +31,6 @@ int main(int argc, char** argv)
                       &calibrator,
                       &triangulator,
                       &laser);
-
     visu.run();
 
 //    DLT dlt;

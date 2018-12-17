@@ -8,6 +8,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+
+
 class TriangulatorListener
 {
 public:
@@ -45,8 +47,12 @@ public:
 
     void computeProjectionMatrix(cv::Mat K, cv::Mat R,
                                  cv::Mat T, cv::Mat& P);
+public:
+    // Who triangulator listens to
+    Matcher* m_matcher;
+    LaserController* m_laser;
 
-    // DAVIS camera settings
+    // Camera settings
     const int m_rows{180};
     const int m_cols{240};
 
@@ -54,16 +60,12 @@ public:
     bool m_enable{false};
     bool m_debug{false};
 
-    // Who triangulator is listening to
-    Matcher* m_matcher;
-    LaserController* m_laser;
-
     // Stereo mode
     enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2 };
     std::string stereoPairNames[3] = {"Cameras", "CamLeftLaser", "CamRightLaser"};
     StereoPair m_mode{Cameras};
 
-    // Event recordings
+    // Recording settings
     bool m_record{false};
     bool m_record_pointwise{false};
     bool m_record_next_point{false};
@@ -74,7 +76,7 @@ public:
     std::string m_path_calib_cam = "../calibration/calibCameras.yaml";
     std::string m_path_calib_laser = "../calibration/calibLaser.yaml";
 
-    // Calibration matrices (camera0,camera1,laser)
+    // Calibration datastructures (camera0,camera1,laser)
     std::array<cv::Mat, 3> m_K;
     std::array<cv::Mat, 3> m_D;
     std::array<cv::Mat, 3> m_R;
@@ -85,8 +87,12 @@ public:
     // Two matrices for each stereo pairs (cam0-cam1, cam0-laser, cam1-laser)
     std::array<std::array<cv::Mat,2>, 3> m_P;
     std::array<std::array<cv::Mat,2>, 3> m_Rect;
+    cv::Mat m_Pfix;
 
 private:
+    // Thread this object runs in (including triangulator listeners)
+    std::thread m_thread;
+
     // List of incoming filtered events for each camera (FIFO)
     std::list<DAVIS240CEvent> m_evtQueue0;
     std::list<DAVIS240CEvent> m_evtQueue1;
@@ -101,9 +107,6 @@ private:
 
     // List of triangulator listeners
     std::list<TriangulatorListener*> m_triangulatorListeners;
-
-    // Thread this object runs in.
-    std::thread m_thread;
 };
 
 #endif // EBV_TRIANGULATOR_H

@@ -1,7 +1,7 @@
 #ifndef EBV_LASERCONTROLLER_H
 #define EBV_LASERCONTROLLER_H
 
-#include <EBV_DAVIS240C.h>
+//#include <EBV_DAVIS240C.h>
 
 #include <list>
 #include <cmath>
@@ -13,24 +13,6 @@
 #include <condition_variable>
 
 class MagneticMirrorLaser;
-
-struct LaserEvent : public DAVIS240CEvent
-{
-  LaserEvent()
-      : DAVIS240CEvent (0,0,false,0)
-  {}
-
-  LaserEvent(int x, int y, int t)
-      : DAVIS240CEvent (x,y,false,t)
-  {}
-};
-
-class LaserListener
-{
-public:
-    LaserListener(void) {}
-    virtual void receivedNewLaserEvent(const LaserEvent& event) = 0;
-};
 
 class LaserController
 {
@@ -72,6 +54,9 @@ public:
     float getRatio() const { return m_ratio; }
     void setRatio(const float ratio) { m_ratio= ratio; }
 
+    int getSleepTime() const { return m_sleep; }
+    void setSleepTime(const int sleep_time);
+
     void setPos(const int x, const int y);
     void setVel(const int vx, const int vy);
 
@@ -79,53 +64,43 @@ public:
     void init();
     void start();
     void stop();
+    void runThread();
     void toogleState();
     void toogleSweep();
-    void runThread();
     void sweep();
 
-    // Laser event listening
-    void registerLaserListener(LaserListener* listener);
-    void deregisterLaserListener(LaserListener* listener);
-    void warnCommand(const LaserEvent& event);
-
 public:
-    std::thread m_thread;
-    std::string m_mode;
-    std::mutex m_mutex;
-    std::chrono::high_resolution_clock::time_point m_chrono{};
-
     // Laser state
     int m_x;
     int m_y;
     long m_t;
-    std::chrono::high_resolution_clock::time_point m_t_start;
     bool m_laser_on{false};
     bool m_swipe_on{false};
     bool m_received_new_state{false};
 
+    // Laser position boundaries
     int m_min_x{500};
     int m_min_y{0};
     int m_max_x{4000};
     int m_max_y{4000};
 
+    std::chrono::high_resolution_clock::time_point m_t_start;
+    std::thread m_thread;
+
 private:
     MagneticMirrorLaser* m_laser;
-    int m_freq;
+    int m_freq{0};
     int m_step{50};
     float m_ratio{2};
     int m_vx{0};
     int m_vy{0};
-    int m_swipe_vx{15000};
-    int m_swipe_vy{200000};
     int m_direction_x{1};
     int m_direction_y{1};
+    int m_sleep{2};
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;
     std::mutex m_condWaitMutex;
-
-    std::list<LaserListener*> m_laserListeners;
 };
 
 #endif // EBV_LASERCONTROLLER_H

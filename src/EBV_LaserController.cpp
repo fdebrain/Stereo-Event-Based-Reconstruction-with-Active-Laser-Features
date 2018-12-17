@@ -3,9 +3,9 @@
 
 LaserController::LaserController(int freq)
     : m_laser{new MagneticMirrorLaser},
-      m_freq(freq) // Fix the offset
+      m_freq(freq) // Fix the frequency offset
 { 
-    // Initialize laser
+    // Connect laser
     m_laser->init("/dev/ttyUSB0");
     m_x = m_max_x/2;
     m_y = m_max_y/2;
@@ -23,6 +23,7 @@ LaserController::~LaserController()
     delete m_laser;
 }
 
+// SETTERS
 void LaserController::setFreq(const int freq)
 {
     m_freq = freq;
@@ -48,14 +49,7 @@ void LaserController::setPos(const int x, const int y)
     m_laser->pos(m_x,m_y);
 
     // Wait for laser to reach target
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));
-
-    // Warn new laser event
-//    const auto now = std::chrono::high_resolution_clock::now();
-//    auto t = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
-
-    LaserEvent event(m_x,m_y,m_t);
-    this->warnCommand(event);
+    std::this_thread::sleep_for(std::chrono::milliseconds(m_sleep));
 }
 
 void LaserController::setVel(const int vx, const int vy)
@@ -87,36 +81,6 @@ void LaserController::stop()
     m_laser->vel(0,0);
 }
 
-void LaserController::toogleState()
-{
-    m_received_new_state = true;
-    m_laser_on = !m_laser_on;
-
-    if (m_laser_on) { this->start(); }
-    else { this->stop(); }
-
-    // Notify new command to the thread
-    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
-    m_condWait.notify_one();
-}
-
-void LaserController::toogleSweep()
-{
-    m_received_new_state = true;
-    m_swipe_on = !m_swipe_on;
-
-    if (m_swipe_on)
-    {
-        printf("Swipe mode laser. \n\r");
-        this->start();
-    }
-    else { this->stop(); }
-
-    // Notify new command to the thread
-    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
-    m_condWait.notify_one();
-}
-
 void LaserController::runThread()
 {
     while(true)
@@ -132,12 +96,50 @@ void LaserController::runThread()
     }
 }
 
+void LaserController::toogleState()
+{
+    m_received_new_state = true;
+    m_laser_on = !m_laser_on;
+
+    if (m_laser_on)
+    {
+        printf("Laser on. \n\r");
+        this->start();
+    }
+    else
+    {
+        printf("Laser off. \n\r");
+        this->stop();
+    }
+
+    // Notify new command to the thread
+    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+    m_condWait.notify_one();
+}
+
+void LaserController::toogleSweep()
+{
+    m_received_new_state = true;
+    m_swipe_on = !m_swipe_on;
+
+    if (m_swipe_on)
+    {
+        printf("Laser sweep mode enabled. \n\r");
+        this->start();
+    }
+    else
+    {
+        printf("Laser sweep mode disabled. \n\r");
+        this->stop();
+    }
+
+    // Notify new command to the thread
+    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
+    m_condWait.notify_one();
+}
+
 void LaserController::sweep()
 {
-    //const auto now = std::chrono::high_resolution_clock::now();
-    //m_chrono = now;
-    //this->setVel(m_swipe_vx,m_swipe_vy);
-
     // Sweep mode 1
     m_y += m_step;
     if (m_y>=m_max_y) { m_y = m_min_y; m_x += m_ratio*m_step; }
@@ -151,116 +153,4 @@ void LaserController::sweep()
 //    if (m_x>m_max_x) { m_direction_x = -1; }
 //    else if (m_x<m_min_x) { m_direction_x = 1; }
 //    this->setPos(m_x,m_y);
-
-    // Sweep mode 3
-//    m_y += m_direction_y*m_step;
-//    if (m_y>m_max_y)
-//    {
-//        m_y = m_max_y;
-//        m_x += m_direction_x*m_ratio*m_step;
-//        m_direction_y = -1;
-//    }
-//    else if (m_y<m_min_y)
-//    {
-//        m_y = m_min_y;
-//        m_x += m_direction_x*m_ratio*m_step;
-//        m_direction_y = 1;
-//    }
-//    if (m_x>m_max_x)
-//    {
-//        m_x = m_max_x;
-//        m_direction_x = -1;
-//    }
-//    else if (m_x<m_min_x)
-//    {
-//        m_x = m_min_x;
-//        m_direction_x = 1;
-//    }
-//    this->setPos(m_x,m_y);
-
-//    double t = 0.0;
-//    uint x=0, y=0;
-
-//    while(true)
-//    {
-//        if (m_mode=="circle")
-//        {
-//            t += m_step;
-//            x = static_cast<uint>(m_cx + m_r*cos(2.*3.14*t));
-//            y = static_cast<uint>(m_cy + m_r*sin(2.*3.14*t));
-//            m_laser->pos(x,y);
-//            if (t>1.0) { t = 0.0; }
-
-//            std::this_thread::sleep_for (std::chrono::milliseconds(1));
-//        }
-//        else
-//        {
-//            y += 10;
-//            m_laser->pos(x,y);
-//            if (y>=m_max_y) { y = 0; x += 100; }
-//            if (x>m_max_x) { x = 0; }
-//            std::this_thread::sleep_for (std::chrono::microseconds(500));
-//        }
-//    }
-
-    // Normal swipe
-//    while(true)
-//    {
-//        m_y += m_step;
-//        this->setPos(m_x,m_y);
-//        if (m_y>=m_max_y) { m_y = m_min_y; m_x += 2*m_step; }
-//        if (m_x>m_max_x) { m_x = m_min_x; }
-//        std::this_thread::sleep_for (std::chrono::milliseconds(10));
-//    }
-
-    // Draw rectangle
-//    while(true)
-//    {
-//        while(m_y<m_max_y)
-//        {
-//            m_y += m_step;
-//            m_laser->pos(m_x,m_y);
-//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-//        }
-
-//        while(m_x<m_max_x)
-//        {
-//            m_x += m_step;
-//            m_laser->pos(m_x,m_y);
-//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-//        }
-
-//        while(m_y>m_min_y)
-//        {
-//            m_y -= m_step;
-//            m_laser->pos(m_x,m_y);
-//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-//        }
-
-//        while(m_x>m_min_x)
-//        {
-//            m_x -= m_step;
-//            m_laser->pos(m_x,m_y);
-//            std::this_thread::sleep_for (std::chrono::milliseconds(10));
-//        }
-//    }
-}
-
-//=== LASER LISTENING ===//
-void LaserController::registerLaserListener(LaserListener* listener)
-{
-    m_laserListeners.push_back(listener);
-}
-
-void LaserController::warnCommand(const LaserEvent& event)
-{
-    for(auto it = m_laserListeners.begin(); it!=m_laserListeners.end(); it++)
-    {
-        (*it)->receivedNewLaserEvent(event);
-    }
-}
-
-void LaserController::deregisterLaserListener(LaserListener* listener)
-{
-    m_laserListeners.remove(listener);
 }

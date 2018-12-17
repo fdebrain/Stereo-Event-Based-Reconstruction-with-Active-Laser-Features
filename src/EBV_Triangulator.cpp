@@ -17,6 +17,7 @@ void Triangulator::resetCalibration()
     for (auto &q : m_Q) { q = cv::Mat(4,4,CV_32FC1); }
     for (auto &p : m_P) { p[0] = cv::Mat(3,4,CV_32FC1); p[1] = cv::Mat(3,4,CV_32FC1); }
     for (auto &rect : m_Rect) { rect[0] = cv::Mat(3,3,CV_32FC1); rect[1] = cv::Mat(3,3,CV_32FC1); }
+    m_Pfix = cv::Mat(3,4,CV_32FC1);
 }
 
 void Triangulator::importCalibration()
@@ -42,6 +43,26 @@ void Triangulator::importCalibration()
     std::cout << "F: " << m_F[0] << "\n\r";
     fs.release();
 
+    // Import laser calibration
+    fs.open(m_path_calib_laser, cv::FileStorage::READ);
+    fs["camera_matrix_laser"] >> m_K[2];
+    fs["dist_coeffs_laser"] >> m_D[2];
+    fs["R1"] >> m_R[1];
+    fs["T1"] >> m_T[1];
+    fs["F1"] >> m_F[1];
+    fs["R2"] >> m_R[2];
+    fs["T2"] >> m_T[2];
+    fs["F2"] >> m_F[2];
+    std::cout << "KLaser: " << m_K[2] << "\n\r";
+    std::cout << "DLaser: " << m_D[2] << "\n\r";
+    std::cout << "R1: " << m_R[1] << "\n\r";
+    std::cout << "T1: " << m_T[1] << "\n\r";
+    std::cout << "F1: " << m_F[1] << "\n\r";
+    std::cout << "R2: " << m_R[2] << "\n\r";
+    std::cout << "T2: " << m_T[2] << "\n\r";
+    std::cout << "F2: " << m_F[2] << "\n\r";
+    fs.release();
+
     // Initialize projection matrices for cam0-cam1 stereo pair
     if (isValid(0) && isValid(1))
     {
@@ -65,26 +86,6 @@ void Triangulator::importCalibration()
         printf("Please press C to calibrate the cameras.\n\r");
         return;
     }
-
-    // Import laser calibration
-    fs.open(m_path_calib_laser, cv::FileStorage::READ);
-    fs["camera_matrix_laser"] >> m_K[2];
-    fs["dist_coeffs_laser"] >> m_D[2];
-    fs["R1"] >> m_R[1];
-    fs["T1"] >> m_T[1];
-    fs["F1"] >> m_F[1];
-    fs["R2"] >> m_R[2];
-    fs["T2"] >> m_T[2];
-    fs["F2"] >> m_F[2];
-    std::cout << "KLaser: " << m_K[2] << "\n\r";
-    std::cout << "DLaser: " << m_D[2] << "\n\r";
-    std::cout << "R1: " << m_R[1] << "\n\r";
-    std::cout << "T1: " << m_T[1] << "\n\r";
-    std::cout << "F1: " << m_F[1] << "\n\r";
-    std::cout << "R2: " << m_R[2] << "\n\r";
-    std::cout << "T2: " << m_T[2] << "\n\r";
-    std::cout << "F2: " << m_F[2] << "\n\r";
-    fs.release();
 
     // Initialize projection matrices for cam0-laser & cam1-laser stereo pairs
     if (isValid(0) && isValid(1) && isValid(2))
@@ -112,8 +113,11 @@ void Triangulator::importCalibration()
                           m_Rect[2][0], m_Rect[2][1],
                           m_P[2][0], m_P[2][1],
                           m_Q[2], cv::CALIB_ZERO_DISPARITY);
-        //computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[2][0]);
-        //computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[2][1]);
+        computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[2][0]);
+        computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[2][1]);
+
+//        computeProjectionMatrix(m_K[2],m_R[0],m_T[0],m_Pfix);
+//        std::cout << "Pfixed: " << m_Pfix << "\n\r";
     }
     else
     {
@@ -230,17 +234,16 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     cv::Vec4d point3D;
     cv::Vec4d point3D_bis;
 
-    m_queueAccessMutex0.lock();
+    //m_queueAccessMutex0.lock();
     const int x0 = event0.m_x;
     const int y0 = event0.m_y;
     const int x1 = event1.m_x;
     const int y1 = event1.m_y;
     int laser_x = 180*(m_laser->getX()-500)/(4000 - 500);
     int laser_y = 240*(m_laser->getY())/(4000);
-    m_queueAccessMutex0.unlock();
-
-    //printf("xLaser: %d - yLaser: %d - xEvent0: %d - yEvent0: %d - xEvent1: %d - yEvent1: %d. \n\r",
-    //       xLaser, yLaser, x0, y0, x1, y1);
+    //int laser_x = 180.*(event0.m_laser_x-500)/(4000. - 500.);
+    //int laser_y = 240.*(event0.m_laser_y)/(4000.);
+    //m_queueAccessMutex0.unlock();
 
     // Camera0-Camera1 stereo
     if (m_mode==Cameras)
@@ -298,10 +301,24 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                           undistCoordsCorrected1,
                           point3D);
 
-    // Convert to cm
-    double X = 100*point3D[0]/point3D[3];
-    double Y = 100*point3D[1]/point3D[3];
-    double Z = 100*point3D[2]/point3D[3];
+    // Convert to cm + scale
+    double X = point3D[0];
+    double Y = point3D[1];
+    double Z = point3D[2];
+    double scale = point3D[3];
+
+    // Map 3D points expressed in Cam1 to Cam0 reference frame
+    if (m_mode==2)
+    {
+//        Z = -Z;
+//        X = m_Pfix.at<double>(0,0)*X + m_Pfix.at<double>(0,1)*Y + m_Pfix.at<double>(0,2)*Z + m_Pfix.at<double>(0,3)*scale;
+//        Y = m_Pfix.at<double>(1,0)*X + m_Pfix.at<double>(1,1)*Y + m_Pfix.at<double>(1,2)*Z + m_Pfix.at<double>(1,3)*scale;
+//        Z = m_Pfix.at<double>(2,0)*X + m_Pfix.at<double>(2,1)*Y + m_Pfix.at<double>(2,2)*Z + m_Pfix.at<double>(2,3)*scale;
+    }
+
+    X = 100*X/scale;
+    Y = 100*Y/scale;
+    Z = 100*Z/scale;
 
     // DEBUG - CHECK 3D POINT POSITION
     if (m_debug) { printf("Point at: (%2.1f,%2.1f,%2.1f). \n\r ",X,Y,Z); }
@@ -346,7 +363,7 @@ void Triangulator::computeProjectionMatrix(cv::Mat K, cv::Mat R,
     cv::Mat Rt;
     K.convertTo(K,CV_64FC1);
     cv::hconcat(K*R,K*T,P);
-    std::cout << "P: " << P << "\n\r";
+    //std::cout << "P: " << P << "\n\r";
 }
 
 void Triangulator::registerTriangulatorListener(TriangulatorListener* listener)
