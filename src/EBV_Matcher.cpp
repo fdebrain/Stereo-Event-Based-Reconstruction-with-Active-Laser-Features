@@ -1,15 +1,11 @@
 #include <EBV_Matcher.h>
 
-Matcher::Matcher(Filter* filter0,
-                 Filter* filter1,
-                 LaserController* laser)
-    : m_filter0(filter0), m_filter1(filter1),
-      m_laser(laser)
+Matcher::Matcher(Filter* filter0, Filter* filter1)
+    : m_filter0(filter0), m_filter1(filter1)
 {
     // Initialize filters listeners
     m_filter0->registerFilterListener(this);
     m_filter1->registerFilterListener(this);
-    //m_laser->registerLaserListener(this);
 
     // Initialize thread
     m_thread = std::thread(&Matcher::runThread,this);
@@ -19,7 +15,6 @@ Matcher::~Matcher()
 {
     m_filter0->deregisterFilterListener(this);
     m_filter1->deregisterFilterListener(this);
-    //m_laser->deregisterLaserListener(this);
 }
 
 // The function the thread executes and waits on
@@ -27,10 +22,10 @@ void Matcher::runThread()
 {
     bool hasQueueEvent0;
     bool hasQueueEvent1;
-    //bool hasQueueEvent2;
-    DAVIS240CEvent event0;
-    DAVIS240CEvent event1;
-    //LaserEvent event2;
+    bool ask_for_next0 = true;
+    bool ask_for_next1 = true;
+    DAVIS240CEvent event0{};
+    DAVIS240CEvent event1{};
 
     while(true)
     {
@@ -42,57 +37,46 @@ void Matcher::runThread()
             hasQueueEvent1  = !m_evtQueue1.empty();
         m_queueAccessMutex1.unlock();
 
-//        m_queueAccessMutex2.lock();
-//            hasQueueEvent2  = !m_evtQueue2.empty();
-//        m_queueAccessMutex2.unlock();
-
-        // Process only if incoming filtered events in both cameras
-        //CHANGE
-        if(hasQueueEvent0 && hasQueueEvent1)
+        if (hasQueueEvent0 && hasQueueEvent1)
         {
-            m_queueAccessMutex0.lock();
+            if(ask_for_next0)
+            {
+                m_queueAccessMutex0.lock();
                 event0 = m_evtQueue0.front();
                 m_evtQueue0.pop_front();
-            m_queueAccessMutex0.unlock();
+                m_queueAccessMutex0.unlock();
+                ask_for_next0 = false;
+            }
 
-            m_queueAccessMutex1.lock();
+            if (ask_for_next1)
+            {
+                m_queueAccessMutex1.lock();
                 event1 = m_evtQueue1.front();
                 m_evtQueue1.pop_front();
-            m_queueAccessMutex1.unlock();
+                m_queueAccessMutex1.unlock();
+                ask_for_next1 = false;
+            }
 
-            // DEBUG - QUEUE SIZE SHOULD BE SIMILAR
-            //printf("Queue size: %d - %d.\n\r", s0, s1);
-            // END DEBUG
+            // Synchronize incoming filtered events
+            if (event0.m_timestamp > event1.m_timestamp + m_eps)
+            {
+                //printf("Event1 too old: %d. \n\r", event0.m_timestamp - event1.m_timestamp);
+                ask_for_next1 = true;
+                continue;
+            }
+            else if (event1.m_timestamp > event0.m_timestamp + m_eps)
+            {
+                //printf("Event0 too old: %d. \n\r", event0.m_timestamp - event1.m_timestamp);
+                ask_for_next0 = true;
+                continue;
+            }
 
-
-            // DEBUG - DELTA TIME SHOULD BE SMALL
-            //int t0 = event0.m_timestamp;
-            //int t1 = event1.m_timestamp;
-            //printf("Delta-time: (%d).\n\r",t0-t1);
-            // END DEBUG
-
-            this->process(event0,event1);
-
-//            // Laser events
-//            if (hasQueueEvent2)
-//            {
-//                m_queueAccessMutex2.lock();
-//                    event2 = m_evtQueue2.front();
-//                    m_evtQueue2.pop_front();
-//                m_queueAccessMutex2.unlock();
-
-//                // DEBUG - QUEUE SIZE SHOULD BE SIMILAR
-//                //printf("Queue size: %d - %d.\n\r", m_evtQueue0.size(), m_evtQueue2.size());
-//                // END DEBUG
-
-//                // DEBUG - DELTA TIME SHOULD BE SMALL
-//                //int t0 = event0.m_timestamp;
-//                //int t1 = event1.m_timestamp;
-//                //printf("Delta-time: (%d).\n\r",t0-t1);
-//                // END DEBUG
-
-//                //this->process(event0, event2);
-//            }
+            if (ask_for_next0==false && ask_for_next1==false)
+            {
+                this->process(event0,event1);
+                ask_for_next0 = true;
+                ask_for_next1 = true;
+            }
         }
         else
         {
@@ -105,8 +89,7 @@ void Matcher::runThread()
 }
 
 // Called by the thread of previous agent (here Filter)
-void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
-                                     const int id)
+void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event, const int id)
 {
     // DEBUG - CHECK IF EVENTS SYNCHRONIZED
     //printf("Camera %d - Timestamp %d. \n\r",id,event.m_timestamp);
@@ -155,45 +138,14 @@ void Matcher::receivedNewFilterEvent(DAVIS240CEvent &event,
     m_condWait.notify_one();
 }
 
-//void Matcher::receivedNewLaserEvent(const LaserEvent& event)
-//{
-//    int t = event.m_timestamp;
-//    m_queueAccessMutex2.lock();
-//        m_evtQueue2.push_back(event);
-
-//        // Remove old events
-//        m_currTime2 = event.m_timestamp;
-//        std::list<LaserEvent>::iterator it = m_evtQueue2.begin(); // DANGER SHARED RESOURCE
-//        while(    ((m_currTime2-it->m_timestamp) > m_maxTimeToKeep)
-//               && (it!=m_evtQueue2.end())
-//             )
-//        {
-//            m_evtQueue2.erase(it++);
-//        }
-//    m_queueAccessMutex2.unlock();
-
-//    std::unique_lock<std::mutex> condLock(m_condWaitMutex);
-//    m_condWait.notify_one();
-//}
-
 void Matcher::process(DAVIS240CEvent& e0, DAVIS240CEvent& e1)
 {
     const int t0 = e0.m_timestamp;
     const int t1 = e1.m_timestamp;
-    //int dt = std::abs(t0 - t1);
-    //printf("%d. \n\r",dt);
 
-    // Positive match if similar timestamps
-    if (std::abs(t0 - t1)<m_eps)
-    {
-        warnMatch(e0,e1);
-    }
+    // Match if similar timestamps
+    if (std::abs(t0 - t1)<m_eps) { warnMatch(e0,e1); }
 }
-
-//void Matcher::process(DAVIS240CEvent& e0, LaserEvent& e1)
-//{
-//    warnMatch(e0,e1);
-//}
 
 void Matcher::registerMatcherListener(MatcherListener* listener)
 {
@@ -214,13 +166,3 @@ void Matcher::warnMatch(const DAVIS240CEvent& event0,
         (*it)->receivedNewMatch(event0,event1);
     }
 }
-
-//void Matcher::warnMatch(const DAVIS240CEvent& event0,
-//                        const LaserEvent& event1)
-//{
-//    std::list<MatcherListener*>::iterator it;
-//    for(it = m_matcherListeners.begin(); it!=m_matcherListeners.end(); it++)
-//    {
-//        (*it)->receivedNewMatch(event0,event1);
-//    }
-//}
