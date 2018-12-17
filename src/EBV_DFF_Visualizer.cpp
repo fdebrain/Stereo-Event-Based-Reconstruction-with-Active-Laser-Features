@@ -8,9 +8,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-//
-
-
 // Exporting depth maps into txt file
 static void writeMatToFile(std::vector<float>& v, const std::string filename)
 {
@@ -175,12 +172,6 @@ static void callbackTrackbarMatcherEps(int eps, void *data)
     matcher->setEps(eps);
 }
 
-static void callbackTrackbarMatcherMaxBuffer(int maxBuffer, void *data)
-{
-    Matcher* matcher = static_cast<Matcher*>(data);
-    matcher->setMaxBuffer(maxBuffer);
-}
-
 Visualizer::Visualizer(const int nbCams,
                        DAVIS240C* davis0, DAVIS240C* davis1,
                        Filter* filter0, Filter* filter1,
@@ -216,11 +207,14 @@ Visualizer::Visualizer(const int nbCams,
                             cv::WindowFlags::WINDOW_NORMAL |
                             cv::WindowFlags::WINDOW_KEEPRATIO |
                             cv::WindowFlags::WINDOW_GUI_EXPANDED);
+            cv::moveWindow(m_pol_win[idx],idx*500,0);
+
             //cv::namedWindow(m_age_win[idx],0);
             cv::namedWindow(m_frame_win[idx],
                             cv::WindowFlags::WINDOW_NORMAL |
                             cv::WindowFlags::WINDOW_KEEPRATIO |
                             cv::WindowFlags::WINDOW_GUI_EXPANDED);
+            cv::moveWindow(m_frame_win[idx],idx*500,370);
 
             // Age trackbars
             cv::createTrackbar("Threshold",m_pol_win[idx],&m_age_thresh,m_max_trackbar_val,nullptr);
@@ -236,7 +230,6 @@ Visualizer::Visualizer(const int nbCams,
         // Initialize filter
         if (m_filter[idx]!=nullptr)
         {
-            // Listen to filter
             m_filter[idx]->registerFilterListener(this);
 
             // Initialize window
@@ -245,6 +238,7 @@ Visualizer::Visualizer(const int nbCams,
                             cv::WindowFlags::WINDOW_NORMAL |
                             cv::WindowFlags::WINDOW_KEEPRATIO |
                             cv::WindowFlags::WINDOW_GUI_EXPANDED);
+            cv::moveWindow(m_filt_win[idx],idx*500,730);
 
             // Initialize filter tuning parameters
             m_filter_freq[idx] = m_filter[idx]->getFreq();
@@ -323,26 +317,28 @@ Visualizer::Visualizer(const int nbCams,
                         cv::WindowFlags::WINDOW_NORMAL |
                         cv::WindowFlags::WINDOW_KEEPRATIO |
                         cv::WindowFlags::WINDOW_GUI_EXPANDED);
+        cv::moveWindow(m_depth_win,1200,0);
+        cv::resizeWindow(m_depth_win,cv::Size(700,500));
 
         m_depth_inpainted_win = "Depth Map Inpainted";
         cv::namedWindow(m_depth_inpainted_win,
                         cv::WindowFlags::WINDOW_NORMAL |
                         cv::WindowFlags::WINDOW_KEEPRATIO |
                         cv::WindowFlags::WINDOW_GUI_EXPANDED);
+        cv::moveWindow(m_depth_inpainted_win,1200,500);
+        cv::resizeWindow(m_depth_inpainted_win,cv::Size(700,500));
 
         // Initialize matcher parameters
         m_matcherEps = m_triangulator->m_matcher->getEps();
-        m_matcher_max_buffer = m_triangulator->m_matcher->getMaxBuffer();
 
         // Matcher trackbars
         cv::createTrackbar("Matcher eps",m_depth_win,&m_matcherEps,1e5,
                            &callbackTrackbarMatcherEps,static_cast<void*>(m_triangulator->m_matcher));
-        cv::createTrackbar("Matcher max buffer",m_depth_win,&m_matcher_max_buffer,1e5,
-                           &callbackTrackbarMatcherMaxBuffer,static_cast<void*>(m_triangulator->m_matcher));
 
         // Depth trackbars
         cv::createTrackbar("minDepth",m_depth_win,&m_min_depth,100,nullptr);
         cv::createTrackbar("maxDepth",m_depth_win,&m_max_depth,100,nullptr);
+        cv::createTrackbar("Blending",m_depth_win,&m_alphaInt,100,nullptr);
 
         // Laser
         cv::createTrackbar("Laser step",m_depth_win,&m_laser_step,300,
@@ -467,28 +463,25 @@ void Visualizer::run()
     {
         for(int i=0; i<m_rows*m_cols; i++)
         {
+            // Updating matrix placeholders
             for (int idx=0; idx<2; idx++)
             {
-                // Events by polarity - Master
-                // QUESTION: Where do we need mutex lock ?
                 bool pol = m_pol_evts[idx][i];
                 int dt = m_currenTime[idx] - m_age_evts[idx][i];
 
+                // Events by polarity
                 if(dt<m_age_thresh)
                 {
                     polMat[idx].data[3*i + 0] = static_cast<uchar>(0);              // Blue channel
                     polMat[idx].data[3*i + 1] = static_cast<uchar>(pol>0?255:0);    // Green channel
                     polMat[idx].data[3*i + 2] = static_cast<uchar>(pol==0?255:0);    // Red Channel
                 }
-                // Events by age
                 else { dt = m_age_thresh; }
+
+                // Events by age
                 ageMatHSV[idx].data[3*i + 0] = static_cast<uchar>(0.75*180*dt/float(m_age_thresh)); //H
                 ageMatHSV[idx].data[3*i + 1] = static_cast<uchar>(255); //S
                 ageMatHSV[idx].data[3*i + 2] = static_cast<uchar>(dt==m_age_thresh?0:255); //V
-
-                // Events by polarity
-                pol = m_pol_evts[idx][i];
-                dt = m_currenTime[idx] - m_age_evts[idx][i];
 
                 // Filtered events
                 dt = m_currenTime[idx] - m_filt_evts[idx][i];
@@ -507,7 +500,7 @@ void Visualizer::run()
                 }
             }
 
-            // Depth map
+            // Update depthmap
             float z = m_depthmap[i];
             if (z>0)
             {
@@ -527,6 +520,7 @@ void Visualizer::run()
             }
         }
 
+        // Displaying matrices
         for (int idx=0; idx<2; idx++)
         {
             if (m_davis[idx] != nullptr)
@@ -538,36 +532,37 @@ void Visualizer::run()
                 //cv::cvtColor(ageMatHSV[idx],ageMatRGB[idx],CV_HSV2BGR);
                 //cv::imshow(m_age_win[idx],ageMatRGB[idx]);
 
-                // Check if calibration mode
-                if (m_calibrator!=nullptr)
-                {
-                    if (m_calibrator->m_calibrate_cameras)
-                    {
-                        m_calibrator->calibrateCameras(m_frame[idx],idx);
-                    }
-                }
+                // Check if calibration mode - DEPRECATED
+//                if (m_calibrator!=nullptr)
+//                {
+//                    if (m_calibrator->m_calibrate_cameras)
+//                    {
+//                        m_calibrator->calibrateCameras(m_frame[idx],idx);
+//                    }
+//                }
 
                 // Display frame
                 cv::imshow(m_frame_win[idx],m_frame[idx]);
             }
 
-            // Display trackers
+            // Display filtered events + trackers
             if(m_filter[idx] != nullptr)
             {
                 int x = m_filter[idx]->getX();
                 int y = m_filter[idx]->getY();
                 cv::circle(filtMat[idx],cv::Point2i(y,x),
                            3,cv::Scalar(0,255,0));
-
-                // Display filtered events + trackers
                 cv::imshow(m_filt_win[idx],filtMat[idx]);
             }
         }
 
+        // Display depth map + Blending with master frame
         if (m_triangulator != nullptr)
         {
-            // Display depth map
             cv::cvtColor(depthMatHSV,depthMatRGB,CV_HSV2BGR);
+            cv::Mat frameRGB;
+            cv::cvtColor(m_frame[0], frameRGB, cv::COLOR_GRAY2BGR);
+            cv::addWeighted(frameRGB, m_alphaInt/100., depthMatRGB, 1-m_alphaInt/100., 0.0, depthMatRGB);
             cv::imshow(m_depth_win,depthMatRGB);
         }
 
@@ -575,10 +570,11 @@ void Visualizer::run()
         switch (key)
         {
         case 'c':
-            if (m_calibrator)
+            if (m_calibrator && m_laser)
             {
-                printf("Starting camera calibration. \n\r");
-                m_calibrator->m_calibrate_cameras = true;
+                if(!m_laser->m_laser_on) { m_laser->start(); }
+                printf("Starting laser calibration. \n\r");
+                m_calibrator->calibrateCamLaser(m_frame[0],m_frame[1],0);
             }
             break;
 
@@ -598,17 +594,6 @@ void Visualizer::run()
             printf("Inpainting. \n\r");
             cv::inpaint(depthMatRGB,m_mask,depthMatRGBInpainted,2,cv::INPAINT_NS);
             cv::imshow(m_depth_inpainted_win,depthMatRGBInpainted);
-            break;
-
-        case 'l':
-            if (m_calibrator && m_laser)
-            {
-                if(!m_laser->m_laser_on) { m_laser->start(); }
-                printf("Starting laser calibration. \n\r");
-                m_calibrator->m_calibrate_laser = true;
-                m_calibrator->calibrateLaser(m_frame[0],
-                                             m_frame[1],0);
-            }
             break;
 
         case 'o':

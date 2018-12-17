@@ -48,13 +48,21 @@ public:
     void run();
 
 public:
-    // Parameters for camera settings
+    // Camera settings
     const int          m_rows{180};
     const int          m_cols{240};
     const int          m_nbCams{2};
 
+    // Who visualizer listens to
+    std::array<DAVIS240C*,2>          m_davis;
+    LaserController*                  m_laser;
+    std::array<Filter*,2>             m_filter;
+    StereoCalibrator*                 m_calibrator;
+    Triangulator*                     m_triangulator;
+
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime{};
+    std::string m_depthmap_path{"../experiments/Depthmaps/depthmap_scene_laser_"};
 
     // Structures for data storing
     std::array<std::vector<bool>,2>    m_pol_evts;
@@ -65,7 +73,6 @@ public:
     cv::Mat                            m_mask;
 
     // Display window related variables
-    std::string m_depthmap_path{"../experiments/Depthmaps/depthmap_scene_laser_"};
     std::array<std::string,2>   m_pol_win{};
     std::array<std::string,2>   m_age_win{};
     std::array<std::string,2>   m_frame_win{};
@@ -101,24 +108,7 @@ public:
     int        m_min_depth{30};
     int        m_max_depth{50};
     int        m_matcherEps{};
-    int        m_matcher_max_buffer{};
-
-    // Event recorder
-    std::ofstream m_recorder;
-
-    // Davis object
-    std::array<DAVIS240C*,2>          m_davis;
-
-    // Laser object
-    LaserController*                  m_laser;
-
-    // Filter object
-    std::array<Filter*,2>             m_filter;
-    std::mutex                        m_laser_mutex;
-
-    // Triangulator (depth estimator)
-    StereoCalibrator*                 m_calibrator;
-    Triangulator*                     m_triangulator;
+    int        m_alphaInt{50};
 };
 
 #endif // EBV_VISUALIZER_H
