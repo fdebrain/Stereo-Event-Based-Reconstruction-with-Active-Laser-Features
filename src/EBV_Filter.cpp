@@ -16,9 +16,7 @@ Filter::Filter(int freq, DAVIS240C* davis)
 {
 }
 
-Filter::~Filter()
-{
-}
+Filter::~Filter() {}
 
 void Filter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                        const int id)
@@ -56,8 +54,6 @@ BaseFilter::BaseFilter(int freq, DAVIS240C* davis)
 void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                            const int id)
 {
-    // QUESTION: Since event is passed by reference and method is also called in visu,
-    // should we care about thread-safety ? e is accessed by multiple thread
     const int x = e.m_x;
     const int y = e.m_y;
     const bool p = e.m_pol;
@@ -69,7 +65,7 @@ void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     const int xMax = std::min(m_rows-1,x+m_neighborSize);
     const int yMax = std::min(m_cols-1,y+m_neighborSize);
 
-    // QUESTION: When I try p>0 events, the master is always lagging behing the slave (about 1s), but many more events pass through the filter
+    // DEBUG: When trying p>0 events, the master is always lagging behing the slave (about 1s), but many more events pass through the filter
     if (p<=0)
     {
         int nbSupportsA = 0;
@@ -133,11 +129,6 @@ void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
             m_xc = m_eta*m_xc + (1.f-m_eta)*x;
             m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
-            // We send CoG coordinates
-            //e.m_x = static_cast<uint>(m_xc);
-            //e.m_y = static_cast<uint>(m_yc);
-
-            //printf("Camera %d - Timestamp %d. \n\r",m_davis->m_id,e.m_timestamp);
             this->warnFilteredEvent(e);
         }
 
@@ -182,6 +173,8 @@ void AdaptiveFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const int t = e.m_timestamp;
+    const int laser_x = e.m_laser_x;
+    const int laser_y = e.m_laser_y;
     m_current_t = t;
 
     // Check if different to last event's polarity
@@ -195,7 +188,7 @@ void AdaptiveFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
             bool type = (p > last_p?1:0);
 
             // Send transition event
-            DAVIS240CEvent e{x,y,p,t};
+            DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
             receivedNewTransition(e,type);
         }
     }
@@ -212,6 +205,8 @@ void AdaptiveFilter::receivedNewTransition(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const int t = e.m_timestamp;
+    const int laser_x = e.m_laser_x;
+    const int laser_y = e.m_laser_y;
 
     // Compare to last transition event, if one
     if (m_last_transitions[x*m_cols+y][type] > 0)
@@ -220,10 +215,8 @@ void AdaptiveFilter::receivedNewTransition(DAVIS240CEvent& e,
         const int last_t = m_last_transitions[x*m_cols+y][type];
         const int dt = t - last_t;
 
-        //printf("Delta: %d. \n\r",dt);
-
         // Send hyper transition
-        DAVIS240CEvent e(x,y,p,t);
+        DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
         receivedNewHyperTransition(e,dt);
     }
 
@@ -240,9 +233,10 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const int t = e.m_timestamp;
-
-    // Compare with reference frequency
+    const int laser_x = e.m_laser_x;
+    const int laser_y = e.m_laser_y;
     const int freq = int(1e6f/float(dt));
+
     if (m_record) { m_recorder << freq << '\n'; }
 
     //=== DEBUG ===//
@@ -253,19 +247,10 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
 //    }
     //=== END DEBUG ===//
 
-
     if (std::abs(m_frequency-freq)<m_sigma)
     {
-
-        //=== DEBUG ===//
-//        if (freq>200)
-//        {
-//            printf("Freq: %d. \n\r", freq);
-//        }
-        //=== END DEBUG ===//
-
         // Send filtered event
-        DAVIS240CEvent e(x,y,p,t);
+        DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
         warnFilteredEvent(e);
 
         // Center of mass tracker
@@ -273,7 +258,7 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
         m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
         // Save last filtered event in list
-        m_last_filtered_events.emplace_back(x,y,p,t);
+        m_last_filtered_events.emplace_back(x,y,p,t,laser_x,laser_y);
 
         // Remove old filtered events
         auto it = m_last_filtered_events.begin();
@@ -286,9 +271,8 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
     }
 }
 
-
 // ADAPTIVE FILTER BIS
-AdaptiveFilterBis::AdaptiveFilterBis(int freq,DAVIS240C* davis)
+AdaptiveFilterNeighbor::AdaptiveFilterNeighbor(int freq,DAVIS240C* davis)
       : AdaptiveFilter(freq,davis)
 {
     // Initialize datastructures
@@ -304,13 +288,13 @@ AdaptiveFilterBis::AdaptiveFilterBis(int freq,DAVIS240C* davis)
     if (m_record) { m_recorder.open(m_eventRecordFile); }
 }
 
-AdaptiveFilterBis::~AdaptiveFilterBis()
+AdaptiveFilterNeighbor::~AdaptiveFilterNeighbor()
 {
    if (m_record) { m_recorder.close(); }
 }
 
 // Associated to DAVIS event thread
-void AdaptiveFilterBis::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+void AdaptiveFilterNeighbor::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                                const int id)
 {
     // Make a local copy
@@ -318,6 +302,8 @@ void AdaptiveFilterBis::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const int t = e.m_timestamp;
+    const int laser_x = e.m_laser_x;
+    const int laser_y = e.m_laser_y;
     m_current_t = t;
 
     // Check if different to last event's polarity
@@ -331,7 +317,7 @@ void AdaptiveFilterBis::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
             bool type = (p > last_p?1:0);
 
             // Send transition event
-            DAVIS240CEvent e{x,y,p,t};
+            DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
             receivedNewTransition(e,type);
         }
     }
@@ -340,7 +326,7 @@ void AdaptiveFilterBis::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     m_last_event[x*m_cols+y] = std::make_pair(p,t);
 }
 
-void AdaptiveFilterBis::receivedNewTransition(DAVIS240CEvent& e,
+void AdaptiveFilterNeighbor::receivedNewTransition(DAVIS240CEvent& e,
                                            const bool type)
 {
     // Make a local copy
@@ -348,6 +334,8 @@ void AdaptiveFilterBis::receivedNewTransition(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const int t = e.m_timestamp;
+    const int laser_x = e.m_laser_x;
+    const int laser_y = e.m_laser_y;
 
     // Compare to last transition event, if one
     if (m_last_transitions[x*m_cols+y][type] > 0)
@@ -356,10 +344,8 @@ void AdaptiveFilterBis::receivedNewTransition(DAVIS240CEvent& e,
         const int last_t = m_last_transitions[x*m_cols+y][type];
         const int dt = t - last_t;
 
-        //printf("Delta: %d. \n\r",dt);
-
-        // Send hyper transition
-        DAVIS240CEvent e(x,y,p,t);
+        // Send hyper transition event
+        DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
         receivedNewHyperTransition(e,dt);
     }
 
@@ -368,7 +354,7 @@ void AdaptiveFilterBis::receivedNewTransition(DAVIS240CEvent& e,
 }
 
 
-void AdaptiveFilterBis::receivedNewHyperTransition(DAVIS240CEvent& e,
+void AdaptiveFilterNeighbor::receivedNewHyperTransition(DAVIS240CEvent& e,
                                                 const int dt)
 {
     // Make a local copy
@@ -376,8 +362,9 @@ void AdaptiveFilterBis::receivedNewHyperTransition(DAVIS240CEvent& e,
     const int x = e.m_x;
     const int y = e.m_y;
     const int t = e.m_timestamp;
+    const int laser_x = e.m_laser_x;
+    const int laser_y = e.m_laser_y;
 
-    // Compare with reference frequency
     const int freq = int(1e6f/float(dt));
     if (m_record) { m_recorder << freq << '\n'; }
 
@@ -387,7 +374,7 @@ void AdaptiveFilterBis::receivedNewHyperTransition(DAVIS240CEvent& e,
     if (std::abs(m_frequency-freq)<m_sigma)
     {
         // Send filtered event
-        DAVIS240CEvent e(x,y,p,t);
+        DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
         warnFilteredEvent(e);
 
         // Center of mass tracker
@@ -417,7 +404,7 @@ void AdaptiveFilterBis::receivedNewHyperTransition(DAVIS240CEvent& e,
         if (nb_supports>m_thresh_supports)
         {
             // Send filtered event
-            DAVIS240CEvent e(x,y,p,t);
+            DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
             warnFilteredEvent(e);
 
             // Center of mass tracker

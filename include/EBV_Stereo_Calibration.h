@@ -51,38 +51,34 @@ public:
                      Triangulator* triangulator=nullptr);
     ~StereoCalibrator();
 
+    float getLearningRate() const { return m_learningRate; }
+    void setLearningRate(const float lr) { m_learningRate=lr; }
+
     void calibrateCameras(cv::Mat& frame, const int id);
-    void calibrateLaser(cv::Mat& frame0, cv::Mat &frame1, const int id);
+    void calibrateCamLaser(cv::Mat& frame0, cv::Mat &frame1, const int id);
     void saveCamerasCalibration();
     void saveLaserCalibration();
     const std::vector<cv::Point3f> calculateWorldPoints();
     void pointLaserToPixel(const int u, const int v, const int id);
-
-    float getLearningRate() const { return m_learningRate; }
-    void setLearningRate(const float lr) { m_learningRate=lr; }
 
     // Who listens to
     LaserController* m_laser;
     std::array<Filter*,2> m_filter;
     Triangulator* m_triangulator;
 
-    //
+    // Settings
     const cv::Size2i m_resolution{240,180};
-    bool m_calibrate_cameras{false};
-    bool m_calibrate_laser{false};
-    const std::string m_path_calib_cam;
-    const std::string m_path_calib_laser;
+    const cv::Point2i m_pattern_size{8,5};
+    const float m_pattern_square_size{0.03f};
 
     // Intrinsics
-    const cv::Point2i m_pattern_size{8,5}; // 8-5
-    const float m_pattern_square_size{0.03f};
     const size_t m_min_frames_to_capture{10};
     const int m_step{3};
     const std::chrono::milliseconds m_min_capture_delay{1000};
     std::array<std::chrono::high_resolution_clock::time_point,2> m_last_frame_captured;
-    std::vector<std::vector<cv::Point3d>> m_intrinsic_calib_world_points;
-    std::array<std::vector<std::vector<cv::Point2f>>, 2> m_intrinsic_calib_image_points;
-    std::vector<std::vector<cv::Point2f>> m_intrinsic_calib_laser_points;
+    std::vector<std::vector<cv::Point3d>> m_calib_world_points;
+    std::array<std::vector<std::vector<cv::Point2f>>, 2> m_calib_image_points;
+    std::vector<std::vector<cv::Point2f>> m_calib_laser_points;
     std::array<IntrinsicsData,3> m_camera_intrinsics;
 
     // Stereo extrinsics

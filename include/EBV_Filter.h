@@ -36,38 +36,36 @@ public:
     void warnFilteredEvent(DAVIS240CEvent& event);
 
     // Setters and Getters
-    int getX() const {return m_xc;}
-    int getY() const {return m_yc;}
-
-    int getFreq() const {return m_frequency;}
+    int getX()     const {return m_xc;}
+    int getY()     const {return m_yc;}
+    int getFreq()  const {return m_frequency;}
+    int getEps()   const {return m_eps;}
+    float getEta() const {return m_eta;}
     void setFreq(const int freq) {m_frequency=freq;
                                   m_targetPeriod = 1e6f/(float)m_frequency;}
-
-    int getEps() const {return m_eps;}
     void setEps(const int eps) {m_eps=eps;
                                 m_epsPeriod = m_eps*m_targetPeriod/100.f;}
-
-    float getEta() const {return m_eta;}
     void setEta(const float eta) {m_eta=eta;}
 
-    // Who filter listens to
+public:
+    // Who filter is listening to
     DAVIS240C* m_davis;
-    const int  m_id{-1};
 
-    // Datastructure matrix of list of events
+    // Camera settings
     const int m_rows{180};
     const int m_cols{240};
+    const int  m_id{-1};
 
-    // Parameters for events filtering
+    // Filter settings
     int m_frequency;
     int m_targetPeriod;
     int m_eps{10};
     int m_epsPeriod;
 
-    // Event recordings
+    // Recording settings
     bool m_record{false};
     const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
-            + std::to_string(m_id) + ".txt";
+                                          + std::to_string(m_id) + ".txt";
     std::ofstream m_recorder;
 
     // Parameters for flushing old events
@@ -104,6 +102,7 @@ public:
     int getThreshAnti() const {return m_threshAntiSupports;}
     void setThreshAnti(int nbAntiSupports) {m_threshAntiSupports=nbAntiSupports;}
 
+    // Events of negative polarity are stored in matrices of lists
     std::vector<std::list<int>> m_events;
 
     // Parameters for events filtering
@@ -130,8 +129,6 @@ public:
     int getMaxT() const {return m_max_t;}
     void setMaxT(int max_t) { m_max_t=max_t; }
 
-    //const float m_pi{3.14159f};
-
     // Data structure matrix of list of events
     std::vector<std::pair<bool,int>> m_last_event;
     std::vector<std::array<int,2>> m_last_transitions;
@@ -140,12 +137,12 @@ public:
     int m_sigma{30};
 };
 
-
-class AdaptiveFilterBis : public AdaptiveFilter
+// AdaptiveFilter with support neighborhood thresholding
+class AdaptiveFilterNeighbor : public AdaptiveFilter
 {
 public:
-    AdaptiveFilterBis(int freq, DAVIS240C* davis);
-    ~AdaptiveFilterBis();
+    AdaptiveFilterNeighbor(int freq, DAVIS240C* davis);
+    ~AdaptiveFilterNeighbor();
 
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                    const int id) override;
@@ -156,10 +153,8 @@ public:
     int m_thresh_supports{4};
 
 private:
-
-    // Event recordings
     const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
-            + std::to_string(m_id) + ".txt";
+                                          + std::to_string(m_id) + ".txt";
     std::ofstream m_recorder;
 };
 

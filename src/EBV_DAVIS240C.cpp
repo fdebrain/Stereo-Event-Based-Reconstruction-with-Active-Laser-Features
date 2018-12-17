@@ -6,24 +6,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
-#define CF_N_TYPE(COARSE, FINE)                                                \
-    (struct caer_bias_coarsefine) {                                            \
-        .coarseValue = (COARSE), .fineValue = (FINE), .enabled = true,         \
-        .sexN = true, .typeNormal = true, .currentLevelNormal = true           \
-    }
-
-#define CF_P_TYPE(COARSE, FINE)                                                \
-    (struct caer_bias_coarsefine) {                                            \
-        .coarseValue = (COARSE), .fineValue = (FINE), .enabled = true,         \
-        .sexN = false, .typeNormal = true, .currentLevelNormal = true          \
-    }
-
-#define CF_N_TYPE_CAS(COARSE, FINE)                                            \
-    (struct caer_bias_coarsefine) {                                            \
-        .coarseValue = COARSE, .fineValue = FINE, .enabled = true,             \
-        .sexN = true, .typeNormal = false, .currentLevelNormal = true          \
-    }
-
 // Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
 static void globalShutdownSignalHandler(int signal)
 {
@@ -132,21 +114,6 @@ int DAVIS240C::init()
     m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_AUTOEXPOSURE, false);
     m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_EXPOSURE, 4200);
 
-    // Fast biases: Filter not capable of detecting above 300Hz
-//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_DIFFBN,
-//                     caerBiasCoarseFineGenerate(CF_N_TYPE(2, 39)));
-//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_OFFBN,
-//                     caerBiasCoarseFineGenerate(CF_N_TYPE(1, 62)));
-//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_ONBN,
-//                     caerBiasCoarseFineGenerate(CF_N_TYPE(4, 200)));
-
-//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP,
-//                     caerBiasCoarseFineGenerate(CF_P_TYPE(3, 72)));
-//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
-//                     caerBiasCoarseFineGenerate(CF_P_TYPE(3, 96)));
-//    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_REFRBP,
-//                     caerBiasCoarseFineGenerate(CF_P_TYPE(3, 52)));
-//
     return 0;
 }
 
@@ -208,13 +175,6 @@ void DAVIS240C::readThread()
                 {
                     const libcaer::events::PolarityEvent &polarityEvent = (*polarity)[n];
 
-                      //DAVIS240CEvent e;
-//                    e.m_y           = polarityEvent.getX();
-//                    e.m_x           = polarityEvent.getY();
-//                    e.m_timestamp   = polarityEvent.getTimestamp();
-//                    e.m_pol         = polarityEvent.getPolarity(); // {0,1}
-//                    events.push_back(e);
-
                     int y = polarityEvent.getX();
                     int x = polarityEvent.getY();
                     int t = polarityEvent.getTimestamp();
@@ -226,7 +186,10 @@ void DAVIS240C::readThread()
                         int laser_y = m_laser->getY();
                         events.emplace_back(x,y,p,t,laser_x,laser_y);
                     }
-                    events.emplace_back(x,y,p,t);
+                    else
+                    {
+                        events.emplace_back(x,y,p,t);
+                    }
                 }
                 this->warnEvent(events);
             }

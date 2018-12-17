@@ -86,7 +86,7 @@ class DAVIS240C
 {
 public:
     DAVIS240C();
-    DAVIS240C(LaserController *laser = nullptr);
+    DAVIS240C(LaserController *laser);
     ~DAVIS240C();
 
     static int m_nbCams;
@@ -112,15 +112,13 @@ public:
     void deregisterFrameListener(DAVIS240CFrameListener* listener);
 
 public:
-    // Id of the camera
-    const int m_id;
-
-    // Laser
-    LaserController *m_laser;
-
-    // Device resolution
+    // Camera settings
     const int m_rows{180};
     const int m_cols{240};
+    const int m_id;
+
+    // Who camera listens to
+    LaserController *m_laser;
 
 private:
     libcaer::devices::davis m_davis_handle;
