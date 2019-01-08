@@ -34,12 +34,12 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMakeModules")
 #------------------------------------------------------------
 
 # REQUIRED MODULES AND LIBRARIES-----------------------------
-# LibUSB
-find_package(LibUSB REQUIRED)
-if(LIBUSB_FOUND)
-        include_directories(${LIBUSB_INCLUDE_DIRS})
-        list(APPEND 3RD_PARTY_LIBS ${LIBUSB_LIBRARIES})
-endif()
+## LibUSB
+#find_package(LibUSB REQUIRED)
+#if(LIBUSB_FOUND)
+#        include_directories(${LIBUSB_INCLUDE_DIRS})
+#        list(APPEND 3RD_PARTY_LIBS ${LIBUSB_LIBRARIES})
+#endif()
 
 # Threads
 find_package(Threads REQUIRED)
@@ -47,39 +47,10 @@ list(APPEND 3RD_PARTY_LIBS ${CMAKE_THREAD_LIBS_INIT})
 
 # Eigen3
 find_package(Eigen3 REQUIRED)
-if(NOT EIGEN3_FOUND)
-    ExternalProject_Add(
-        Eigen
-        PREFIX "eigen"
-        URL "http://bitbucket.org/eigen/eigen/get/3.3.3.tar.bz2"
-        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
-        BUILD_COMMAND make -j8
-        )
-    set(EIGEN_FOUND TRUE CACHE BOOL "Whether Eigen was found.")
-    set(EIGEN_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/eigen/include/eigen3" CACHE PATH "Eigen include dir")
-endif()
 include_directories(${EIGEN3_INCLUDE_DIRS})
 
 # OpenCV
-find_package(OpenCV REQUIRED)
-if(NOT OpenCV_FOUND)
-    ExternalProject_Add(
-        OpenCV
-        PREFIX "opencv"
-        GIT_REPOSITORY "https://github.com/opencv/opencv.git"
-        GIT_TAG "3.3.0"
-        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
-                   -DCMAKE_BUILD_TYPE="${OPENCV_BUILD_TYPE}"
-                   -DBUILD_DOCS=OFF
-                   -DBUILD_PERF_TEST=OFF
-                   -DBUILD_TESTS=OFF
-                   -DBUILD_WITH_DEBUG_INFO=ON
-        BUILD_COMMAND make -j8
-        )
-    set(OpenCV_FOUND TRUE CACHE BOOL "Whether OpenCV was found")
-    set(OpenCV_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/opencv/include" CACHE PATH "OpenCV include dir")
-    set(OpenCV_LIBS "${CMAKE_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}opencv${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE FILEPATH "OpenCV lib path")
-endif()
+find_package(OpenCV REQUIRED PATHS /usr/local/lib)
 include_directories(${OpenCV_INCLUDE_DIRS})
 list(APPEND 3RD_PARTY_LIBS ${OpenCV_LIBS})
 
@@ -105,7 +76,6 @@ set(LIBCAER_LIBRARIES "${CMAKE_SHARED_LIBRARY_PREFIX}caer${CMAKE_SHARED_LIBRARY_
 include_directories(${LIBCAER_INCLUDE_DIRS})
 link_directories(${LIBCAER_LIBRARY_DIRS})
 list(APPEND 3RD_PARTY_LIBS ${LIBCAER_LIBRARIES})
-
 #------------------------------------------------------------
 
 # COMPILER FLAGS---------------------------------------------
@@ -123,7 +93,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/)
 #------------------------------------------------------------
 
 # CREATE THE TARGET EXECUTABLE-------------------------------
-set(COMP_TARGET "semester-project")
+set(COMP_TARGET "demo")
 add_executable( ${COMP_TARGET}
                 ${COMP_TARGET_CXX}
                 ${COMP_TARGET_HPP}
@@ -135,8 +105,6 @@ target_link_libraries(${COMP_TARGET}
 
 # INSTALATION------------------------------------------------
 set(EXECUTABLE_INSTALL_PATH ${CMAKE_CURRENT_LIST_DIR}/bin/${CMAKE_BUILD_TYPE})
-#install(TARGETS ${CMAKE_CURRENT_LIST_DIR}/misc/99-.rules
-#        DESTINATION /etc/udev/rules.d/)
 install(TARGETS ${COMP_TARGET}
         DESTINATION ${EXECUTABLE_INSTALL_PATH}
        )

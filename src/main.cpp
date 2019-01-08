@@ -1,5 +1,4 @@
 #include <EBV_DFF_Visualizer.h>
-#include <EBV_DVS128USB.h>
 #include <EBV_DAVIS240C.h>
 #include <EBV_Filter.h>
 #include <EBV_Matcher.h>

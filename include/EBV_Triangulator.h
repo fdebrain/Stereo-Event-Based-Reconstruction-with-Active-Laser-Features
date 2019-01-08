@@ -7,8 +7,7 @@
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
-
-
+#include <opencv2/sfm/triangulation.hpp>
 
 class TriangulatorListener
 {
@@ -43,7 +42,7 @@ public:
     void warnDepth(const int u, const int v,
                    const double X, const double Y, const double Z);
     void recordPoint(int x0, int y0, int x1, int y1, int x2, int y2,
-                     float X, float Y, float Z);
+                     double X, double Y, double Z);
 
     void computeProjectionMatrix(cv::Mat K, cv::Mat R,
                                  cv::Mat T, cv::Mat& P);
@@ -70,7 +69,7 @@ public:
     bool m_record_pointwise{false};
     bool m_record_next_point{false};
     std::ofstream m_recorder;
-    const std::string m_eventRecordFile = "../experiments/triangulation_scene.txt";
+    const std::string m_eventRecordFile = "../experiments/triangulation_plane_sfm.txt";
 
     // Calibration paths
     std::string m_path_calib_cam = "../calibration/calibCameras.yaml";
@@ -110,5 +109,4 @@ private:
 };
 
 #endif // EBV_TRIANGULATOR_H
-
 

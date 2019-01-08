@@ -5,7 +5,6 @@
 #include <string>
 #include <mutex>
 
-#include <EBV_DVS128USB.h>
 #include <EBV_DAVIS240C.h>
 #include <EBV_MagneticMirrorLaser.h>
 #include <EBV_Filter.h>

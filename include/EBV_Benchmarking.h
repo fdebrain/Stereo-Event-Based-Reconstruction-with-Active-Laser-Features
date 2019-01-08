@@ -1,6 +1,11 @@
+#ifndef EBV_BENCHMARKING_H
+#define EBV_BENCHMARKING_H
+
 #include <iostream>
 #include <chrono>
 #include <thread>
+
+#include <EBV_LaserController.h>
 
 struct Timer
 {
@@ -20,3 +25,16 @@ struct Timer
         std::cout << "Timer took " << ms << "\n\r";
     }
 };
+
+class LaserTest
+{
+public:
+    LaserTest(LaserController* laser);
+    ~LaserTest();
+
+    void computeAngularVelocity();
+    LaserController* m_laser;
+
+};
+
+#endif // EBV_BENCHMARKING_H
