@@ -3,7 +3,7 @@
 
 void Triangulator::switchMode()
 {
-    m_mode = static_cast<Triangulator::StereoPair>((m_mode+1)%3);
+    m_mode = static_cast<Triangulator::StereoPair>((m_mode+1)%4);
     std::cout << "Switch triangulation mode to: " << stereoPairNames[m_mode] << "\n\r";
 }
 
@@ -76,17 +76,6 @@ void Triangulator::importCalibration()
                           m_Q[0], cv::CALIB_ZERO_DISPARITY);
         std::cout << " P00:  " << m_P[0][0] << "\n\r";
         std::cout << " P01:  " << m_P[0][1] << "\n\r";
-
-//        auto R0 = cv::Mat::eye(3,3,CV_64FC1);
-//        auto T0 = cv::Mat::zeros(3,1,CV_64FC1);
-//        computeProjectionMatrix(m_K[0],R0,T0,m_P[0][0]);
-
-//        cv::Mat m_Rbis;
-//        cv::Mat m_Tbis;
-//        cv::transpose(m_R[0],m_Rbis);
-//        m_Tbis = m_Rbis*m_T[0];
-//        computeProjectionMatrix(m_K[1],m_Rbis,m_Tbis,m_P[0][1]);
-        //computeProjectionMatrix(m_K[1],m_R[0],m_T[0],m_P[0][1]);
     }
     else
     {
@@ -111,17 +100,6 @@ void Triangulator::importCalibration()
         std::cout << " P10:  " << m_P[1][0] << "\n\r";
         std::cout << " P11:  " << m_P[1][1] << "\n\r";
 
-//        auto R0 = cv::Mat::eye(3,3,CV_64FC1);
-//        auto T0 = cv::Mat::zeros(3,1,CV_64FC1);
-//        computeProjectionMatrix(m_K[0],R0,T0,m_P[1][0]);
-
-//        cv::Mat m_Rbis;
-//        cv::Mat m_Tbis;
-//        cv::transpose(m_R[1],m_Rbis);
-//        m_Tbis = m_Rbis*m_T[1];
-//        computeProjectionMatrix(m_K[2],m_Rbis,m_Tbis,m_P[1][1]);
-        //computeProjectionMatrix(m_K[2],m_R[1],m_T[1],m_P[1][1]);
-
         //CameraRight-laser
         cv::stereoRectify(m_K[1],m_D[1],
                           m_K[2],m_D[2],
@@ -132,21 +110,6 @@ void Triangulator::importCalibration()
                           m_Q[2], cv::CALIB_ZERO_DISPARITY);
         std::cout << " P20:  " << m_P[2][0] << "\n\r";
         std::cout << " P21:  " << m_P[2][1] << "\n\r";
-
-        // From Cam1 to Cam0 frame
-//        cv::Mat m_Rbis;
-//        cv::transpose(m_R[0],m_Rbis);
-//        cv::Mat m_Tbis = -m_Rbis*m_T[0];
-//        computeProjectionMatrix(cv::Mat::eye(3,3,CV_64FC1),m_Rbis,m_Tbis,m_Pfix);
-        //computeProjectionMatrix(cv::Mat::eye(3,3,CV_64FC1),m_R[2],m_T[2],m_Pfix);
-
-        //computeProjectionMatrix(cv::Mat::eye(3,3,CV_64FC1),m_Rect[2][0],m_T[0],m_Pfix);
-
-//        cv::Mat Kbis;
-//        m_K[1].convertTo(m_K[1],CV_64FC1);
-//        cv::invert(m_K[1],Kbis);
-//        m_Pfix = Kbis*m_P[1][1];
-        std::cout << "Pfixed: " << m_Pfix << "\n\r";
     }
     else
     {
@@ -273,9 +236,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     const int laser_y = static_cast<int>(240.*(event0.m_laser_y)/(4000.));
     m_queueAccessMutex0.unlock();
 
-    // Camera0-Camera1 stereo
-    if (m_mode==Cameras)
+    switch (m_mode)
     {
+    case Cameras:
         coords0.emplace_back(y0,x0);
         coords1.emplace_back(y1,x1);
 
@@ -287,10 +250,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[1], m_D[1],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
-    }
-    // Camera0-Laser stereo
-    else if (m_mode==CamLeftLaser)
-    {
+        break;
+
+    case CamLeftLaser:
         coords0.emplace_back(y0,x0);
         coords1.emplace_back(laser_y,laser_x);
 
@@ -302,10 +264,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[2], m_D[2],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
-    }
-    // Camera1-Laser stereo
-    else
-    {
+        break;
+
+    case CamRightLaser:
         coords0.emplace_back(y1,x1);
         coords1.emplace_back(laser_y,laser_x);
 
@@ -317,29 +278,16 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[2], m_D[2],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
-    }
+        break;
 
-    // Refine matches coordinates (using epipolar constraint)
-    cv::correctMatches(m_F[m_mode],undistCoords0,undistCoords1,
-                       undistCoordsCorrected0,
-                       undistCoordsCorrected1);
-
-    cv::triangulatePoints(m_P[m_mode][0], m_P[m_mode][1],
-                          undistCoordsCorrected0,
-                          undistCoordsCorrected1,
-                          point3D);
-
-    // sfm triangulation
-    bool use_sfm = false;
-    if (use_sfm)
-    {
+    case SFM:
         std::vector<cv::Mat> input;
         std::vector<cv::Mat> proj;
         cv::Mat output;
 
         cv::Mat pts1 = (cv::Mat_<double>(2,1) << y0, x0);
         cv::Mat pts2 = (cv::Mat_<double>(2,1) << y1, x1);
-        cv::Mat pts3 = (cv::Mat_<double>(2,1) << laser_x, laser_y);
+        cv::Mat pts3 = (cv::Mat_<double>(2,1) << laser_y, laser_x);
         cv::Mat P0, P1, P2;
 
         input.emplace_back(pts1);
@@ -357,29 +305,43 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
         proj.emplace_back(P2);
 
         cv::sfm::triangulatePoints(input,proj,output);
+
+        point3D[0] = output.at<double>(0);
+        point3D[1] = output.at<double>(1);
+        point3D[2] = output.at<double>(2);
+        point3D[3] = 1.;
+        break;
+    }
+
+    if (m_mode==CamLeftLaser || m_mode==CamRightLaser)
+    //if (m_mode!=SFM)
+    {
+        // Refine matches coordinates (using epipolar constraint)
+        cv::correctMatches(m_F[m_mode],undistCoords0,undistCoords1,
+                           undistCoordsCorrected0,
+                           undistCoordsCorrected1);
+
+        cv::triangulatePoints(m_P[m_mode][0], m_P[m_mode][1],
+                              undistCoordsCorrected0,
+                              undistCoordsCorrected1,
+                              point3D);
+    }
+    else if (m_mode==Cameras)
+    {
+        cv::triangulatePoints(m_P[m_mode][0], m_P[m_mode][1],
+                              undistCoords0,
+                              undistCoords1,
+                              point3D);
     }
 
     // Convert to cm + scale
-    double X = 100*point3D[0];
-    double Y = 100*point3D[1];
-    double Z = 100*point3D[2];
-    //double scale = point3D[3];
-
-    // Map 3D points expressed in Cam1 to Cam0 reference frame
-    if (m_mode==CamLeftLaser)
-    {
-//        Z = -Z;
-        //X = m_Pfix.at<double>(0,0)*X + m_Pfix.at<double>(0,1)*Y + m_Pfix.at<double>(0,2)*Z + m_Pfix.at<double>(0,3)*scale;
-        //Y = m_Pfix.at<double>(1,0)*X + m_Pfix.at<double>(1,1)*Y + m_Pfix.at<double>(1,2)*Z + m_Pfix.at<double>(1,3)*scale;
-        //Z = m_Pfix.at<double>(2,0)*X + m_Pfix.at<double>(2,1)*Y + m_Pfix.at<double>(2,2)*Z + m_Pfix.at<double>(2,3)*scale;
-    }
-
-//    X = 100*X/scale;
-//    Y = 100*Y/scale;
-//    Z = 100*Z/scale;
+    double scale = point3D[3];
+    double X = 100*point3D[0]/scale;
+    double Y = 100*point3D[1]/scale;
+    double Z = 100*point3D[2]/scale;
 
     // DEBUG - CHECK 3D POINT POSITION
-    if (m_debug) { printf("Point at: (%2.1f,%2.1f,%2.1f). \n\r ",X,Y,Z); }
+    if (m_debug) { printf("Point at: (%2.1f,%2.1f,%2.1f,%2.1f). \n\r ",X,Y,Z,scale); }
     // END DEBUG
 
     if (m_record)

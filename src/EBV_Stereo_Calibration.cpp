@@ -154,8 +154,8 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
             for (auto &point : points0)
             {
                 pointLaserToPixel(int(point.y),int(point.x),0);
-                int xLaser = 180*(m_laser->getX()-500)/(4000 - 500);
-                int yLaser = 240*(m_laser->getY())/(4000);
+                int xLaser = 180*(m_laser->getX()-m_laser->getMinX())/(m_laser->getMaxX() - m_laser->getMinX());
+                int yLaser = 240*(m_laser->getY()-m_laser->getMinY())/(m_laser->getMaxY() - m_laser->getMinY());
                 laserPoints.emplace_back(yLaser, xLaser);
                 printf("Pointing to (%d,%d) with commands (%d,%d)->(%d,%d). \n\r",
                        int(point.x),int(point.y),m_laser->getX(),m_laser->getY(),
@@ -326,12 +326,12 @@ const std::vector<cv::Point3f> StereoCalibrator::calculateWorldPoints()
     std::vector<cv::Point3f> points;
     points.reserve(static_cast<uint64_t>(m_pattern_size.x * m_pattern_size.y));
 
-    for (int i = 0; i < m_pattern_size.y; i++)
+    for (int i = 0; i < m_pattern_size.y; i++)  // row index
     {
-        for (int j = 0; j < m_pattern_size.x; j++)
+        for (int j = 0; j < m_pattern_size.x; j++) // column index
         {
-            points.emplace_back(cv::Point3f(j * m_pattern_square_size,
-                                            i * m_pattern_square_size, 0));
+            points.emplace_back(cv::Point3f(j * m_pattern_square_size.x,
+                                            i * m_pattern_square_size.y, 0));
         }
     }
     return points;

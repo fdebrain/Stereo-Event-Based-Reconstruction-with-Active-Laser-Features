@@ -143,7 +143,7 @@ void LaserController::sweep()
     // Sweep mode 1
     m_y += m_step;
     if (m_y>=m_max_y) { m_y = m_min_y; m_x += m_ratio*m_step; }
-    if (m_x>m_max_x) { m_x = m_min_x; }
+    if (m_x>m_max_x) { m_x = m_min_x + rand()%200; }
     this->setPos(m_x,m_y);
 
     // Sweep mode 2

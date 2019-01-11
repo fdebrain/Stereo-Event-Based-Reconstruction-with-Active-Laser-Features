@@ -60,8 +60,8 @@ public:
     bool m_debug{false};
 
     // Stereo mode
-    enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2 };
-    std::string stereoPairNames[3] = {"Cameras", "CamLeftLaser", "CamRightLaser"};
+    enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2, SFM=3 };
+    std::string stereoPairNames[4] = {"Cameras", "CamLeftLaser", "CamRightLaser","SFM"};
     StereoPair m_mode{Cameras};
 
     // Recording settings
@@ -69,7 +69,7 @@ public:
     bool m_record_pointwise{false};
     bool m_record_next_point{false};
     std::ofstream m_recorder;
-    const std::string m_eventRecordFile = "../experiments/triangulation_plane_sfm.txt";
+    const std::string m_eventRecordFile = "../experiments/Pointclouds/pcl.txt";
 
     // Calibration paths
     std::string m_path_calib_cam = "../calibration/calibCameras.yaml";

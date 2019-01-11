@@ -32,7 +32,6 @@ public:
                LaserController* laser = nullptr);
     ~Visualizer();
 
-    //void receivedNewDVS128USBEvent(DVS128USBEvent& e);
     void receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                    const int id) override;
     void receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
@@ -95,17 +94,13 @@ public:
     // Trackbar parameters (filter)
     std::array<int,2> m_filter_freq{};
     std::array<int,2> m_filter_eps{};
-    std::array<int,2> m_filter_neighbor_size{};
-    std::array<int,2> m_filter_threshA{};
-    std::array<int,2> m_filter_threshB{};
-    std::array<int,2> m_filter_threshAnti{};
     std::array<int,2> m_filter_etaInt{};
     std::array<int,2> m_filter_sigma{};
     std::array<int,2> m_filter_max_t{};
 
     // Trackbar parameters
-    int        m_min_depth{30};
-    int        m_max_depth{50};
+    int        m_min_depth{40};
+    int        m_max_depth{65};
     int        m_matcherEps{};
     int        m_alphaInt{50};
 };

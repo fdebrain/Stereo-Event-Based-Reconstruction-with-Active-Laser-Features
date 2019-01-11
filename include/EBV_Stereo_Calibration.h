@@ -66,10 +66,10 @@ public:
     std::array<Filter*,2> m_filter;
     Triangulator* m_triangulator;
 
-    // Settings
+    // Settings (cols,rows) format
     const cv::Size2i m_resolution{240,180};
-    const cv::Point2i m_pattern_size{8,5};
-    const float m_pattern_square_size{0.03f};
+    const cv::Point2i m_pattern_size{8,5}; // 8,5
+    const cv::Point2f m_pattern_square_size{0.02866,0.0286}; //{0.0242f,0.02275f};
 
     // Intrinsics
     const size_t m_min_frames_to_capture{10};

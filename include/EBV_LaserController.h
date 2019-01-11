@@ -1,8 +1,6 @@
 #ifndef EBV_LASERCONTROLLER_H
 #define EBV_LASERCONTROLLER_H
 
-//#include <EBV_DAVIS240C.h>
-
 #include <list>
 #include <cmath>
 #include <chrono>
@@ -79,10 +77,10 @@ public:
     bool m_received_new_state{false};
 
     // Laser position boundaries
-    int m_min_x{500};
-    int m_min_y{0};
-    int m_max_x{4000};
-    int m_max_y{4000};
+    int m_min_x{950}; // 500
+    int m_min_y{400};   // 0
+    int m_max_x{3300}; // 4000
+    int m_max_y{3300}; // 4000
 
     std::chrono::high_resolution_clock::time_point m_t_start;
     std::thread m_thread;
