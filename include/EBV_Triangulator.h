@@ -66,8 +66,6 @@ public:
 
     // Recording settings
     bool m_record{false};
-    bool m_record_pointwise{false};
-    bool m_record_next_point{false};
     std::ofstream m_recorder;
     const std::string m_eventRecordFile = "../experiments/Pointclouds/pcl.txt";
 

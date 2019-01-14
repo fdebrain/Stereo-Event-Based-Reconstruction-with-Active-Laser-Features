@@ -77,9 +77,9 @@ public:
     bool m_received_new_state{false};
 
     // Laser position boundaries
-    int m_min_x{950}; // 500
-    int m_min_y{400};   // 0
-    int m_max_x{3300}; // 4000
+    int m_min_x{840}; // 500
+    int m_max_x{3750}; // 4000
+    int m_min_y{500};   // 0
     int m_max_y{3300}; // 4000
 
     std::chrono::high_resolution_clock::time_point m_t_start;
@@ -88,7 +88,7 @@ public:
 private:
     MagneticMirrorLaser* m_laser;
     int m_freq{0};
-    int m_step{50};
+    int m_step{20};
     float m_ratio{2};
     int m_vx{0};
     int m_vy{0};

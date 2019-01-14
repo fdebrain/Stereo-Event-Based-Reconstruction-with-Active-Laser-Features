@@ -60,7 +60,7 @@ public:
 
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime{};
-    std::string m_depthmap_path{"../experiments/Depthmaps/depthmap_scene_laser_"};
+    std::string m_depthmap_path{"../experiments/Depthmaps/depthmap_scene_Cam0Cam1"};
 
     // Structures for data storing
     std::array<std::vector<bool>,2>    m_pol_evts;
@@ -99,8 +99,8 @@ public:
     std::array<int,2> m_filter_max_t{};
 
     // Trackbar parameters
-    int        m_min_depth{40};
-    int        m_max_depth{65};
+    int        m_min_depth{34};
+    int        m_max_depth{62};
     int        m_matcherEps{};
     int        m_alphaInt{50};
 };

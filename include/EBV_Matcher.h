@@ -49,7 +49,7 @@ public:
     // Camera settings
     const int m_rows{180};
     const int m_cols{240};
-    int m_eps{5000};
+    int m_eps{200};
 
     // Flushing old events
     int m_currTime0;

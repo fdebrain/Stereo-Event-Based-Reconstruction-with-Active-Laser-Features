@@ -9,7 +9,7 @@
 Filter::Filter(int freq, DAVIS240C* davis)
     : m_davis(davis),
       m_id(davis->m_id),
-      m_frequency(freq),     //Hz (n°15=204 / n°17=167 / n°5=543, laser=600)
+      m_frequency(freq),
       m_targetPeriod(1e6f/(float)m_frequency),
       m_epsPeriod((m_eps*m_targetPeriod)/100.f),
       m_max_t(10*m_targetPeriod) //When to flush old events = 10ms
@@ -249,16 +249,18 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
 
     if (std::abs(m_frequency-freq)<m_sigma)
     {
-        // Send filtered event
-        DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
-        warnFilteredEvent(e);
-
         // Center of mass tracker
         m_xc = m_eta*m_xc + (1.f-m_eta)*x;
         m_yc = m_eta*m_yc + (1.f-m_eta)*y;
 
+        // Send filtered event
+        //DAVIS240CEvent e{m_xc,m_yc,p,t,laser_x,laser_y};
+        DAVIS240CEvent e{x,y,p,t,laser_x,laser_y};
+        warnFilteredEvent(e);
+
         // Save last filtered event in list
         m_last_filtered_events.emplace_back(x,y,p,t,laser_x,laser_y);
+
 
         // Remove old filtered events
         auto it = m_last_filtered_events.begin();

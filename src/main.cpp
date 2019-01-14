@@ -11,6 +11,8 @@ int main(int argc, char** argv)
     int freq = 500;
     int filter_offset = 20;
 
+//    Triangulator trig(nullptr,nullptr);
+
     LaserController laser(freq);
     DAVIS240C       davis_master(&laser);
     DAVIS240C       davis_slave(&laser);
@@ -31,10 +33,6 @@ int main(int argc, char** argv)
                       &triangulator,
                       &laser);
     visu.run();
-
-//    DLT dlt;
-//    dlt.test();
-//    dlt.extractCalibration();
 
     return 0;
 }

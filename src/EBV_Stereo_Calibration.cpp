@@ -163,6 +163,9 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
             }
             m_calib_laser_points.push_back(laserPoints);
         }
+        {
+            printf("Checkboard not detected. Please move it in the field of view of both cameras./n/r");
+        }
     }
 
     // Extract intrinsics & extrinsics once enough data
@@ -192,11 +195,6 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
                                              + cv::TermCriteria::EPS,
                                              60, DBL_EPSILON));
 
-//        const std::vector<std::vector<cv::Point3f>> worldPoints1
-//        {
-//            m_calib_image_points[1].size(),
-//            calculateWorldPoints()
-//        };
         cv::Mat rvecs1, tvecs1;
         cv::calibrateCamera(worldPoints,m_calib_image_points[1],
                             m_resolution,
@@ -207,12 +205,6 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
                                              + cv::TermCriteria::EPS,
                                              60, DBL_EPSILON));
 
-        // Extract laser intrinsics
-//        const std::vector<std::vector<cv::Point3f>> worldPoints2
-//        {
-//            m_calib_laser_points.size(),
-//            calculateWorldPoints()
-//        };
         cv::Mat rvecs2, tvecs2;
         cv::calibrateCamera(worldPoints,m_calib_laser_points,
                             m_resolution,
@@ -224,7 +216,7 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
                                              60, DBL_EPSILON));
 
         // Extract extrinsics (camera0-camera1)
-        float rms0 = cv::stereoCalibrate(
+        double rms0 = cv::stereoCalibrate(
             worldPoints,
             m_calib_image_points[0],
             m_calib_image_points[1],
@@ -239,7 +231,7 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
                              DBL_EPSILON));
 
         // Extract extrinsics (Camera0-Laser)
-        float rms1 = cv::stereoCalibrate(
+        double rms1 = cv::stereoCalibrate(
             worldPoints,
             m_calib_image_points[0],
             m_calib_laser_points,
@@ -254,7 +246,7 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
                              DBL_EPSILON));
 
         // Extract extrinsics (Laser-Camera1)
-        float rms2 = cv::stereoCalibrate(
+        double rms2 = cv::stereoCalibrate(
             worldPoints,
             m_calib_image_points[1],
             m_calib_laser_points,
@@ -269,9 +261,7 @@ void StereoCalibrator::calibrateCamLaser(cv::Mat& frame0,
                              DBL_EPSILON));
 
         printf("Finished extracting the extrinsics with rms %.3f - %.3f - %.3f. \n\r",
-               rms0/m_min_frames_to_capture,
-               rms1/m_min_frames_to_capture,
-               rms2/m_min_frames_to_capture);
+               rms0,rms1,rms2);
 
         // Save all
         saveCamerasCalibration();

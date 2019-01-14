@@ -248,9 +248,9 @@ Visualizer::Visualizer(const int nbCams,
                            &callbackTrackbarLaserMinY,static_cast<void*>(m_laser));
         cv::createTrackbar("laserMaxY",m_pol_win[0],&m_laser_boundaries[3],4000,
                            &callbackTrackbarLaserMaxY,static_cast<void*>(m_laser));
-        cv::createTrackbar("laserX",m_pol_win[0],&m_laser_pos[0],m_laser->m_max_x,
+        cv::createTrackbar("laserX",m_pol_win[0],&m_laser_pos[0],4000,
                            &callbackTrackbarLaserX,static_cast<void*>(m_laser));
-        cv::createTrackbar("laserY",m_pol_win[0],&m_laser_pos[1],m_laser->m_max_y,
+        cv::createTrackbar("laserY",m_pol_win[0],&m_laser_pos[1],4000,
                            &callbackTrackbarLaserY,static_cast<void*>(m_laser));
     }
 
@@ -550,19 +550,6 @@ void Visualizer::run()
             m_triangulator->m_record = !m_triangulator->m_record;
             printf("Switch triangulator recording on/off.");
             break;
-//            if (m_triangulator->m_record==false)
-//            {
-//                printf("Record pointwise. \n\r");
-//                m_triangulator->m_recorder.open(m_triangulator->m_eventRecordFile);
-//                m_triangulator->m_record = true;
-//                m_triangulator->m_record_pointwise = true;
-//            }
-//            else
-//            {
-//                printf("Save 3D point. \n\r");
-//                m_triangulator->m_record_next_point = true;
-//            }
-//            break;
         }
 
         // Reset the display matrices

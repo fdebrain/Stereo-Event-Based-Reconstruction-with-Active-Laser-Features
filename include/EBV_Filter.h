@@ -75,7 +75,7 @@ public:
     // Center of mass tracker
     int m_xc{0};
     int m_yc{0};
-    float m_eta{0.01f};
+    float m_eta{0.5f};
 
     // List of filter listeners
     std::list<FilterListener*> m_filteredEventListeners;
