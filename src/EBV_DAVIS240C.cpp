@@ -6,6 +6,21 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
 
+const std::vector<std::string> explode(const std::string& s, const char& c)
+{
+    std::string buff{""};
+    std::vector<std::string> v;
+
+    for(auto n:s)
+    {
+        if(n != c) buff+=n; else
+        if(n == c && buff != "") { v.push_back(buff); buff = ""; }
+    }
+    if(buff != "") v.push_back(buff);
+
+    return v;
+}
+
 // Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
 static void globalShutdownSignalHandler(int signal)
 {
@@ -58,6 +73,12 @@ DAVIS240C::DAVIS240C(LaserController *laser)
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
+
+    if (m_record)
+    {
+        m_recorder_davis.close();
+        if (m_id==0) { m_recorder_laser.close(); }
+    }
 }
 
 
@@ -109,10 +130,10 @@ int DAVIS240C::init()
     m_davis_handle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
                             caerBiasCoarseFineGenerate(coarseFineBias));
 
-    m_davis_handle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
-    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_GLOBAL_SHUTTER, false);
-    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_AUTOEXPOSURE, false);
-    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_EXPOSURE, 4200);
+//    m_davis_handle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+//    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_GLOBAL_SHUTTER, false);
+//    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_AUTOEXPOSURE, false);
+//    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_EXPOSURE, 4200);
 
     return 0;
 }
@@ -132,6 +153,13 @@ int DAVIS240C::start()
     if (m_id==0) { m_davis_master_handle = &m_davis_handle; }
     else { resetMasterClock(); }
 
+    // Recorder
+    if (m_record)
+    {
+        m_recorder_davis.open(m_eventRecordFileDavis);
+        if (m_id==0) { m_recorder_laser.open(m_eventRecordFileLaser); }
+    }
+
     return 0;
 }
 
@@ -148,22 +176,28 @@ int DAVIS240C::listen()
     return 0;
 }
 
+int DAVIS240C::listenRecording()
+{
+    m_stop_read_thread = false;
+    m_read_thread = std::thread(&DAVIS240C::readData,this);
+    return 0;
+}
+
 void DAVIS240C::readThread()
 {
-    // QUESTION: Do we need mutex lockers ? If yes, where ?
-    // Frame is sent to warn function as a reference, I don't see how a mutex is benefitial here
     std::vector<DAVIS240CEvent> events;
     while (!globalShutdown.load(std::memory_order_relaxed) & !m_stop_read_thread)
     {
         std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davis_handle.dataGet();
 
-        // Skip if nothing there.
+        // Skip if container empty
         if (packetContainer == nullptr) { continue; }
 
         for (auto &packet : *packetContainer)
         {
             if (packet == nullptr) { continue; }
 
+            // Events
             if (packet->getEventType() == POLARITY_EVENT)
             {
                 std::shared_ptr<const libcaer::events::PolarityEventPacket> polarity
@@ -179,11 +213,13 @@ void DAVIS240C::readThread()
                     int x = polarityEvent.getY();
                     int t = polarityEvent.getTimestamp();
                     bool p = polarityEvent.getPolarity(); // {0,1}
+                    if (m_record) { m_recorder_davis << p << '\t' << x << '\t' << y << '\t' << t << '\n'; }
 
                     if (m_laser)
                     {
                         int laser_x = m_laser->getX();
                         int laser_y = m_laser->getY();
+                        if (m_record && m_id==0) { m_recorder_laser << laser_x << '\t' << laser_y << '\n'; }
                         events.emplace_back(x,y,p,t,laser_x,laser_y);
                     }
                     else
@@ -193,9 +229,9 @@ void DAVIS240C::readThread()
                 }
                 this->warnEvent(events);
             }
-
             else if (packet == nullptr) { continue; }
 
+            // Frame
             if (packet->getEventType() == FRAME_EVENT)
             {
                 std::shared_ptr<const libcaer::events::FrameEventPacket> frame
@@ -265,4 +301,34 @@ int DAVIS240C::stop()
 {
     m_davis_handle.dataStop();
     return 0;
+}
+
+
+void DAVIS240C::readData()
+{
+    std::fstream eventReader;
+    eventReader.open(m_eventRecordFileDavis);
+
+    std::string output;
+    if (eventReader.is_open())
+    {
+        while (!eventReader.eof())
+        {
+            std::getline(eventReader,output);
+            std::vector<std::string> v{explode(output, '\t')};
+
+            DAVIS240CEvent e;
+            e.m_pol = std::atoi(v[0].c_str());
+            e.m_x = std::atoi(v[1].c_str());
+            e.m_y = std::atoi(v[2].c_str());
+            e.m_timestamp = std::atoi(v[3].c_str());
+
+            std::vector<DAVIS240CEvent> events;
+            events.push_back(e);
+            this->warnEvent(events);
+            std::cout << e.m_pol << " - " << e.m_x << " - " << e.m_y << " - " << e.m_timestamp << '\n';
+        }
+    }
+    eventReader.close();
+    std::cout << "Finished! \n";
 }

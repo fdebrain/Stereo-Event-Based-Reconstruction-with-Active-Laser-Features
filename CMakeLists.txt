@@ -7,7 +7,7 @@
 #  $ cmake <PATH_TO_PROJECT_ROOT>
 #
 #  initial version: jmartel@ini.ethz.ch @ 2017
-#
+#  updated version: freddebraine@gmail.com 2019
 #------------------------------------------------------------
 
 # ENSURE MINIMUM VERSION TO USE------------------------------

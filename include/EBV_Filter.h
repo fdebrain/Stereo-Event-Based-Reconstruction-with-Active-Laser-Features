@@ -64,7 +64,7 @@ public:
 
     // Recording settings
     bool m_record{false};
-    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
+    const std::string m_eventRecordFile = "../EventsDAVIS"
                                           + std::to_string(m_id) + ".txt";
     std::ofstream m_recorder;
 
@@ -105,7 +105,7 @@ public:
     // Events of negative polarity are stored in matrices of lists
     std::vector<std::list<int>> m_events;
 
-    // Parameters for events filtering
+    // Tunable parameters
     int m_neighborSize{3};
     int m_threshSupportsA{2};
     int m_threshSupportsB{2};
@@ -134,6 +134,7 @@ public:
     std::vector<std::array<int,2>> m_last_transitions;
     std::vector<DAVIS240CEvent> m_last_filtered_events;
 
+    // Tunable parameters
     int m_sigma{30};
 };
 
@@ -150,12 +151,9 @@ public:
     void receivedNewHyperTransition(DAVIS240CEvent& e, const int dt);
 
     std::vector<int> m_last_hypertransitions;
-    int m_thresh_supports{4};
 
-private:
-    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
-                                          + std::to_string(m_id) + ".txt";
-    std::ofstream m_recorder;
+    // Tunable parameters
+    int m_thresh_supports{4};
 };
 
 #endif // EBV_FILTER_H

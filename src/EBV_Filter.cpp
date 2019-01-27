@@ -50,7 +50,6 @@ BaseFilter::BaseFilter(int freq, DAVIS240C* davis)
     m_davis->registerEventListener(this);
 }
 
-// Associated to DAVIS event thread
 void BaseFilter::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
                                            const int id)
 {
@@ -239,14 +238,6 @@ void AdaptiveFilter::receivedNewHyperTransition(DAVIS240CEvent& e,
 
     if (m_record) { m_recorder << freq << '\n'; }
 
-    //=== DEBUG ===//
-//    if (freq>200)
-//    {
-//        printf("Freq: %d. \n\r", freq);
-
-//    }
-    //=== END DEBUG ===//
-
     if (std::abs(m_frequency-freq)<m_sigma)
     {
         // Center of mass tracker
@@ -285,14 +276,10 @@ AdaptiveFilterNeighbor::AdaptiveFilterNeighbor(int freq,DAVIS240C* davis)
 
     // Listen to Davis
     m_davis->registerEventListener(this);
-
-    // Recording events frequency
-    if (m_record) { m_recorder.open(m_eventRecordFile); }
 }
 
 AdaptiveFilterNeighbor::~AdaptiveFilterNeighbor()
 {
-   if (m_record) { m_recorder.close(); }
 }
 
 // Associated to DAVIS event thread

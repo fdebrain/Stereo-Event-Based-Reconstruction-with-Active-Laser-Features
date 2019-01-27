@@ -74,7 +74,6 @@ void Triangulator::importCalibration()
                           m_Rect[0][0], m_Rect[0][1],
                           m_P[0][0], m_P[0][1],
                           m_Q[0], cv::CALIB_ZERO_DISPARITY);
-        std::cout << "Q[0]: " << m_Q[0] << std::endl;
     }
     else
     {
@@ -96,7 +95,6 @@ void Triangulator::importCalibration()
                           m_Rect[1][0], m_Rect[1][1],
                           m_P[1][0], m_P[1][1],
                           m_Q[1], cv::CALIB_ZERO_DISPARITY);
-        std::cout << "Q[1]: " << m_Q[1] << std::endl;
 
         //CameraRight-laser
         cv::stereoRectify(m_K[1],m_D[1],
@@ -106,7 +104,6 @@ void Triangulator::importCalibration()
                           m_Rect[2][0], m_Rect[2][1],
                           m_P[2][0], m_P[2][1],
                           m_Q[2], cv::CALIB_ZERO_DISPARITY);
-        std::cout << "Q[2]: " << m_Q[2] << std::endl;
     }
     else
     {
@@ -145,7 +142,7 @@ Triangulator::Triangulator(Matcher* matcher,
 Triangulator::~Triangulator()
 {
     m_matcher->deregisterMatcherListener(this);
-    if (m_record){ m_recorder.close(); }
+    if (m_record) { m_recorder.close(); }
 }
 
 void Triangulator::run()
@@ -267,42 +264,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
         break;
-
-    case SFM:
-        std::vector<cv::Mat> input;
-        std::vector<cv::Mat> proj;
-        cv::Mat output;
-
-        cv::Mat pts1 = (cv::Mat_<double>(2,1) << y0, x0);
-        cv::Mat pts2 = (cv::Mat_<double>(2,1) << y1, x1);
-        cv::Mat pts3 = (cv::Mat_<double>(2,1) << laser_y, laser_x);
-        cv::Mat P0, P1, P2;
-
-        input.emplace_back(pts1);
-        input.emplace_back(pts2);
-        input.emplace_back(pts3);
-
-        computeProjectionMatrix(m_K[0],
-                                cv::Mat::eye(3,3,CV_64FC1),
-                                cv::Mat::zeros(3,1,CV_64FC1),P0);
-        computeProjectionMatrix(m_K[1],m_R[0],m_T[0],P1);
-        computeProjectionMatrix(m_K[2],m_R[1],m_T[1],P2);
-
-        proj.emplace_back(P0);
-        proj.emplace_back(P1);
-        proj.emplace_back(P2);
-
-        cv::sfm::triangulatePoints(input,proj,output);
-
-        point3D[0] = output.at<double>(0);
-        point3D[1] = output.at<double>(1);
-        point3D[2] = output.at<double>(2);
-        point3D[3] = 1.;
-        break;
     }
 
     if (m_mode==CamLeftLaser || m_mode==CamRightLaser)
-    //if (m_mode!=SFM)
     {
         // Refine matches coordinates (using epipolar constraint)
         cv::correctMatches(m_F[m_mode],undistCoords0,undistCoords1,
@@ -328,11 +292,9 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     double Y = 100*point3D[1]/scale;
     double Z = 100*point3D[2]/scale;
 
-    if (m_record) { recordPoint(x0,y0,x1,y1,laser_x,laser_y,X,Y,Z); }
+    if (m_record) { recordPoint(X,Y,Z); }
 
     warnDepth(x0,y0,X,Y,Z);
-
-    // Necessary ?
     coords0.clear();
     coords1.clear();
 
@@ -341,18 +303,8 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     // END DEBUG
 }
 
-void Triangulator::recordPoint(int x0, int y0, int x1, int y1, int x2, int y2,
-                               double X, double Y, double Z)
+void Triangulator::recordPoint(double X, double Y, double Z)
 {
-//    m_recorder << x0 << '\t'
-//               << y0 << '\t'
-//               << x1 << '\t'
-//               << y1 << '\t'
-//               << x2 << '\t'
-//               << y2 << '\t'
-//               << X << '\t'
-//               << Y << '\t'
-//               << Z << '\n';
     m_recorder << X << '\t'
                << Y << '\t'
                << Z << '\n';

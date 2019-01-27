@@ -7,7 +7,7 @@
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
-#include <opencv2/sfm/triangulation.hpp>
+//#include <opencv2/sfm/triangulation.hpp>
 
 class TriangulatorListener
 {
@@ -41,8 +41,7 @@ public:
     void deregisterTriangulatorListener(TriangulatorListener* listener);
     void warnDepth(const int u, const int v,
                    const double X, const double Y, const double Z);
-    void recordPoint(int x0, int y0, int x1, int y1, int x2, int y2,
-                     double X, double Y, double Z);
+    void recordPoint(double X, double Y, double Z);
 
     void computeProjectionMatrix(cv::Mat K, cv::Mat R,
                                  cv::Mat T, cv::Mat& P);
@@ -59,9 +58,9 @@ public:
     bool m_enable{false};
     bool m_debug{false};
 
-    // Stereo mode
-    enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2, SFM=3 };
-    std::string stereoPairNames[4] = {"Cameras", "CamLeftLaser", "CamRightLaser","SFM"};
+    // Stereo pairs
+    enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2};
+    std::string stereoPairNames[3] = {"Cameras", "CamLeftLaser", "CamRightLaser"};
     StereoPair m_mode{Cameras};
 
     // Recording settings
