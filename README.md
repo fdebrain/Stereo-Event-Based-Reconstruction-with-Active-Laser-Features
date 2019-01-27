@@ -1,5 +1,5 @@
 # Stereo-Event-Based-Reconstruction-with-Active-Laser-Features
-Stereo Depth Estimation using Event-Based Cameras & Active Laser Features
+
 A Semester project carried out in V4RL & INI at ETHZ & UZH.
 Author: Frédéric Debraine
 
