@@ -7,7 +7,7 @@
 #  $ cmake <PATH_TO_PROJECT_ROOT>
 #
 #  initial version: jmartel@ini.ethz.ch @ 2017
-#
+#  updated version: freddebraine@gmail.com 2019
 #------------------------------------------------------------
 
 # ENSURE MINIMUM VERSION TO USE------------------------------
@@ -34,27 +34,32 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMakeModules")
 #------------------------------------------------------------
 
 # REQUIRED MODULES AND LIBRARIES-----------------------------
-find_package(OpenCV REQUIRED)
-if(OpenCV_FOUND)
-	link_directories(${OPENCV_LIB_DIR})
-	list(APPEND 3RD_PARTY_LIBS ${OpenCV_LIBS})
-endif()
+## LibUSB
+#find_package(LibUSB REQUIRED)
+#if(LIBUSB_FOUND)
+#        include_directories(${LIBUSB_INCLUDE_DIRS})
+#        list(APPEND 3RD_PARTY_LIBS ${LIBUSB_LIBRARIES})
+#endif()
 
-find_package(LibUSB REQUIRED)
-if(LIBUSB_FOUND)
-	include_directories(${LIBUSB_INCLUDE_DIRS})
-	list(APPEND 3RD_PARTY_LIBS ${LIBUSB_LIBRARIES})
-endif()
-
+# Threads
 find_package(Threads REQUIRED)
 list(APPEND 3RD_PARTY_LIBS ${CMAKE_THREAD_LIBS_INIT})
-#------------------------------------------------------------
 
+# Eigen3
+find_package(Eigen3 REQUIRED)
+include_directories(${EIGEN3_INCLUDE_DIRS})
+
+# OpenCV
+find_package(OpenCV REQUIRED PATHS /usr/local/lib)
+include_directories(${OpenCV_INCLUDE_DIRS})
+list(APPEND 3RD_PARTY_LIBS ${OpenCV_LIBS})
+
+#------------------------------------------------------------
 
 # DOWNLOAD EXTERNAL MODULES AND LIBRARIES--------------------
 include(ExternalProject)
 
-# libcaer
+# Libcaer
 ExternalProject_Add(
     libcaer
     PREFIX "libcaer"
@@ -63,8 +68,8 @@ ExternalProject_Add(
     UPDATE_COMMAND ""
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR> -DENABLE_OPENCV=1
     BUILD_COMMAND make -j8
-)
-set(LIBCAER_FOUND TRUE CACHE BOOL "Whether libcaer was found.")
+    )
+set(LIBCAER_FOUND TRUE CACHE BOOL "Whether Libcaer was found.")
 set(LIBCAER_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/libcaer/include" CACHE PATH "libcaer include dir")
 set(LIBCAER_LIBRARY_DIRS "${CMAKE_BINARY_DIR}/libcaer/lib" CACHE PATH "libcaer lib dir")
 set(LIBCAER_LIBRARIES "${CMAKE_SHARED_LIBRARY_PREFIX}caer${CMAKE_SHARED_LIBRARY_SUFFIX}" CACHE FILEPATH "libcaer lib file(s)")
@@ -74,7 +79,7 @@ list(APPEND 3RD_PARTY_LIBS ${LIBCAER_LIBRARIES})
 #------------------------------------------------------------
 
 # COMPILER FLAGS---------------------------------------------
-set(GCC_COVERAGE_COMPILE_FLAGS "-std=c++11 -Ofast -O3")
+set(GCC_COVERAGE_COMPILE_FLAGS "-std=c++11 -Ofast -O3 -pthread") # Added -pthread
 set(GCC_COVERAGE_LINK_FLAGS    "")
 
 list(APPEND CMAKE_CXX_FLAGS ${GCC_COVERAGE_COMPILE_FLAGS} )
@@ -88,22 +93,20 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/)
 #------------------------------------------------------------
 
 # CREATE THE TARGET EXECUTABLE-------------------------------
-set(COMP_TARGET "semester-project")
+set(COMP_TARGET "demo")
 add_executable( ${COMP_TARGET}
                 ${COMP_TARGET_CXX}
                 ${COMP_TARGET_HPP}
                )
-target_link_libraries(	${COMP_TARGET}
-                        ${3RD_PARTY_LIBS}
-                      )
+target_link_libraries(${COMP_TARGET}
+                      ${3RD_PARTY_LIBS}
+                     )
 #------------------------------------------------------------
 
 # INSTALATION------------------------------------------------
 set(EXECUTABLE_INSTALL_PATH ${CMAKE_CURRENT_LIST_DIR}/bin/${CMAKE_BUILD_TYPE})
-#install(TARGETS ${CMAKE_CURRENT_LIST_DIR}/misc/99-.rules
-#        DESTINATION /etc/udev/rules.d/)
 install(TARGETS ${COMP_TARGET}
         DESTINATION ${EXECUTABLE_INSTALL_PATH}
-        )
+       )
 message(STATUS ${EXECUTABLE_INSTALL_PATH})
 #------------------------------------------------------------

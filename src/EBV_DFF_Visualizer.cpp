@@ -1,187 +1,578 @@
-﻿#include <EBV_DFF_Visualizer.h>
+#include <EBV_DFF_Visualizer.h>
 
-// OpenCV
+#include <string.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
-#include <string.h>
 
-Visualizer::Visualizer(int rows, int cols, int nbCams)
-    : m_rows(rows), m_cols(cols), m_nbCams(nbCams)
+// Exporting depth maps into txt file
+static void writeMatToFile(std::vector<float>& v, const std::string filename)
 {
-    // Create a data structure to hold the events (flatten matrix)
-    m_polEvts0.resize(m_rows*m_cols);
-    m_ageEvts0.resize(m_rows*m_cols);
-
-    m_polEvts1.resize(m_rows*m_cols);
-    m_ageEvts1.resize(m_rows*m_cols);
-
-    // Create a data structure to hold the frame
-    m_grayFrame0.resize(m_rows*m_cols);
-    m_grayFrame0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
-
-    m_grayFrame1.resize(m_rows*m_cols);
-    m_grayFrame1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
-
-    // Create windows to display events by polarity and age
-    m_polWin0 = "Events by Polarity - Master"; //+ std::to_string(id);
-    m_ageWin0 = "Events by Age - Master";
-    m_frameWin0 = "Frame - Master";
-
-    m_polWin1 = "Events by Polarity - Slave"; //+ std::to_string(id);
-    m_ageWin1 = "Events by Age - Slave";
-    m_frameWin1 = "Frame - Slave";
-
-    cv::namedWindow(m_polWin0,0);
-    cv::namedWindow(m_ageWin0,0);
-    cv::namedWindow(m_frameWin0,0);
-
-    cv::namedWindow(m_polWin1,0);
-    cv::namedWindow(m_ageWin1,0);
-    cv::namedWindow(m_frameWin1,0);
-
-    m_thresh = 40e3; // 40ms
-    cv::createTrackbar("Threshold",m_ageWin0,&m_thresh,m_max_trackbar_val,0);
+    std::ofstream fout(filename);
+    for(size_t i=0; i<v.size(); ++i) { fout << v[i] << std::endl; }
+    fout.close();
 }
 
-Visualizer::~Visualizer()
+// Setting laser ROI with depthmap window
+static void onMouse(int event, int x, int y, int, void* data)
 {
-    //cv::destroyAllWindows();
-}
+    LaserController* laser = static_cast<LaserController*>(data);
 
-void Visualizer::receivedNewDVS128USBEvent(DVS128USBEvent& e)
-{
-    int x = e.m_x;
-    int y = e.m_y;
-    int p = e.m_pol; // p={0,1}
+    // Remapping (TODO: fix offset on screen)
+    int y_bis = x*static_cast<int>(4000.f/240.f) - 200;
+    int x_bis = y*static_cast<int>((3500.f/180.f)) + 700;
 
-    m_evtMutex.lock();
-        m_polEvts0[x*m_cols+y] += 2*p-1; // p={-1,1}
-    m_evtMutex.unlock();
-}
-
-void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,int id)
-{
-    int x = e.m_x;
-    int y = e.m_y;
-    int p = e.m_pol; // p={0,1}
-    unsigned int t = e.m_timestamp;
-
-    // Store event polarity p and timestamp t at a given (x,y) pixel (here vectorized for performance)
-    // (Master id is 0 - Slave id is 1)
-    switch(id)
+    if (event == cv::EVENT_LBUTTONDOWN)
     {
-        case 0:
-            m_evtMutex.lock();
-                m_currenTime0 = e.m_timestamp;
-                m_polEvts0[x*m_cols+y] = 2*p-1; // p={-1,1}
-                m_ageEvts0[x*m_cols+y] = t;
-            m_evtMutex.unlock();
-        break;
-
-        case 1:
-            m_evtMutex.lock();
-                m_currenTime1 = e.m_timestamp;
-                m_polEvts1[x*m_cols+y] = 2*p-1; // p={-1,1}
-                m_ageEvts1[x*m_cols+y] = t;
-            m_evtMutex.unlock();
-        break;
+        printf("Set laser boundaries to xMin: %d, yMin: %d. \n\r",x_bis,y_bis);
+        laser->setMinX(x_bis);
+        laser->setMinY(y_bis);
+    }
+    else if (event == cv::EVENT_LBUTTONUP)
+    {
+        if (x_bis>laser->getMinX() && y_bis>laser->getMinY())
+        {
+            printf("Set laser boundaries to xMax: %d, yMax: %d. \n\r",x_bis,y_bis);
+            laser->setMaxX(x_bis);
+            laser->setMaxY(y_bis);
+        }
     }
 }
 
-// Store events info in a vectorized datastructure (function called each time the DAVIS receives an event)
-void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,int id)
-{ 
-    // Store frame (Master id is 0 - Slave id is 1)
-    switch(id)
-    {
-        case 0:
-            m_evtMutex.lock();
-                m_currenTime0 = f.m_timestamp;
-                m_grayFrame0 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-            m_evtMutex.unlock();
-        break;
+//=== TRACKBAR CALLBACKS ===//
+//=== Filters ===//
+static void callbackTrackbarFilterFreq(int new_freq, void *data)
+{
+    Filter* filter = static_cast<Filter*>(data);
+    filter->setFreq(new_freq);
+}
 
+static void callbackTrackbarFilterEps(int new_eps, void *data)
+{
+    Filter* filter = static_cast<Filter*>(data);
+    filter->setEps(new_eps);
+}
+
+static void callbackTrackbarFilterSigma(int new_sigma, void *data)
+{
+    AdaptiveFilter* filter = static_cast<AdaptiveFilter*>(data);
+    filter->setSigma(new_sigma);
+}
+
+static void callbackTrackbarEta(int newEta, void *data)
+{
+    Filter* filter = static_cast<Filter*>(data);
+    filter->setEta(newEta/100.f);
+}
+
+//=== Laser ===//
+static void callbackTrackbarLaserMinX(int min_x, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMinX(min_x);
+}
+
+static void callbackTrackbarLaserMaxX(int max_x, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMaxX(max_x);
+}
+
+static void callbackTrackbarLaserMinY(int min_y, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMinY(min_y);
+}
+
+static void callbackTrackbarLaserMaxY(int max_y, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setMaxY(max_y);
+}
+
+static void callbackTrackbarLaserX(int x, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setX(x);
+}
+
+static void callbackTrackbarLaserY(int y, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setY(y);
+}
+
+static void callbackTrackbarLaserLearningRate(int lrInt, void *data)
+{
+    StereoCalibrator* calib = static_cast<StereoCalibrator*>(data);
+    calib->setLearningRate(lrInt/100.f);
+}
+
+static void callbackTrackbarLaserFreq(int freq, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setFreq(freq);
+}
+
+static void callbackTrackbarLaserStep(int step, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setStep(step);
+}
+
+static void callbackTrackbarLaserRatio(int ratio, void *data)
+{
+    LaserController* laser = static_cast<LaserController*>(data);
+    laser->setRatio(ratio/10.f);
+}
+
+//=== Matcher ===//
+static void callbackTrackbarMatcherEps(int eps, void *data)
+{
+    Matcher* matcher = static_cast<Matcher*>(data);
+    matcher->setEps(eps);
+}
+
+Visualizer::Visualizer(const int nbCams,
+                       DAVIS240C* davis0, DAVIS240C* davis1,
+                       Filter* filter0, Filter* filter1,
+                       StereoCalibrator* calibrator,
+                       Triangulator* triangulator,
+                       LaserController* laser)
+    : m_nbCams(nbCams),
+      m_davis{davis0,davis1},
+      m_laser(laser),
+      m_filter{filter0,filter1},
+      m_calibrator(calibrator),
+      m_triangulator(triangulator)
+{
+    // Initialize data structure
+    for (auto& v : m_pol_evts) { v.resize(m_rows*m_cols,false); }
+    for (auto& v : m_filt_evts) { v.resize(m_rows*m_cols,0); }
+    for (auto& v : m_age_evts) { v.resize(m_rows*m_cols,0); }
+    for (auto& v : m_frame) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC1); }
+    m_depthmap.resize(m_rows*m_cols,0);
+    m_mask = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
+
+    // Initialize recordings
+    if (m_record)
+    {
+        m_recorder_davis0.open(m_eventRecordFileDavis0);
+        m_recorder_davis1.open(m_eventRecordFileDavis1);
+        m_recorder_laser.open(m_eventRecordFileLaser);
+    }
+
+    for (int idx=0; idx<2; idx++)
+    {
+        // Initialize davis
+        if (m_davis[idx])
+        {
+            // Initialize windows
+            m_pol_win[idx] = "Events by Polarity - " + std::to_string(idx);
+            m_frame_win[idx] = "Frame - "  + std::to_string(idx);
+
+            cv::namedWindow(m_pol_win[idx],
+                            cv::WindowFlags::WINDOW_NORMAL |
+                            cv::WindowFlags::WINDOW_KEEPRATIO |
+                            cv::WindowFlags::WINDOW_GUI_EXPANDED);
+            cv::moveWindow(m_pol_win[idx],idx*500,10);
+
+            cv::namedWindow(m_frame_win[idx],
+                            cv::WindowFlags::WINDOW_NORMAL |
+                            cv::WindowFlags::WINDOW_KEEPRATIO |
+                            cv::WindowFlags::WINDOW_GUI_EXPANDED);
+            cv::moveWindow(m_frame_win[idx],idx*500,370);
+
+            // Age trackbars
+            cv::createTrackbar("Threshold",m_pol_win[idx],&m_age_thresh,m_max_trackbar_val,nullptr);
+
+            // Listen to davis
+            m_davis[idx]->init();
+            m_davis[idx]->start();
+            m_davis[idx]->registerEventListener(this);
+            m_davis[idx]->registerFrameListener(this);
+            m_davis[idx]->listen();
+        }
+
+        // Initialize filter
+        if (m_filter[idx])
+        {
+            m_filter[idx]->registerFilterListener(this);
+
+            // Initialize window
+            m_filt_win[idx] = "Filtered Events - "  + std::to_string(idx);
+            cv::namedWindow(m_filt_win[idx],
+                            cv::WindowFlags::WINDOW_NORMAL |
+                            cv::WindowFlags::WINDOW_KEEPRATIO |
+                            cv::WindowFlags::WINDOW_GUI_EXPANDED);
+            cv::moveWindow(m_filt_win[idx],idx*500,730);
+
+            // Initialize filter tuning parameters
+            m_filter_freq[idx] = m_filter[idx]->getFreq();
+            m_filter_eps[idx] = m_filter[idx]->getEps();
+            m_filter_etaInt[idx] = static_cast<int>(100*m_filter[idx]->getEta());
+            m_filter_sigma[idx] = static_cast<AdaptiveFilter*>(m_filter[idx])->getSigma();
+            m_filter_max_t[idx] = static_cast<AdaptiveFilter*>(m_filter[idx])->getMaxT();
+
+            // Filter trackbars
+            cv::createTrackbar("Filter frequency",m_filt_win[idx],&m_filter_freq[idx],1500,
+                               &callbackTrackbarFilterFreq,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Epsilon",m_filt_win[idx],&m_filter_eps[idx],20,
+                               &callbackTrackbarFilterEps,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Sigma",m_filt_win[idx],&m_filter_sigma[idx],100,
+                               &callbackTrackbarFilterSigma,static_cast<void*>(m_filter[idx]));
+            cv::createTrackbar("Eta",m_filt_win[idx],&m_filter_etaInt[idx],100,
+                               &callbackTrackbarEta,static_cast<void*>(m_filter[idx]));
+        }
+    }
+
+    // Initialize laser
+    if (m_laser)
+    {
+        // Initialize tuning parameters (laser)
+        m_laser_pos[0] = m_laser->getX();
+        m_laser_pos[1] = m_laser->getY();
+        m_laser_vel[0] = m_laser->getVx();
+        m_laser_vel[1] = m_laser->getVy();
+        m_laser_freq = m_laser->getFreq();
+        m_laser_step = m_laser->getStep();
+        m_laser_ratio_int = static_cast<int>(10*m_laser->getRatio());
+        m_laser_boundaries[0] = m_laser->getMinX();
+        m_laser_boundaries[1] = m_laser->getMaxX();
+        m_laser_boundaries[2] = m_laser->getMinY();
+        m_laser_boundaries[3] = m_laser->getMaxY();
+
+        // Laser trackbars
+        cv::createTrackbar("Laser frequency",m_pol_win[0],&m_laser_freq,1500,
+                           &callbackTrackbarLaserFreq,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMinX",m_pol_win[0],&m_laser_boundaries[0],4000,
+                           &callbackTrackbarLaserMinX,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMaxX",m_pol_win[0],&m_laser_boundaries[1],4000,
+                           &callbackTrackbarLaserMaxX,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMinY",m_pol_win[0],&m_laser_boundaries[2],4000,
+                           &callbackTrackbarLaserMinY,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserMaxY",m_pol_win[0],&m_laser_boundaries[3],4000,
+                           &callbackTrackbarLaserMaxY,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserX",m_pol_win[0],&m_laser_pos[0],4000,
+                           &callbackTrackbarLaserX,static_cast<void*>(m_laser));
+        cv::createTrackbar("laserY",m_pol_win[0],&m_laser_pos[1],4000,
+                           &callbackTrackbarLaserY,static_cast<void*>(m_laser));
+    }
+
+    // Initialize triangulator
+    if (m_triangulator)
+    {
+        // Listen to triangulator
+        m_triangulator->registerTriangulatorListener(this);
+
+        // Initialize window
+        m_depth_win = "Depth Map";
+        cv::namedWindow(m_depth_win,
+                        cv::WindowFlags::WINDOW_NORMAL |
+                        cv::WindowFlags::WINDOW_KEEPRATIO |
+                        cv::WindowFlags::WINDOW_GUI_EXPANDED);
+        cv::moveWindow(m_depth_win,1200,0);
+        cv::resizeWindow(m_depth_win,cv::Size(700,500));
+
+        m_depth_inpainted_win = "Depth Map Inpainted";
+        cv::namedWindow(m_depth_inpainted_win,
+                        cv::WindowFlags::WINDOW_NORMAL |
+                        cv::WindowFlags::WINDOW_KEEPRATIO |
+                        cv::WindowFlags::WINDOW_GUI_EXPANDED);
+        cv::moveWindow(m_depth_inpainted_win,1200,500);
+        cv::resizeWindow(m_depth_inpainted_win,cv::Size(700,500));
+
+        // Initialize matcher parameters
+        m_matcherEps = m_triangulator->m_matcher->getEps();
+
+        // Matcher trackbars
+        cv::createTrackbar("Matcher eps",m_depth_win,&m_matcherEps,1e5,
+                           &callbackTrackbarMatcherEps,static_cast<void*>(m_triangulator->m_matcher));
+
+        // Depth trackbars
+        cv::createTrackbar("minDepth",m_depth_win,&m_min_depth,100,nullptr);
+        cv::createTrackbar("maxDepth",m_depth_win,&m_max_depth,100,nullptr);
+        cv::createTrackbar("Blending",m_depth_win,&m_alphaInt,100,nullptr);
+
+        // Laser
+        cv::createTrackbar("Laser step",m_depth_win,&m_laser_step,300,
+                           &callbackTrackbarLaserStep,static_cast<void*>(m_laser));
+        cv::createTrackbar("Laser ratio",m_depth_win,&m_laser_ratio_int,300,
+                           &callbackTrackbarLaserRatio,static_cast<void*>(m_laser));
+
+        // Mouse
+        cv::setMouseCallback(m_depth_win,&onMouse,static_cast<void*>(m_laser));
+    }
+
+    // Initialize calibrator
+    if (m_calibrator)
+    {
+        m_lrInt = static_cast<int>(100*m_calibrator->getLearningRate());
+        cv::createTrackbar("LearningRate",m_pol_win[0],&m_lrInt,100,
+                           &callbackTrackbarLaserLearningRate,static_cast<void*>(m_calibrator));
+    }
+}
+
+
+Visualizer::~Visualizer()
+{
+    for (int idx=0; idx<2; idx++)
+    {
+        if (m_davis[idx])
+        {
+            m_davis[idx]->stopListening();
+            m_davis[idx]->deregisterEventListener(this);
+            m_davis[idx]->deregisterFrameListener(this);
+            m_davis[idx]->stop();
+        }
+
+        if (m_filter[idx]) { m_filter[idx]->deregisterFilterListener(this); }
+    }
+
+    if (m_triangulator) { m_triangulator->deregisterTriangulatorListener(this); }
+    if (m_laser) { m_laser->stop(); }
+    if (m_record)
+    {
+        m_recorder_davis0.close();
+        m_recorder_davis1.close();
+        m_recorder_laser.close();
+    }
+}
+
+// Runs in DAVIS240 thread
+void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
+                                           const int id)
+{
+    const int x = e.m_x;
+    const int y = e.m_y;
+    const bool p = e.m_pol; // p={0,1}
+    const int t = e.m_timestamp;
+    m_currenTime[id] = t;
+    m_pol_evts[id][x*m_cols+y] = p;
+    m_age_evts[id][x*m_cols+y] = t;
+
+    // Record
+    if (m_record)
+    {
+        switch (id)
+        {
+        case 0:
+            m_recorder_davis0 << p << '\t' << x << '\t' << y << '\t' << t << '\n';
+            break;
         case 1:
-            m_evtMutex.lock();
-                m_currenTime1 = f.m_timestamp;
-                m_grayFrame1 = cv::Mat(m_rows,m_cols,CV_8UC1,f.m_frame.data());
-            m_evtMutex.unlock();
-        break;
+            m_recorder_davis1 << p << '\t' << x << '\t' << y << '\t' << t << '\n';
+            m_recorder_laser << e.m_laser_x << '\t' << e.m_laser_y << '\n';
+            break;
+        }
+    }
+}
+
+// Runs in DAVIS240 thread
+void Visualizer::receivedNewDAVIS240CFrame(DAVIS240CFrame& f,
+                                           const int id)
+{
+    auto frame = f.m_frame;
+    const int t = f.m_timestamp;
+    m_frame[id] = cv::Mat(m_rows,m_cols,CV_8UC1,frame.data());
+    m_currenTime[id] = t;
+}
+
+// Runs in Filter thread
+void Visualizer::receivedNewFilterEvent(DAVIS240CEvent& e,
+                                        const int id)
+{
+    const int x = e.m_x;
+    const int y = e.m_y;
+    const int t = e.m_timestamp;
+    m_filt_evts[id][x*m_cols+y] = t;
+}
+
+void Visualizer::receivedNewDepth(const int &u,
+                                  const int &v,
+                                  const double &X,
+                                  const double &Y,
+                                  const double &Z)
+{
+    // Update depth value
+    const float depth = Z;
+    const float last_depth = m_depthmap[u*m_cols+v];
+    if (last_depth>0)
+    {
+        m_depthmap[u*m_cols+v] = 0.5*(last_depth + depth);
+    }
+    else
+    {
+        m_depthmap[u*m_cols+v] = depth;
     }
 }
 
 void Visualizer::run()
 {
+    // Wait (in ms)
     char key = ' ';
 
     // Initialize display matrices
-    cv::Mat polMat0(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatHSV0(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatRGB0(m_rows,m_cols,CV_8UC3);
-
-    cv::Mat polMat1(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatHSV1(m_rows,m_cols,CV_8UC3);
-    cv::Mat ageMatRGB1(m_rows,m_cols,CV_8UC3);
+    std::array<cv::Mat,2> polMat;
+    std::array<cv::Mat,2> filtMat;
+    cv::Mat depthMatHSV = cv::Mat(m_rows,m_cols,CV_8UC3);
+    cv::Mat depthMatRGB = cv::Mat(m_rows,m_cols,CV_8UC3);
+    cv::Mat depthMatRGBInpainted = cv::Mat(m_rows,m_cols,CV_8UC3);
+    for (auto& v : polMat) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
+    for (auto& v : filtMat) { v = cv::Mat(m_rows,m_cols,CV_8UC3); }
 
     while(key != 'q')
     {
-        // Grant unique access of thread resources
-        m_evtMutex.lock();
         for(int i=0; i<m_rows*m_cols; i++)
         {
-            // Get the polarity of i-th event and fill display matrix (color by polarity) - Master
-            int pol = m_polEvts0[i];
-            if((m_currenTime0-m_ageEvts0[i])<m_thresh)
+            // Updating matrix placeholders
+            for (int idx=0; idx<2; idx++)
             {
-                polMat0.data[3*i + 0] = (unsigned char)0;              // Blue channel
-                polMat0.data[3*i + 1] = (unsigned char)(pol>0?255:0);    // Green channel
-                polMat0.data[3*i + 2] = (unsigned char)(pol<0?255:0);    // Red Channel
+                bool pol = m_pol_evts[idx][i];
+                int dt = m_currenTime[idx] - m_age_evts[idx][i];
+
+                // Events by polarity
+                if(dt<m_age_thresh)
+                {
+                    polMat[idx].data[3*i + 0] = static_cast<uchar>(0);              // Blue channel
+                    polMat[idx].data[3*i + 1] = static_cast<uchar>(pol>0?255:0);    // Green channel
+                    polMat[idx].data[3*i + 2] = static_cast<uchar>(pol==0?255:0);    // Red Channel
+                }
+                else { dt = m_age_thresh; }
+
+                // Filtered events
+                dt = m_currenTime[idx] - m_filt_evts[idx][i];
+
+                if(dt < m_age_thresh)
+                {
+                    filtMat[idx].data[3*i + 0] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 1] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 2] = static_cast<uchar>(255);  // why not change color given laser frequency?
+                }
+                else
+                {
+                    filtMat[idx].data[3*i + 0] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 1] = static_cast<uchar>(0);
+                    filtMat[idx].data[3*i + 2] = static_cast<uchar>(0);
+                }
             }
 
-            // Get the polarity of i-th event and fill display matrix (color by polarity) - Slave
-            pol = m_polEvts1[i];
-            if((m_currenTime1-m_ageEvts1[i])<m_thresh)
+            // Update depthmap
+            float z = m_depthmap[i];
+            if (z>0)
             {
-                polMat1.data[3*i + 0] = (unsigned char)0;              // Blue channel
-                polMat1.data[3*i + 1] = (unsigned char)(pol>0?255:0);    // Green channel
-                polMat1.data[3*i + 2] = (unsigned char)(pol<0?255:0);    // Red Channel
+                if (z<m_min_depth){ z = m_min_depth; }
+                else if (z>m_max_depth){ z = m_max_depth; }
+                depthMatHSV.data[3*i + 0] = static_cast<uchar>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+                depthMatHSV.data[3*i + 1] = static_cast<uchar>(255);
+                depthMatHSV.data[3*i + 2] = static_cast<uchar>(255);
+                m_mask.data[i] = static_cast<uint8_t>(0);
             }
-
-            // Compute age of event and set a maximum age threshold and fill the display matrix (color by age) - Master
-            int dt = m_currenTime0 - m_ageEvts0[i];
-            if(dt>m_thresh) { dt = m_thresh; }
-            ageMatHSV0.data[3*i + 0] = (unsigned char)(0.75*180.*dt/float(m_thresh)); //H
-            ageMatHSV0.data[3*i + 1] = (unsigned char)255; //S
-            ageMatHSV0.data[3*i + 2] = (unsigned char)(dt==m_thresh?0:255); //V
-
-            // Compute age of event and set a maximum age threshold and fill the display matrix (color by age) - Slave
-            dt = m_currenTime1 - m_ageEvts1[i];
-            if(dt>m_thresh) { dt = m_thresh; }
-            ageMatHSV1.data[3*i + 0] = (unsigned char)(0.75*180.*dt/float(m_thresh)); //H
-            ageMatHSV1.data[3*i + 1] = (unsigned char)255; //S
-            ageMatHSV1.data[3*i + 2] = (unsigned char)(dt==m_thresh?0:255); //V
+            else
+            {
+                depthMatHSV.data[3*i + 0] = static_cast<uchar>(0.8*180.*(z-m_min_depth)/(m_max_depth-m_min_depth));
+                depthMatHSV.data[3*i + 1] = static_cast<uchar>(255);
+                depthMatHSV.data[3*i + 2] = static_cast<uchar>(0);
+                m_mask.data[i] = static_cast<uint8_t>(255);
+            }
         }
-        m_evtMutex.unlock();
 
-        // Display the "polarity" and "age" event matrices - Master
-        cv::imshow(m_polWin0,polMat0);
-        cv::cvtColor(ageMatHSV0,ageMatRGB0,CV_HSV2BGR);
-        cv::imshow(m_ageWin0,ageMatRGB0);
-        cv::imshow(m_frameWin0,m_grayFrame0);
+        // Displaying matrices
+        for (int idx=0; idx<2; idx++)
+        {
+            if (m_davis[idx])
+            {
+                // Display events by polarity
+                cv::imshow(m_pol_win[idx],polMat[idx]);
 
-        // Display the "polarity" and "age" event matrices - Master
-        cv::imshow(m_polWin1,polMat1);
-        cv::cvtColor(ageMatHSV1,ageMatRGB1,CV_HSV2BGR);
-        cv::imshow(m_ageWin1,ageMatRGB1);
-        cv::imshow(m_frameWin1,m_grayFrame1);
+                // Display frame
+                cv::imshow(m_frame_win[idx],m_frame[idx]);
+            }
+
+            // Display filtered events + trackers
+            if(m_filter[idx])
+            {
+                int x = m_filter[idx]->getX();
+                int y = m_filter[idx]->getY();
+                cv::circle(filtMat[idx],cv::Point2i(y,x),3,cv::Scalar(0,255,0));
+                cv::imshow(m_filt_win[idx],filtMat[idx]);
+            }
+        }
+
+        // Display depth map + Blending with master frame
+        if (m_triangulator)
+        {
+            cv::cvtColor(depthMatHSV,depthMatRGB,CV_HSV2BGR);
+            cv::Mat frameRGB;
+            cv::cvtColor(m_frame[0], frameRGB, cv::COLOR_GRAY2BGR);
+            cv::addWeighted(frameRGB, m_alphaInt/100., depthMatRGB, 1-m_alphaInt/100., 0.0, depthMatRGB);
+            cv::imshow(m_depth_win,depthMatRGB);
+        }
+
+        // User keyboard input
+        key = cv::waitKey(10);
+        switch (key)
+        {
+        case 'c': // Calibrate cameras and laser
+            if (m_calibrator && m_laser)
+            {
+                if(!m_laser->m_laser_on) { m_laser->start(); }
+                printf("Starting laser calibration. \n\r");
+                m_calibrator->calibrateCamLaser(m_frame[0],m_frame[1],0);
+            }
+            break;
+
+        case 'd': // Print triangulated points coordinates
+           printf("Switch debug mode. \n\r");
+           m_triangulator->m_debug = !m_triangulator->m_debug;
+           break;
+
+        case 'e': // Export current depthmap as a .txt file
+            static int nb_maps = 1;
+            printf("Export new depthmap.\n\r");
+            writeMatToFile(m_depthmap,m_depthmap_path + std::to_string(nb_maps) + ".txt");
+            nb_maps++;
+            break;
+
+        case 'i': // Inpaint current depthmap
+            printf("Inpainting. \n\r");
+            cv::inpaint(depthMatRGB,m_mask,depthMatRGBInpainted,2,cv::INPAINT_NS);
+            cv::imshow(m_depth_inpainted_win,depthMatRGBInpainted);
+            break;
+
+        case 'o': // Switch laser on/off
+            if (m_laser) { m_laser->toogleState(); }
+            break;
+
+        case 'r': // Reset depthmap
+            printf("Reset depth map.\n\r");
+            m_depthmap.clear();
+            m_depthmap.resize(m_rows*m_cols,0);
+            break;
+
+
+        case 's': // Switch sweeping on/off
+            if (m_laser) { m_laser->toogleSweep(); }
+            break;
+
+        case 't': // Switch stereo pair
+            m_triangulator->switchMode();
+            break;
+
+        case 'z': // Switch triangulator recording on/off
+            if (m_triangulator->m_record==false)
+            {
+                m_triangulator->m_recorder.open(m_triangulator->m_eventRecordFile);
+            }
+            m_triangulator->m_record = !m_triangulator->m_record;
+            printf("Switch triangulator recording on/off.");
+            break;
+        }
 
         // Reset the display matrices
-        ageMatHSV0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        polMat0 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        ageMatHSV1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-        polMat1 = cv::Mat::zeros(m_rows,m_cols,CV_8UC3);
-
-        // Wait for 20ms
-        key = cv::waitKey(20);
+        for (auto& v : polMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
+        for (auto& v : filtMat) { v = cv::Mat::zeros(m_rows,m_cols,CV_8UC3); }
     }
 }

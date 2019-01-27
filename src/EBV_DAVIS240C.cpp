@@ -3,29 +3,43 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include <libcaercpp/devices/davis.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
-static void globalShutdownSignalHandler(int signal) {
-    // Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
-    if (signal == SIGTERM || signal == SIGINT) {
-        globalShutdown.store(true);
+const std::vector<std::string> explode(const std::string& s, const char& c)
+{
+    std::string buff{""};
+    std::vector<std::string> v;
+
+    for(auto n:s)
+    {
+        if(n != c) buff+=n; else
+        if(n == c && buff != "") { v.push_back(buff); buff = ""; }
     }
+    if(buff != "") v.push_back(buff);
+
+    return v;
 }
 
-static void usbShutdownHandler(void *ptr) {
-    (void) (ptr); // UNUSED.
+// Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
+static void globalShutdownSignalHandler(int signal)
+{
+    if (signal == SIGTERM || signal == SIGINT) { globalShutdown.store(true); }
+}
 
+static void usbShutdownHandler(void *ptr)
+{
+    (void) (ptr); // UNUSED.
     globalShutdown.store(true);
 }
 
-//
 int DAVIS240C::m_nbCams=0;
+libcaer::devices::davis* DAVIS240C::m_davis_master_handle = nullptr;
 
 DAVIS240C::DAVIS240C()
     // Open a DAVIS, give it a device ID of 1, and don't care about USB bus or SN restrictions.
     : m_id(m_nbCams),
-      m_davisHandle(libcaer::devices::davis(m_id)),
-      m_stopreadThread(false)
+      m_davis_handle(libcaer::devices::davis(m_id))
 {
     m_nbCams += 1;
 
@@ -37,37 +51,61 @@ DAVIS240C::DAVIS240C()
     sigaddset(&shutdownAction.sa_mask, SIGTERM);
     sigaddset(&shutdownAction.sa_mask, SIGINT);
 
-    if (sigaction(SIGTERM, &shutdownAction, NULL) == -1) {
+    if (sigaction(SIGTERM, &shutdownAction, nullptr) == -1) {
         libcaer::log::log(libcaer::log::logLevel::CRITICAL, "ShutdownAction",
             "Failed to set signal handler for SIGTERM. Error: %d.", errno);
         return;
     }
 
-    if (sigaction(SIGINT, &shutdownAction, NULL) == -1) {
+    if (sigaction(SIGINT, &shutdownAction, nullptr) == -1) {
         libcaer::log::log(libcaer::log::logLevel::CRITICAL, "ShutdownAction",
             "Failed to set signal handler for SIGINT. Error: %d.", errno);
         return;
     }
 }
 
+DAVIS240C::DAVIS240C(LaserController *laser)
+    : DAVIS240C()
+{
+     m_laser = laser;
+}
+
 DAVIS240C::~DAVIS240C()
 {
     m_nbCams -= 1;
-    // Close automatically done by destructor.
+
+    if (m_record)
+    {
+        m_recorder_davis.close();
+        if (m_id==0) { m_recorder_laser.close(); }
+    }
+}
+
+
+//=== INITIALIZING ===//
+void DAVIS240C::resetMasterClock()
+{
+    if (m_davis_master_handle->infoGet().deviceIsMaster)
+    {
+        m_davis_master_handle->configSet(DAVIS_CONFIG_MUX,
+                                         DAVIS_CONFIG_MUX_TIMESTAMP_RESET, 2);
+        printf("Reset Master clock. \n\r");
+    }
 }
 
 int DAVIS240C::init()
 {
     // Let's take a look at the information we have on the device.
-    struct caer_davis_info davis_info = m_davisHandle.infoGet();
+    struct caer_davis_info davis_info = m_davis_handle.infoGet();
 
-    printf("%s --- ID: %d, Master: %d, DVS X: %d, DVS Y: %d, Logic: %d.\n", davis_info.deviceString,
-        davis_info.deviceID, davis_info.deviceIsMaster, davis_info.dvsSizeX, davis_info.dvsSizeY,
-        davis_info.logicVersion);
+    printf("%s --- ID: %d, Master: %d, DVS X: %d, DVS Y: %d, Logic: %d.\n\r",
+           davis_info.deviceString, davis_info.deviceID,
+           davis_info.deviceIsMaster, davis_info.dvsSizeX,
+           davis_info.dvsSizeY, davis_info.logicVersion);
 
     // Send the default configuration before using the device.
     // No configuration is sent automatically!
-    m_davisHandle.sendDefaultConfig();
+    m_davis_handle.sendDefaultConfig();
 
     // Tweak some biases, to increase bandwidth in this case.
     struct caer_bias_coarsefine coarseFineBias;
@@ -79,7 +117,8 @@ int DAVIS240C::init()
     coarseFineBias.typeNormal         = true;
     coarseFineBias.currentLevelNormal = true;
 
-    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP, caerBiasCoarseFineGenerate(coarseFineBias));
+    m_davis_handle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP,
+                            caerBiasCoarseFineGenerate(coarseFineBias));
 
     coarseFineBias.coarseValue        = 1;
     coarseFineBias.fineValue          = 33;
@@ -88,15 +127,13 @@ int DAVIS240C::init()
     coarseFineBias.typeNormal         = true;
     coarseFineBias.currentLevelNormal = true;
 
-    m_davisHandle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP, caerBiasCoarseFineGenerate(coarseFineBias));
+    m_davis_handle.configSet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP,
+                            caerBiasCoarseFineGenerate(coarseFineBias));
 
-    // Let's verify they really changed!
-    uint32_t prBias   = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRBP);
-    uint32_t prsfBias = m_davisHandle.configGet(DAVIS_CONFIG_BIAS, DAVIS240_CONFIG_BIAS_PRSFBP);
-
-    printf("New bias values --- PR-coarse: %d, PR-fine: %d, PRSF-coarse: %d, PRSF-fine: %d.\n",
-        caerBiasCoarseFineParse(prBias).coarseValue, caerBiasCoarseFineParse(prBias).fineValue,
-        caerBiasCoarseFineParse(prsfBias).coarseValue, caerBiasCoarseFineParse(prsfBias).fineValue);
+//    m_davis_handle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+//    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_GLOBAL_SHUTTER, false);
+//    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_AUTOEXPOSURE, false);
+//    m_davis_handle.configSet(DAVIS_CONFIG_APS, DAVIS_CONFIG_APS_EXPOSURE, 4200);
 
     return 0;
 }
@@ -106,108 +143,110 @@ int DAVIS240C::start()
     // Now let's get start getting some data from the device. We just loop in blocking mode,
     // no notification needed regarding new events. The shutdown notification, for example if
     // the device is disconnected, should be listened to.
-    m_davisHandle.dataStart(nullptr, nullptr, nullptr, &usbShutdownHandler, nullptr);
+    m_davis_handle.dataStart(nullptr, nullptr, nullptr, &usbShutdownHandler, nullptr);
 
     // Let's turn on blocking data-get mode to avoid wasting resources.
-    m_davisHandle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE, CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
+    m_davis_handle.configSet(CAER_HOST_CONFIG_DATAEXCHANGE,
+                             CAER_HOST_CONFIG_DATAEXCHANGE_BLOCKING, true);
 
+    // Reset master clock when new device is added
+    if (m_id==0) { m_davis_master_handle = &m_davis_handle; }
+    else { resetMasterClock(); }
+
+    // Recorder
+    if (m_record)
+    {
+        m_recorder_davis.open(m_eventRecordFileDavis);
+        if (m_id==0) { m_recorder_laser.open(m_eventRecordFileLaser); }
+    }
+
+    return 0;
+}
+
+//=== EVENT LISTENING ===//
+void DAVIS240C::registerEventListener(DAVIS240CEventListener* listener)
+{
+    m_event_listeners.push_back(listener);
+}
+
+int DAVIS240C::listen()
+{
+    m_stop_read_thread = false;
+    m_read_thread = std::thread(&DAVIS240C::readThread,this);
+    return 0;
+}
+
+int DAVIS240C::listenRecording()
+{
+    m_stop_read_thread = false;
+    m_read_thread = std::thread(&DAVIS240C::readData,this);
     return 0;
 }
 
 void DAVIS240C::readThread()
 {
     std::vector<DAVIS240CEvent> events;
+    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stop_read_thread)
+    {
+        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davis_handle.dataGet();
 
-    while (!globalShutdown.load(std::memory_order_relaxed) & !m_stopreadThread) {
-        std::unique_ptr<libcaer::events::EventPacketContainer> packetContainer = m_davisHandle.dataGet();
-        if (packetContainer == nullptr) {
-            continue; // Skip if nothing there.
-        }
+        // Skip if container empty
+        if (packetContainer == nullptr) { continue; }
 
-        // DEBUG ===
-        //printf("\nGot event container with %d packets (allocated).\n", packetContainer->size());
+        for (auto &packet : *packetContainer)
+        {
+            if (packet == nullptr) { continue; }
 
-        for (auto &packet : *packetContainer) {
-            if (packet == nullptr) {
-                // DEBUG ===
-                //printf("Packet is empty (not present).\n");
-                continue; // Skip if nothing there.
-            }
-
-            // DEBUG ===
-           //printf("Packet of type %d -> %d events, %d capacity.\n", packet->getEventType(), packet->getEventNumber(),
-           //     packet->getEventCapacity());
-
-            if (packet->getEventType() == POLARITY_EVENT) {
+            // Events
+            if (packet->getEventType() == POLARITY_EVENT)
+            {
                 std::shared_ptr<const libcaer::events::PolarityEventPacket> polarity
                     = std::static_pointer_cast<libcaer::events::PolarityEventPacket>(packet);
-
-                // DEBUG ===
-                // Get full timestamp and addresses of first event.
-                /*
-                const libcaer::events::PolarityEvent &firstEvent = (*polarity)[0];
-
-                int32_t ts = firstEvent.getTimestamp();
-                uint16_t x = firstEvent.getX();
-                uint16_t y = firstEvent.getY();
-                bool pol   = firstEvent.getPolarity();
-
-                printf("First polarity event - ts: %d, x: %d, y: %d, pol: %d.\n", ts, x, y, pol);
-                */
 
                 int nEvents = packet->getEventNumber();
                 events.clear();
                 for(int n=0; n<nEvents ; n++)
                 {
-                    const libcaer::events::PolarityEvent &theEvent = (*polarity)[n];
+                    const libcaer::events::PolarityEvent &polarityEvent = (*polarity)[n];
 
-                    DAVIS240CEvent e;
-                    e.m_y           = theEvent.getX();
-                    e.m_x           = theEvent.getY();
-                    e.m_timestamp   = theEvent.getTimestamp();
-                    e.m_pol         = theEvent.getPolarity();
+                    int y = polarityEvent.getX();
+                    int x = polarityEvent.getY();
+                    int t = polarityEvent.getTimestamp();
+                    bool p = polarityEvent.getPolarity(); // {0,1}
+                    if (m_record) { m_recorder_davis << p << '\t' << x << '\t' << y << '\t' << t << '\n'; }
 
-                    events.push_back(e);
+                    if (m_laser)
+                    {
+                        int laser_x = m_laser->getX();
+                        int laser_y = m_laser->getY();
+                        if (m_record && m_id==0) { m_recorder_laser << laser_x << '\t' << laser_y << '\n'; }
+                        events.emplace_back(x,y,p,t,laser_x,laser_y);
+                    }
+                    else
+                    {
+                        events.emplace_back(x,y,p,t);
+                    }
                 }
                 this->warnEvent(events);
             }
+            else if (packet == nullptr) { continue; }
 
-            if (packet->getEventType() == FRAME_EVENT) {
+            // Frame
+            if (packet->getEventType() == FRAME_EVENT)
+            {
                 std::shared_ptr<const libcaer::events::FrameEventPacket> frame
                     = std::static_pointer_cast<libcaer::events::FrameEventPacket>(packet);
 
-                /* DEBUG
-                // Get full timestamp, and sum all pixels of first frame event.
-                const libcaer::events::FrameEvent &theFrame = (*frame)[0];
-
-                int32_t ts   = theFrame.getTimestamp();
-                uint64_t sum = 0;
-                int32_t m_cols = this->m_cols;
-
-
-                for (int32_t y = 0; y < theFrame.getLengthY(); y++) {
-                    for (int32_t x = 0; x < theFrame.getLengthX(); x++) {
-                        sum += theFrame.getPixel(x, y);
-                        frame[x*m_rows+y] = theFrame.getPixel(x, y);
-                    }
-                }
-
-                printf("First frame event - ts: %d, sum: %" PRIu64 ".\n", ts, sum);
-                */
-
-                const libcaer::events::FrameEvent &theFrame = (*frame)[0];
+                const libcaer::events::FrameEvent &frameEvent = (*frame)[0];
 
                 DAVIS240CFrame f;
-                f.m_timestamp = theFrame.getTimestamp();
+                f.m_timestamp = frameEvent.getTimestamp();
 
-                // Problem is here:
-                //std::memcpy(&(f.m_frame),&(theFrame.pixels), theFrame.getPixelsSize());
-                //f.m_frame = theFrame.pixels;
-                //theFrame.getPixel()
-
-                for (int row = 0; row < theFrame.getLengthY(); row++) {
-                    for (int col = 0; col < theFrame.getLengthX(); col++) {
-                        f.m_frame[row*m_cols + col] = (unsigned char)(255.*theFrame.getPixel(col, row)/65535.);
+                for (int row = 0; row < frameEvent.getLengthY(); row++)
+                {
+                    for (int col = 0; col < frameEvent.getLengthX(); col++)
+                    {
+                        f.m_frame[row*m_cols + col] = static_cast<uchar>(255.*frameEvent.getPixel(col, row)/65535.);
                     }
                 }
 
@@ -217,71 +256,79 @@ void DAVIS240C::readThread()
     }
 }
 
-int DAVIS240C::listen()
-{
-    // Spawn the thread
-    m_stopreadThread = false;
-    m_readThread = std::thread(&DAVIS240C::readThread,this);
-    return 0;
-}
-
 int DAVIS240C::stopListening()
 {
-    //Communicate with the thread
-    m_stopreadThread = true;
+    m_stop_read_thread = true;
     return 0;
 }
 
-int DAVIS240C::stop()
-{
-    m_davisHandle.dataStop();
-    return 0;
-}
-
-int DAVIS240C::close()
-{
-    return 0;
-}
-
-// Register a listener to receive the new events
-void DAVIS240C::registerEventListener(DAVIS240CListener* listener)
-{
-    m_eventListeners.push_back(listener);
-}
-
-void DAVIS240C::deregisterEventListener(DAVIS240CListener* listener)
-{
-    m_eventListeners.remove(listener);
-}
-
-// Send new event to all listeners
 void DAVIS240C::warnEvent(std::vector<DAVIS240CEvent>& events)
 {
-    std::list<DAVIS240CListener*>::iterator it;
-    for(it = m_eventListeners.begin(); it!=m_eventListeners.end(); it++)
+    for(auto it = m_event_listeners.begin(); it!=m_event_listeners.end(); it++)
     {
-        for(int i=0;i<events.size();i++)
+        for(int i=0; i<events.size(); i++)
             (*it)->receivedNewDAVIS240CEvent(events[i],m_id);
     }
 }
 
-// Register a listener to receive the new frames
-void DAVIS240C::registerFrameListener(DAVIS240CListener* listener)
+void DAVIS240C::deregisterEventListener(DAVIS240CEventListener* listener)
 {
-    m_frameListeners.push_back(listener);
+    m_event_listeners.remove(listener);
 }
 
-void DAVIS240C::deregisterFrameListener(DAVIS240CListener* listener)
+//=== FRAME LISTENING ===//
+// QUESTION: I cannot launch both events and frames threads (double free or corruption)
+void DAVIS240C::registerFrameListener(DAVIS240CFrameListener* listener)
 {
-    m_frameListeners.remove(listener);
+    m_frame_listeners.push_back(listener);
 }
 
-// Send new frame to all listeners
 void DAVIS240C::warnFrame(DAVIS240CFrame& frame)
 {
-    std::list<DAVIS240CListener*>::iterator it;
-    for(it = m_frameListeners.begin(); it!=m_frameListeners.end(); it++)
+    for(auto it = m_frame_listeners.begin(); it!=m_frame_listeners.end(); it++)
     {
         (*it)->receivedNewDAVIS240CFrame(frame,m_id);
     }
+}
+
+void DAVIS240C::deregisterFrameListener(DAVIS240CFrameListener* listener)
+{
+    m_frame_listeners.remove(listener);
+}
+
+//=== CLOSING ===/
+int DAVIS240C::stop()
+{
+    m_davis_handle.dataStop();
+    return 0;
+}
+
+
+void DAVIS240C::readData()
+{
+    std::fstream eventReader;
+    eventReader.open(m_eventRecordFileDavis);
+
+    std::string output;
+    if (eventReader.is_open())
+    {
+        while (!eventReader.eof())
+        {
+            std::getline(eventReader,output);
+            std::vector<std::string> v{explode(output, '\t')};
+
+            DAVIS240CEvent e;
+            e.m_pol = std::atoi(v[0].c_str());
+            e.m_x = std::atoi(v[1].c_str());
+            e.m_y = std::atoi(v[2].c_str());
+            e.m_timestamp = std::atoi(v[3].c_str());
+
+            std::vector<DAVIS240CEvent> events;
+            events.push_back(e);
+            this->warnEvent(events);
+            std::cout << e.m_pol << " - " << e.m_x << " - " << e.m_y << " - " << e.m_timestamp << '\n';
+        }
+    }
+    eventReader.close();
+    std::cout << "Finished! \n";
 }
