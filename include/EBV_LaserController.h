@@ -77,8 +77,8 @@ public:
     bool m_received_new_state{false};
 
     // Laser position boundaries
-    int m_min_x{840}; // 500
-    int m_max_x{3750}; // 4000
+    int m_min_x{1500}; // 500
+    int m_max_x{3000}; // 4000
     int m_min_y{500};   // 0
     int m_max_y{3300}; // 4000
 
@@ -94,8 +94,8 @@ private:
 
     // Tunable parameters
     int m_freq{0};
-    int m_step{20};
-    float m_ratio{2};
+    int m_step{30};
+    float m_ratio{3};
     int m_sleep{2};
 
     // Wait when no processing has to be done

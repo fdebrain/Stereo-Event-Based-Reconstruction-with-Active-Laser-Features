@@ -56,7 +56,7 @@ public:
     int m_maxTimeToKeep{2*m_eps};
 
     // Tunable parameters
-    int m_eps{200};
+    int m_eps{100};
 
 private:
     // Thread this object runs in (including matcher listeners)

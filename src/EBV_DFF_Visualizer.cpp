@@ -548,7 +548,7 @@ void Visualizer::run()
                 m_triangulator->m_recorder.open(m_triangulator->m_eventRecordFile);
             }
             m_triangulator->m_record = !m_triangulator->m_record;
-            printf("Switch triangulator recording on/off.");
+            printf("Switch triangulator recording on/off. \n\r");
             break;
         }
 

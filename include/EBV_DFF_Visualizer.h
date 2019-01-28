@@ -99,8 +99,8 @@ public:
     std::array<int,2> m_filter_max_t{};
 
     // Trackbar parameters
-    int        m_min_depth{34};
-    int        m_max_depth{62};
+    int        m_min_depth{29};
+    int        m_max_depth{31};
     int        m_matcherEps{};
     int        m_alphaInt{50};
 };
