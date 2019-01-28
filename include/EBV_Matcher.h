@@ -44,6 +44,7 @@ public:
     // Who matcher listens to
     Filter* m_filter0;
     Filter* m_filter1;
+    LaserController* m_laser;
 
     // Camera settings
     const int m_rows{180};
@@ -55,7 +56,7 @@ public:
     int m_maxTimeToKeep{2*m_eps};
 
     // Tunable parameters
-    int m_eps{2000};
+    int m_eps{100};
 
 private:
     // Thread this object runs in (including matcher listeners)

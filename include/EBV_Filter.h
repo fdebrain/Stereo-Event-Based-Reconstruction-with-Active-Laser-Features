@@ -56,7 +56,7 @@ public:
     const int m_cols{240};
     const int  m_id{-1};
 
-    // Filter settings
+    // Tunable parameters
     int m_frequency;
     int m_targetPeriod;
     int m_eps{10};
@@ -64,7 +64,7 @@ public:
 
     // Recording settings
     bool m_record{false};
-    const std::string m_eventRecordFile = "../EventsDAVIS"
+    const std::string m_eventRecordFile = "../experiments/frequencies_500_sweep"
                                           + std::to_string(m_id) + ".txt";
     std::ofstream m_recorder;
 

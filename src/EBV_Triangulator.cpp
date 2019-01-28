@@ -3,7 +3,7 @@
 
 void Triangulator::switchMode()
 {
-    m_mode = static_cast<Triangulator::StereoPair>((m_mode+1)%4);
+    m_mode = static_cast<Triangulator::StereoPair>((m_mode+1)%3);
     std::cout << "Switch triangulation mode to: " << stereoPairNames[m_mode] << "\n\r";
 }
 
@@ -142,7 +142,7 @@ Triangulator::Triangulator(Matcher* matcher,
 Triangulator::~Triangulator()
 {
     m_matcher->deregisterMatcherListener(this);
-    if (m_record) { m_recorder.close(); }
+    if (m_record){ m_recorder.close(); }
 }
 
 void Triangulator::run()
@@ -235,6 +235,11 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[1], m_D[1],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
+
+        cv::triangulatePoints(m_P[m_mode][0], m_P[m_mode][1],
+                              undistCoords0, //undistCoordsCorrected0
+                              undistCoords1, //undistCoordsCorrected1
+                              point3D);
         break;
 
     case CamLeftLaser:
@@ -249,6 +254,16 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[2], m_D[2],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
+
+        // Refine matches coordinates (using epipolar constraint)
+        cv::correctMatches(m_F[m_mode],undistCoords0,undistCoords1,
+                           undistCoordsCorrected0,
+                           undistCoordsCorrected1);
+
+        cv::triangulatePoints(m_P[m_mode][0], m_P[m_mode][1],
+                              undistCoordsCorrected0,
+                              undistCoordsCorrected1,
+                              point3D);
         break;
 
     case CamRightLaser:
@@ -263,11 +278,7 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                             m_K[2], m_D[2],
                             m_Rect[m_mode][1],
                             m_P[m_mode][1]);
-        break;
-    }
 
-    if (m_mode==CamLeftLaser || m_mode==CamRightLaser)
-    {
         // Refine matches coordinates (using epipolar constraint)
         cv::correctMatches(m_F[m_mode],undistCoords0,undistCoords1,
                            undistCoordsCorrected0,
@@ -277,13 +288,7 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
                               undistCoordsCorrected0,
                               undistCoordsCorrected1,
                               point3D);
-    }
-    else if (m_mode==Cameras)
-    {
-        cv::triangulatePoints(m_P[m_mode][0], m_P[m_mode][1],
-                              undistCoords0, //undistCoordsCorrected0
-                              undistCoords1, //undistCoordsCorrected1
-                              point3D);
+        break;
     }
 
     // Convert to cm + scale
@@ -295,6 +300,7 @@ void Triangulator::process(const DAVIS240CEvent& event0, const DAVIS240CEvent& e
     if (m_record) { recordPoint(X,Y,Z); }
 
     warnDepth(x0,y0,X,Y,Z);
+
     coords0.clear();
     coords1.clear();
 
@@ -315,7 +321,6 @@ void Triangulator::computeProjectionMatrix(cv::Mat K, cv::Mat R,
 {
     K.convertTo(K,CV_64FC1);
     cv::hconcat(K*R,K*T,P);
-    //std::cout << "P: " << P << "\n\r";
 }
 
 void Triangulator::registerTriangulatorListener(TriangulatorListener* listener)

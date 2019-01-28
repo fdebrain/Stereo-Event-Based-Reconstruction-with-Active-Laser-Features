@@ -77,27 +77,26 @@ public:
     bool m_received_new_state{false};
 
     // Laser position boundaries
-    int m_min_x{500}; // 500
-    int m_max_x{4000}; // 4000
-    int m_min_y{0};   // 0
-    int m_max_y{4000}; // 4000
+    int m_min_x{1500}; // 500
+    int m_max_x{3000}; // 4000
+    int m_min_y{500};   // 0
+    int m_max_y{3300}; // 4000
 
     std::chrono::high_resolution_clock::time_point m_t_start;
     std::thread m_thread;
 
 private:
     MagneticMirrorLaser* m_laser;
-
-    // Main tunable parameters
-    int m_freq{0};
-    int m_step{30};
-    float m_ratio{3};
-    int m_sleep{2};
-
     int m_vx{0};
     int m_vy{0};
     int m_direction_x{1};
     int m_direction_y{1};
+
+    // Tunable parameters
+    int m_freq{0};
+    int m_step{30};
+    float m_ratio{3};
+    int m_sleep{2};
 
     // Wait when no processing has to be done
     std::condition_variable m_condWait;

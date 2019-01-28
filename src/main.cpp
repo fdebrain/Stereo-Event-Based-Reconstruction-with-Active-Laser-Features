@@ -14,6 +14,7 @@ int main(int argc, char** argv)
     LaserController laser(freq);
     DAVIS240C       davis_master(&laser);
     DAVIS240C       davis_slave(&laser);
+
     AdaptiveFilter  filter0(freq+filter_offset,&davis_master);
     AdaptiveFilter  filter1(freq+filter_offset,&davis_slave);
     Matcher         matcher(&filter0,&filter1);

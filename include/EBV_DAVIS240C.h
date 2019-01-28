@@ -2,7 +2,6 @@
 #define EBV_DAVIS240C_H
 
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <list>
 #include <atomic>
@@ -98,11 +97,9 @@ public:
     int init();
     int start();
     int listen();
-    int listenRecording();
     int stopListening();
     void readThread();
     int stop();
-    void readData();
 
     // Life cycle - events listening
     void registerEventListener(DAVIS240CEventListener* listener);
@@ -119,13 +116,6 @@ public:
     const int m_rows{180};
     const int m_cols{240};
     const int m_id;
-
-    // Recording settings
-    const bool m_record{false};
-    std::ofstream m_recorder_davis;
-    std::ofstream m_recorder_laser;
-    const std::string m_eventRecordFileDavis = "../EventsDAVIS";
-    const std::string m_eventRecordFileLaser = "../EventsLaser.txt";
 
     // Who camera listens to
     LaserController *m_laser;

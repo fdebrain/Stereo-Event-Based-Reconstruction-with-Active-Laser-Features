@@ -51,16 +51,6 @@ public:
     const int          m_cols{240};
     const int          m_nbCams{2};
 
-    // Recording settings
-    const bool m_record{false};
-    std::ofstream m_recorder_davis0;
-    std::ofstream m_recorder_davis1;
-    std::ofstream m_recorder_laser;
-    const std::string m_eventRecordFileDavis0 = "../EventsDAVIS0.txt";
-    const std::string m_eventRecordFileDavis1 = "../EventsDAVIS1.txt";
-    const std::string m_eventRecordFileLaser = "../EventsLaser.txt";
-    const std::string m_depthmap_path{"../depthmap.txt"};
-
     // Who visualizer listens to
     std::array<DAVIS240C*,2>          m_davis;
     LaserController*                  m_laser;
@@ -70,6 +60,7 @@ public:
 
     // Parameters related to filtering events above threshold age
     std::array<int,2>           m_currenTime{};
+    std::string m_depthmap_path{"../experiments/Depthmaps/depthmap_scene_Cam0Cam1"};
 
     // Structures for data storing
     std::array<std::vector<bool>,2>    m_pol_evts;
@@ -107,9 +98,9 @@ public:
     std::array<int,2> m_filter_sigma{};
     std::array<int,2> m_filter_max_t{};
 
-    // Trackbar parameters (depthmap)
-    int        m_min_depth{34};
-    int        m_max_depth{62};
+    // Trackbar parameters
+    int        m_min_depth{29};
+    int        m_max_depth{31};
     int        m_matcherEps{};
     int        m_alphaInt{50};
 };

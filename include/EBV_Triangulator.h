@@ -7,7 +7,7 @@
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
-//#include <opencv2/sfm/triangulation.hpp>
+#include <opencv2/sfm/triangulation.hpp>
 
 class TriangulatorListener
 {
@@ -58,7 +58,7 @@ public:
     bool m_enable{false};
     bool m_debug{false};
 
-    // Stereo pairs
+    // Stereo mode
     enum StereoPair { Cameras=0, CamLeftLaser=1, CamRightLaser=2};
     std::string stereoPairNames[3] = {"Cameras", "CamLeftLaser", "CamRightLaser"};
     StereoPair m_mode{Cameras};
