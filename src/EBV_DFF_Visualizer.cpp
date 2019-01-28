@@ -157,14 +157,6 @@ Visualizer::Visualizer(const int nbCams,
     m_depthmap.resize(m_rows*m_cols,0);
     m_mask = cv::Mat::zeros(m_rows,m_cols,CV_8UC1);
 
-    // Initialize recordings
-    if (m_record)
-    {
-        m_recorder_davis0.open(m_eventRecordFileDavis0);
-        m_recorder_davis1.open(m_eventRecordFileDavis1);
-        m_recorder_laser.open(m_eventRecordFileLaser);
-    }
-
     for (int idx=0; idx<2; idx++)
     {
         // Initialize davis
@@ -329,16 +321,20 @@ Visualizer::~Visualizer()
             m_davis[idx]->stop();
         }
 
-        if (m_filter[idx]) { m_filter[idx]->deregisterFilterListener(this); }
+        if (m_filter[idx])
+        {
+            m_filter[idx]->deregisterFilterListener(this);
+        }
     }
 
-    if (m_triangulator) { m_triangulator->deregisterTriangulatorListener(this); }
-    if (m_laser) { m_laser->stop(); }
-    if (m_record)
+    if (m_triangulator)
     {
-        m_recorder_davis0.close();
-        m_recorder_davis1.close();
-        m_recorder_laser.close();
+        m_triangulator->deregisterTriangulatorListener(this);
+    }
+
+    if (m_laser)
+    {
+        m_laser->stop();
     }
 }
 
@@ -353,21 +349,6 @@ void Visualizer::receivedNewDAVIS240CEvent(DAVIS240CEvent& e,
     m_currenTime[id] = t;
     m_pol_evts[id][x*m_cols+y] = p;
     m_age_evts[id][x*m_cols+y] = t;
-
-    // Record
-    if (m_record)
-    {
-        switch (id)
-        {
-        case 0:
-            m_recorder_davis0 << p << '\t' << x << '\t' << y << '\t' << t << '\n';
-            break;
-        case 1:
-            m_recorder_davis1 << p << '\t' << x << '\t' << y << '\t' << t << '\n';
-            m_recorder_laser << e.m_laser_x << '\t' << e.m_laser_y << '\n';
-            break;
-        }
-    }
 }
 
 // Runs in DAVIS240 thread

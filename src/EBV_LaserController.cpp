@@ -37,6 +37,7 @@ void LaserController::setPos(const int x, const int y)
     m_t = std::chrono::duration_cast<std::chrono::microseconds>(now - m_t_start).count();
     m_x = x;
     m_y = y;
+    //printf("Laser t: %ld. \n\r",m_t);
 
     // Boundaries check
     if (m_x<m_min_x) { m_x = m_min_x; }
