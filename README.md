@@ -60,6 +60,8 @@ sudo ./demo
 
 ### Troubleshoots
 
+**Error opening /dev/ttyUSB0**: Make sure you connected the laser. You can check the device path in /dev/ and modify it if needed in the header EBV_LaserController.h.
+
 **The depthmap is always empty**: Make sure the calibration .yaml files exist and change the location direction in the header EBV_Triangulator.h if necessary. You can also recalibrate the setup by launching the demo executable and press C  while having the calibration chessboard in front of the DAVIS (repeat until calibration parameters are computed, i.e. about 10 poses). It is important not to move the calibration target while the laser is moving. 
 
 **The triangulated point cloud is too sparse**: Slightly defocus both cameras and turn the aperture diaphragm such as there are no saturated pixels in the frames. 
