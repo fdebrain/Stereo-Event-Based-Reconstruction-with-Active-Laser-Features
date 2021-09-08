@@ -1,4 +1,7 @@
 # Stereo-Event-Based-Reconstruction-with-Active-Laser-Features
+[[Slides presentation](https://docs.google.com/presentation/d/1tXoAg83I_oNXGtQD3tcpglnKlZFLjmrbY52141NRQi4/edit?usp=sharing)]
+[[Report](https://drive.google.com/file/d/1eHIvLH24uCGfen_UDQDYRRNrPE4c19DG/view?usp=sharing)]
+
 
 Semester project carried out in V4RL & INI at ETHZ & UZH (Autumn 2018)
 Author: Frédéric Debraine
@@ -8,9 +11,6 @@ Dr. Yulia Sandamirskaya,
 Prof. Dr. Margarita Chli,
 Julien Martel,
 Ignacio Alzugaray
-
-[Slides presentation](https://docs.google.com/presentation/d/1tXoAg83I_oNXGtQD3tcpglnKlZFLjmrbY52141NRQi4/edit?usp=sharing)
-[Report](https://drive.google.com/file/d/1eHIvLH24uCGfen_UDQDYRRNrPE4c19DG/view?usp=sharing)
 
 ## Getting Started
 
